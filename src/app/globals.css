@@ -1,0 +1,209 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-cta: var(--cta);
+  --color-cta-foreground: var(--cta-foreground);
+  --color-sprout: var(--sprout);
+  --radius-sm: calc(var(--radius) - 8px);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --font-sans: var(--font-be-vietnam), ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+:root {
+  /* Nền mặc định màu trắng theo yêu cầu */
+  --background: #ffffff;
+  --foreground: #1a2e1f;
+  --card: #ffffff;
+  --card-foreground: #1a2e1f;
+  --popover: #ffffff;
+  --popover-foreground: #1a2e1f;
+  --primary: #2e7d32;
+  --primary-foreground: #ffffff;
+  --secondary: #e8f5e9;
+  --secondary-foreground: #1b5e20;
+  --muted: #f4f3f1;
+  --muted-foreground: #6b7c6e;
+  --accent: #f1f5f0;
+  --accent-foreground: #1a2e1f;
+  --destructive: #d32f2f;
+  --destructive-foreground: #ffffff;
+  --border: #e5e9e4;
+  --input: #e5e9e4;
+  --ring: #2e7d32;
+  --success: #4caf50;
+  --warning: #ff9800;
+  --cta: #ff8f00;
+  --cta-foreground: #ffffff;
+  --sprout: #8bc34a;
+  --radius: 1rem;
+}
+
+.dark {
+  --background: #0b1410;
+  --foreground: #e6f2e7;
+  --card: #12211a;
+  --card-foreground: #e6f2e7;
+  --popover: #12211a;
+  --popover-foreground: #e6f2e7;
+  --primary: #66bb6a;
+  --primary-foreground: #06210b;
+  --secondary: #1b2e22;
+  --secondary-foreground: #c8e6c9;
+  --muted: #16261d;
+  --muted-foreground: #9bb0a0;
+  --accent: #1c3326;
+  --accent-foreground: #e6f2e7;
+  --destructive: #f87171;
+  --destructive-foreground: #2b0b0b;
+  --border: #24382c;
+  --input: #24382c;
+  --ring: #66bb6a;
+  --success: #66bb6a;
+  --warning: #ffb74d;
+  --cta: #ffa726;
+  --cta-foreground: #2b1a00;
+  --sprout: #9ccc65;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+  background-color: var(--background);
+  color: var(--foreground);
+  font-feature-settings:
+    'rlig' 1,
+    'calt' 1;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ==========================================================================
+   Custom Scrollbar: Thanh cuộn ngang thanh mảnh, tinh tế
+   ========================================================================== */
+.custom-scrollbar::-webkit-scrollbar {
+  height: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 0 1.25rem;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
+  opacity: 0.35;
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+  opacity: 0.8;
+}
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+/* ==========================================================================
+   View Transition: Hiệu ứng gợn sóng lan tỏa (Circular Wave) cho Dark / Light mode
+   ========================================================================== */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 9999;
+}
+
+/* ==========================================================================
+   Sonner Toast Customization: Phong cách VeggieConnect
+   ========================================================================== */
+[data-sonner-toaster] {
+  --normal-bg: var(--card);
+  --normal-border: var(--border);
+  --normal-text: var(--foreground);
+}
+
+[data-sonner-toast] {
+  border-radius: 1rem !important;
+  font-family: var(--font-sans) !important;
+}
+
+[data-sonner-toast][data-styled='true'] {
+  border-radius: 1rem !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.06) !important;
+}
+
+.dark [data-sonner-toast][data-styled='true'] {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-sonner-toast] [data-close-button] {
+  border-radius: 9999px !important;
+  transition: all 0.2s ease !important;
+}
+
+/* ==========================================================================
+   Border Beam: Ánh sáng chuyển động liên tục quanh khung viền
+   ========================================================================== */
+@keyframes border-beam-spin {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+.animate-border-beam {
+  animation: border-beam-spin 3.5s linear infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-border-beam {
+    animation: none !important;
+  }
+}

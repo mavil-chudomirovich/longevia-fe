@@ -1,0 +1,39 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env*.local
+.env
+
+# local swagger source (giữ local, chỉ commit catalog đã chẻ nhỏ)
+docs/swagger.json
+API-WORKFLOW.md
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# agent cache/local
+.codegraph
