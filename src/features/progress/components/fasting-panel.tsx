@@ -38,7 +38,13 @@ import {
 } from '../utils/progress-date';
 
 export function FastingPanel() {
-  const { data: currentSession, isLoading: isLoadingCurrent } = useCurrentFastingQuery();
+  const {
+    data: currentSession,
+    isLoading: isLoadingCurrent,
+    isError: isErrorCurrent,
+    refetch: refetchCurrent,
+    isFetching: isFetchingCurrent,
+  } = useCurrentFastingQuery();
   const startMutation = useStartFastingMutation();
   const endMutation = useEndFastingMutation();
 
@@ -153,6 +159,38 @@ export function FastingPanel() {
             <div className="text-muted-foreground text-sm flex items-center gap-2">
               <Clock className="size-4 animate-spin" /> Đang tải trạng thái nhịn ăn...
             </div>
+          </CardContent>
+        </Card>
+      ) : isErrorCurrent ? (
+        /* Trạng thái lỗi: Hiển thị thông báo và nút thử lại, không hiển thị form nhịn ăn sai ngữ cảnh */
+        <Card className="border-border/60 shadow-xs border-destructive/20 bg-destructive/5">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-full bg-destructive/10 text-destructive">
+                <AlertTriangle className="size-5" />
+              </div>
+              <div>
+                <CardTitle className="text-lg sm:text-xl text-destructive">
+                  Không thể tải trạng thái nhịn ăn
+                </CardTitle>
+                <CardDescription>
+                  Đã xảy ra sự cố khi kết nối với máy chủ. Vui lòng thử lại để kiểm tra phiên nhịn
+                  ăn hiện tại của bạn.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetchCurrent()}
+              disabled={isFetchingCurrent}
+              className="gap-2"
+            >
+              <RotateCcw className={`size-4 ${isFetchingCurrent ? 'animate-spin' : ''}`} />
+              {isFetchingCurrent ? 'Đang thử lại...' : 'Thử lại'}
+            </Button>
           </CardContent>
         </Card>
       ) : currentSession ? (

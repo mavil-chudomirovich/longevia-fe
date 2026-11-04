@@ -70,6 +70,29 @@ describe('ProgressMapper Unit Tests', () => {
       expect(result.currentStreakDays).toBe(0);
       expect(result.hasRecordedMetrics).toBe(false);
     });
+
+    it('prioritizes backend bmiCategory over local calculation when present', () => {
+      const dto: DashboardSummaryResponseDto = {
+        currentWeightKg: 70.0,
+        currentBmi: 22.0, // normally NORMAL_WEIGHT
+        bmiCategory: 'Overweight', // backend explicitly says Overweight
+      } as DashboardSummaryResponseDto;
+
+      const result = progressMapper.toDashboardSummary(dto);
+      expect(result.bmiCategory).toBe(BmiCategoryEnum.OVERWEIGHT);
+      expect(result.bmiCategoryLabel).toBe('Thừa cân');
+    });
+
+    it('handles malformed numbers safely without crashing or returning NaN', () => {
+      const dto = {
+        currentWeightKg: 'not-a-number',
+        currentBmi: null,
+      } as unknown as DashboardSummaryResponseDto;
+
+      const result = progressMapper.toDashboardSummary(dto);
+      expect(result.currentWeightKg).toBeNull();
+      expect(result.currentBmi).toBeNull();
+    });
   });
 
   describe('BMI Category Resolution', () => {
@@ -145,6 +168,27 @@ describe('ProgressMapper Unit Tests', () => {
       expect(progressMapper.toCurrentFastingSession(null)).toBeNull();
       expect(progressMapper.toCurrentFastingSession(undefined)).toBeNull();
       expect(progressMapper.toCurrentFastingSession({} as CurrentFastingResponseDto)).toBeNull();
+      expect(
+        progressMapper.toCurrentFastingSession({ sessionId: '   ' } as CurrentFastingResponseDto)
+      ).toBeNull();
+    });
+
+    it('falls back safely when dates are malformed in fasting session', () => {
+      const dto: CurrentFastingResponseDto = {
+        sessionId: 'session-invalid-date',
+        protocol: '16:8',
+        startedAt: 'invalid-date-string',
+        targetEndedAt: 'invalid-date-string',
+        targetHours: 16,
+        elapsedHours: 0,
+        remainingHours: 16,
+        status: 'InProgress',
+      };
+
+      const result = progressMapper.toCurrentFastingSession(dto);
+      expect(result).not.toBeNull();
+      expect(result?.startedAt).toBeInstanceOf(Date);
+      expect(isNaN(result!.startedAt.getTime())).toBe(false);
     });
   });
 

@@ -16,8 +16,18 @@ import {
 } from '@/features/progress/queries/progress.queries';
 
 export default function ProgressDashboardPage() {
-  const { data: summary, isLoading: isLoadingSummary } = useDashboardSummaryQuery();
-  const { data: historyData, isLoading: isLoadingHistory } = useMetricsHistoryQuery({
+  const {
+    data: summary,
+    isLoading: isLoadingSummary,
+    isError: isErrorSummary,
+    refetch: refetchSummary,
+  } = useDashboardSummaryQuery();
+  const {
+    data: historyData,
+    isLoading: isLoadingHistory,
+    isError: isErrorHistory,
+    refetch: refetchHistory,
+  } = useMetricsHistoryQuery({
     pageNumber: 1,
     pageSize: 15,
   });
@@ -37,8 +47,13 @@ export default function ProgressDashboardPage() {
         </div>
       </div>
 
-      {/* Thẻ tóm tắt tổng quan */}
-      <ProgressSummaryCards summary={summary} isLoading={isLoadingSummary} />
+      {/* Thẻ tóm tắt tổng quan - Có đầy đủ trạng thái Loading, Error, Success */}
+      <ProgressSummaryCards
+        summary={summary}
+        isLoading={isLoadingSummary}
+        isError={isErrorSummary}
+        onRetry={() => refetchSummary()}
+      />
 
       {/* Phím tắt hành động nhanh */}
       <div className="space-y-2">
@@ -58,7 +73,12 @@ export default function ProgressDashboardPage() {
 
         {/* Cột phải: Biểu đồ xu hướng cân nặng & Giấc ngủ (5 cột) */}
         <div className="lg:col-span-5 space-y-6">
-          <WeightTrendChart metrics={historyData?.items ?? []} isLoading={isLoadingHistory} />
+          <WeightTrendChart
+            metrics={historyData?.items ?? []}
+            isLoading={isLoadingHistory}
+            isError={isErrorHistory}
+            onRetry={() => refetchHistory()}
+          />
 
           {/* Card thông tin giấc ngủ */}
           <Card className="border-border/60 shadow-xs">
@@ -87,9 +107,14 @@ export default function ProgressDashboardPage() {
                 <div className="flex items-baseline justify-between p-3 rounded-lg bg-muted/40 border border-border/40">
                   <span className="text-xs text-muted-foreground">Thời lượng trung bình:</span>
                   <span className="text-base font-bold text-foreground tabular-nums">
-                    {summary?.averageSleepHours !== null && summary?.averageSleepHours !== undefined
-                      ? `${summary.averageSleepHours.toFixed(1)} giờ/đêm`
-                      : 'Chưa có dữ liệu'}
+                    {isErrorSummary ? (
+                      <span className="text-xs text-destructive font-normal">Lỗi tải dữ liệu</span>
+                    ) : summary?.averageSleepHours !== null &&
+                      summary?.averageSleepHours !== undefined ? (
+                      `${summary.averageSleepHours.toFixed(1)} giờ/đêm`
+                    ) : (
+                      'Chưa có dữ liệu'
+                    )}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground text-pretty">

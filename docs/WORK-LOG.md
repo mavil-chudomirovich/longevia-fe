@@ -4,6 +4,51 @@
 
 ---
 
+## [2026-11-04] Hoàn tất PR #1 Corrective — Phân lập Cache theo User, Lập lịch UTC Midnight & Trạng thái UI (Bảo — Dev 3)
+
+- **Người thực hiện**: Bảo — Progress Service Owner (Dev 3).
+- **Phạm vi sở hữu**: Progress & Biomarkers frontend (`src/features/progress/`, `src/app/progress/`).
+- **Mục tiêu**:
+  - Khắc phục triệt để các vấn đề được phát hiện trong đợt review độc lập PR #1:
+    - **Corrective A**: Phân lập bộ nhớ cache (User-isolated Progress Cache) theo `userId`, ngăn chặn tuyệt đối rò rỉ dữ liệu sức khỏe giữa các tài khoản khi đăng xuất hoặc đổi tài khoản trong cùng tab trình duyệt.
+    - **Corrective B**: Bổ sung tường minh 4 trạng thái UI (Loading, Error, Empty, Success), xử lý triệt để tình trạng hiển thị sai lệch khi query thất bại (không fake streak = 0, không hiển thị form nhịn ăn mới khi lỗi gây lỗi 409, bổ sung nút Thử lại bằng tiếng Việt).
+    - **Corrective C**: Lập lịch tự động chuyển ngày theo lịch UTC (00:00 UTC Midnight Rollover), đồng bộ khi tab hiển thị trở lại qua `visibilitychange`, giải phóng timer khi unmount.
+    - **Corrective D**: Chuẩn hóa Mapper bảo toàn null an toàn hợp đồng (Contract-Safe Mapping), ưu tiên phân loại BMI từ backend, bảo vệ chống crash khi nhận chuỗi ngày/số dị thường.
+    - **Corrective E**: Lập tài liệu báo cáo rào cản bất đồng bộ hợp đồng Auth BE/FE và bàn giao liên module cho Nguyên (Dev 1).
+
+- **Đã thực hiện**:
+  1. **User-Isolated Cache (`src/features/progress/queries/progress.queries.ts`)**:
+     - Cập nhật toàn bộ Query Key Factory gắn `userId`: `progressKeys.dashboard(userId)`, `progressKeys.fastingCurrent(userId)`, `progressKeys.waterToday(userId, utcDate)`, `progressKeys.metricsHistory(userId, filters)`.
+     - Vô hiệu hóa truy vấn (`enabled: false`) khi phiên chưa xác thực hoặc `userId` rỗng.
+     - Triển khai `clearProgressCache(queryClient, userId?)` hủy các query đang pending trước khi remove khỏi cache.
+     - Mutations tự động invalidate chính xác các key thuộc về `currentUserId`.
+  2. **Vòng đời Cache & UTC Rollover (`src/features/progress/hooks/useUtcDayRollover.ts` & `src/features/progress/components/progress-cache-sync.tsx`)**:
+     - `getMsUntilNextUtcMidnight()`: Tính chính xác số mili-giây đến 00:00:00 UTC tiếp theo.
+     - `setupUtcDayRollover()`: Tự động kích hoạt invalidate water và dashboard tại mốc 00:00 UTC + 500ms; lắng nghe `visibilitychange` khi người dùng mở lại tab sau khi ngủ máy/ẩn tab.
+     - `ProgressCacheSync`: Gắn tại `src/app/progress/layout.tsx`, lắng nghe `useAuthStore.subscribe()`, dọn dẹp các query của user khác ngay khi mount và xóa cache khi logout / đổi user.
+  3. **Trạng thái UI minh bạch (Corrective B)**:
+     - `fasting-panel.tsx`: Khi `isErrorCurrent`, hiển thị Card báo lỗi với nút "Thử lại", tuyệt đối không render form bắt đầu nhịn ăn khi đang lỗi mạng.
+     - `progress-summary-cards.tsx`: Nhận props `isError` và `onRetry`. Khi lỗi, hiển thị Error Card với nút "Thử lại", không hiển thị fake streak = 0 hay "Chưa ghi nhận số đo".
+     - `water-tracker.tsx`: Khi `isError`, hiển thị thông báo lỗi và nút "Thử lại", không hiển thị form hay số liệu 0 ml sai lệch.
+     - `weight-trend-chart.tsx`: Nhận `isError` và `onRetry`, phân biệt rạch ròi giữa trạng thái lỗi mạng và trạng thái rỗng chưa đủ mốc đo.
+     - `src/app/progress/page.tsx`: Kết nối toàn bộ cờ `isError` và hàm `refetch` vào các component con và snapshot giấc ngủ.
+  4. **Contract-Safe Mapping (Corrective D)**:
+     - `src/features/progress/mappers/progress.mapper.ts`: Thêm `safeDate` và `safeNullableNumber`. Ưu tiên `bmiCategory` từ backend, bảo toàn giá trị null cho cân nặng/BMI/giấc ngủ.
+  5. **Unit & Integration Tests**:
+     - `src/features/progress/queries/progress.queries.test.ts`: 7 tests kiểm chứng phân lập khóa theo user, dọn dẹp cache khi logout, hủy pending requests (7 tests).
+     - `src/features/progress/hooks/useUtcDayRollover.test.ts`: 4 tests kiểm chứng lập lịch 00:00 UTC, xử lý visibilitychange và dọn dẹp timer (4 tests).
+     - `src/features/progress/mappers/progress.mapper.test.ts`: Bổ sung 3 tests kiểm tra bảo toàn null, fallback date, và ưu tiên backend BMI category (tổng 20 tests).
+     - `src/features/progress/utils/progress-date.test.ts`: Bổ sung 3 tests cho `getMsUntilNextUtcMidnight` (tổng 26 tests).
+  6. **Bàn giao rào cản Auth (Corrective E)**:
+     - Tạo `docs/handoffs/progress-to-identity-auth-blocker.md`: Báo cáo chi tiết flat JSON `{ accessToken, refreshToken, tokenType, expiresIn }` từ Identity BE và hướng giải quyết trích xuất User claims từ JWT cho Nguyên (Dev 1).
+
+- **Kết quả kiểm chứng (Verification Gates)**:
+  - `npx tsc --noEmit`: 0 lỗi type.
+  - `npm test`: 10 test suites, 111 tests pass 100% (trong đó có 85 tests cho Progress module).
+  - `npm run build`: Next.js 16 build thành công toàn bộ 15 static/dynamic routes.
+
+---
+
 ## [2026-11-04] Triển khai hoàn chỉnh module Progress & Biomarkers (Bảo — Dev 3)
 
 - **Người thực hiện**: Bảo — Progress Service Owner (Dev 3).

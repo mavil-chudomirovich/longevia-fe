@@ -1,6 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { AxiosError } from 'axios';
+import { useAuthStore } from '@/store/useAuthStore';
 import { progressApi } from '../api/progress.api';
 import {
   CurrentFastingSession,
@@ -21,46 +22,72 @@ import {
   StartFastingFormValues,
 } from '../schemas/progress.schema';
 import { ErrorResponse } from '@/types/api';
+import { getUtcTodayDateString } from '../utils/progress-date';
 
 /**
- * Domain-specific Query Key Factory cho module Tiến trình & Sức khỏe
+ * Domain-specific Query Key Factory cho module Tiến trình & Sức khỏe.
+ * Toàn bộ khóa truy vấn đều được phân lập theo userId để đảm bảo bảo mật dữ liệu sức khỏe,
+ * chống rò rỉ dữ liệu giữa các tài khoản khi đăng xuất / chuyển đổi người dùng (Corrective A).
  */
 export const progressKeys = {
   all: ['progress'] as const,
-  dashboard: () => [...progressKeys.all, 'dashboard'] as const,
-  fasting: () => [...progressKeys.all, 'fasting'] as const,
-  fastingCurrent: () => [...progressKeys.fasting(), 'current'] as const,
-  water: () => [...progressKeys.all, 'water'] as const,
-  waterToday: () => [...progressKeys.water(), 'today'] as const,
-  metrics: () => [...progressKeys.all, 'metrics'] as const,
-  metricsHistory: (filters?: GetMetricsHistoryFilters) =>
-    [...progressKeys.metrics(), 'history', filters ?? {}] as const,
+  user: (userId: string) => [...progressKeys.all, userId] as const,
+  dashboard: (userId: string) => [...progressKeys.user(userId), 'dashboard'] as const,
+  fasting: (userId: string) => [...progressKeys.user(userId), 'fasting'] as const,
+  fastingCurrent: (userId: string) => [...progressKeys.fasting(userId), 'current'] as const,
+  water: (userId: string) => [...progressKeys.user(userId), 'water'] as const,
+  waterToday: (userId: string, utcDate?: string) =>
+    [...progressKeys.water(userId), 'today', utcDate ?? getUtcTodayDateString()] as const,
+  metrics: (userId: string) => [...progressKeys.user(userId), 'metrics'] as const,
+  metricsHistory: (userId: string, filters?: GetMetricsHistoryFilters) =>
+    [...progressKeys.metrics(userId), 'history', filters ?? {}] as const,
 };
 
 /**
- * Xóa sạch toàn bộ cache dữ liệu tiến trình (gọi khi đăng xuất để bảo mật giữa các user)
+ * Xóa sạch toàn bộ cache dữ liệu tiến trình (hoặc của một user cụ thể).
+ * Hủy tất cả các queries đang chạy trước khi removeQueries để tránh race condition.
  */
-export function clearProgressCache(queryClient: ReturnType<typeof useQueryClient>): void {
-  queryClient.removeQueries({ queryKey: progressKeys.all });
+export async function clearProgressCache(queryClient: QueryClient, userId?: string): Promise<void> {
+  const targetKey = userId ? progressKeys.user(userId) : progressKeys.all;
+  await queryClient.cancelQueries({ queryKey: targetKey });
+  queryClient.removeQueries({ queryKey: targetKey });
+}
+
+/**
+ * Internal hook lấy userId và xác định query có được phép kích hoạt hay không.
+ * Ngăn chặn tuyệt đối việc phát request khi phiên chưa xác thực hoặc không có userId.
+ */
+function useProgressAuth(customUserId?: string) {
+  const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const effectiveUserId = customUserId ?? user?.id;
+  const isEnabled = Boolean(effectiveUserId && (customUserId ? true : isAuthenticated));
+  return { userId: effectiveUserId ?? '', isEnabled };
 }
 
 // ==========================================
 // 1. QUERIES
 // ==========================================
 
-export function useDashboardSummaryQuery() {
+export function useDashboardSummaryQuery(customUserId?: string) {
+  const { userId, isEnabled } = useProgressAuth(customUserId);
+
   return useQuery<DashboardSummary>({
-    queryKey: progressKeys.dashboard(),
+    queryKey: progressKeys.dashboard(userId),
     queryFn: ({ signal }) => progressApi.getDashboardSummary(signal),
+    enabled: isEnabled,
     staleTime: 60 * 1000, // 1 phút
     gcTime: 5 * 60 * 1000,
   });
 }
 
-export function useCurrentFastingQuery() {
+export function useCurrentFastingQuery(customUserId?: string) {
+  const { userId, isEnabled } = useProgressAuth(customUserId);
+
   return useQuery<CurrentFastingSession | null>({
-    queryKey: progressKeys.fastingCurrent(),
+    queryKey: progressKeys.fastingCurrent(userId),
     queryFn: ({ signal }) => progressApi.getCurrentFasting(signal),
+    enabled: isEnabled,
     staleTime: 30 * 1000, // 30 giây
     gcTime: 5 * 60 * 1000,
     refetchInterval: (query) => {
@@ -70,19 +97,25 @@ export function useCurrentFastingQuery() {
   });
 }
 
-export function useWaterTodayQuery() {
+export function useWaterTodayQuery(utcDate?: string, customUserId?: string) {
+  const { userId, isEnabled } = useProgressAuth(customUserId);
+
   return useQuery<WaterSummary>({
-    queryKey: progressKeys.waterToday(),
+    queryKey: progressKeys.waterToday(userId, utcDate),
     queryFn: ({ signal }) => progressApi.getWaterToday(signal),
+    enabled: isEnabled,
     staleTime: 30 * 1000,
     gcTime: 5 * 60 * 1000,
   });
 }
 
-export function useMetricsHistoryQuery(filters?: GetMetricsHistoryFilters) {
+export function useMetricsHistoryQuery(filters?: GetMetricsHistoryFilters, customUserId?: string) {
+  const { userId, isEnabled } = useProgressAuth(customUserId);
+
   return useQuery<MetricsHistory>({
-    queryKey: progressKeys.metricsHistory(filters),
+    queryKey: progressKeys.metricsHistory(userId, filters),
     queryFn: ({ signal }) => progressApi.getMetricsHistory(filters, signal),
+    enabled: isEnabled,
     staleTime: 60 * 1000,
     gcTime: 5 * 60 * 1000,
   });
@@ -99,8 +132,13 @@ export function useStartFastingMutation() {
     mutationFn: (values) => progressApi.startFasting(values),
     onSuccess: () => {
       toast.success('Bắt đầu phiên nhịn ăn thành công!');
-      queryClient.invalidateQueries({ queryKey: progressKeys.fastingCurrent() });
-      queryClient.invalidateQueries({ queryKey: progressKeys.dashboard() });
+      const currentUserId = useAuthStore.getState().user?.id;
+      if (currentUserId) {
+        queryClient.invalidateQueries({ queryKey: progressKeys.fastingCurrent(currentUserId) });
+        queryClient.invalidateQueries({ queryKey: progressKeys.dashboard(currentUserId) });
+      } else {
+        queryClient.invalidateQueries({ queryKey: progressKeys.all });
+      }
     },
     onError: (error) => {
       if (error.response?.status === 409) {
@@ -129,8 +167,13 @@ export function useEndFastingMutation() {
       } else {
         toast.info(`Đã kết thúc phiên nhịn ăn (${result.formattedActualHours}).`);
       }
-      queryClient.invalidateQueries({ queryKey: progressKeys.fastingCurrent() });
-      queryClient.invalidateQueries({ queryKey: progressKeys.dashboard() });
+      const currentUserId = useAuthStore.getState().user?.id;
+      if (currentUserId) {
+        queryClient.invalidateQueries({ queryKey: progressKeys.fastingCurrent(currentUserId) });
+        queryClient.invalidateQueries({ queryKey: progressKeys.dashboard(currentUserId) });
+      } else {
+        queryClient.invalidateQueries({ queryKey: progressKeys.all });
+      }
     },
     onError: (error) => {
       const msg =
@@ -149,8 +192,13 @@ export function useLogWaterMutation() {
     mutationFn: (values) => progressApi.logWater(values),
     onSuccess: (data, variables) => {
       toast.success(`Đã ghi nhận thêm ${variables.amountMl} ml nước uống.`);
-      queryClient.invalidateQueries({ queryKey: progressKeys.waterToday() });
-      queryClient.invalidateQueries({ queryKey: progressKeys.dashboard() });
+      const currentUserId = useAuthStore.getState().user?.id;
+      if (currentUserId) {
+        queryClient.invalidateQueries({ queryKey: progressKeys.water(currentUserId) });
+        queryClient.invalidateQueries({ queryKey: progressKeys.dashboard(currentUserId) });
+      } else {
+        queryClient.invalidateQueries({ queryKey: progressKeys.all });
+      }
     },
     onError: (error) => {
       const msg =
@@ -169,7 +217,12 @@ export function useLogSleepMutation() {
     mutationFn: (values) => progressApi.logSleep(values),
     onSuccess: (record) => {
       toast.success(`Đã ghi nhận giấc ngủ (${record.formattedDuration}) thành công!`);
-      queryClient.invalidateQueries({ queryKey: progressKeys.dashboard() });
+      const currentUserId = useAuthStore.getState().user?.id;
+      if (currentUserId) {
+        queryClient.invalidateQueries({ queryKey: progressKeys.dashboard(currentUserId) });
+      } else {
+        queryClient.invalidateQueries({ queryKey: progressKeys.all });
+      }
     },
     onError: (error) => {
       if (error.response?.status === 409) {
@@ -192,8 +245,13 @@ export function useLogBodyMetricMutation() {
     mutationFn: (values) => progressApi.logBodyMetric(values),
     onSuccess: (record) => {
       toast.success(`Đã lưu chỉ số cơ thể! BMI: ${record.bmi} (${record.bmiCategoryLabel}).`);
-      queryClient.invalidateQueries({ queryKey: progressKeys.dashboard() });
-      queryClient.invalidateQueries({ queryKey: progressKeys.metrics() });
+      const currentUserId = useAuthStore.getState().user?.id;
+      if (currentUserId) {
+        queryClient.invalidateQueries({ queryKey: progressKeys.dashboard(currentUserId) });
+        queryClient.invalidateQueries({ queryKey: progressKeys.metrics(currentUserId) });
+      } else {
+        queryClient.invalidateQueries({ queryKey: progressKeys.all });
+      }
     },
     onError: (error) => {
       const status = error.response?.status;

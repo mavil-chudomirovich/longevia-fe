@@ -11,6 +11,8 @@ import {
   TrendingUp,
   ArrowRight,
   Info,
+  AlertTriangle,
+  RotateCcw,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,9 +23,16 @@ import { DashboardSummary, BmiCategoryEnum } from '../types/progress.model';
 interface ProgressSummaryCardsProps {
   summary?: DashboardSummary | null;
   isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
 }
 
-export function ProgressSummaryCards({ summary, isLoading }: ProgressSummaryCardsProps) {
+export function ProgressSummaryCards({
+  summary,
+  isLoading,
+  isError,
+  onRetry,
+}: ProgressSummaryCardsProps) {
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -39,6 +48,31 @@ export function ProgressSummaryCards({ summary, isLoading }: ProgressSummaryCard
           </Card>
         ))}
       </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card className="border-border/60 shadow-xs border-destructive/20 bg-destructive/5">
+        <CardContent className="py-8 text-center space-y-3">
+          <div className="mx-auto p-3 rounded-full bg-destructive/10 text-destructive w-fit">
+            <AlertTriangle className="size-6" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-destructive">
+              Không thể tải dữ liệu tổng quan tiến trình
+            </p>
+            <p className="text-xs text-muted-foreground max-w-sm mx-auto text-pretty">
+              Đã có sự cố khi kết nối với máy chủ. Vui lòng kiểm tra lại kết nối mạng hoặc thử lại.
+            </p>
+          </div>
+          {onRetry && (
+            <Button variant="outline" size="sm" onClick={onRetry} className="gap-1.5 text-xs">
+              <RotateCcw className="size-3.5" /> Thử lại
+            </Button>
+          )}
+        </CardContent>
+      </Card>
     );
   }
 

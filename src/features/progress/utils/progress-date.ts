@@ -165,3 +165,21 @@ export function localInputToUtcIsoString(localDateTimeString: string): string {
   }
   return date.toISOString();
 }
+
+/**
+ * Tính số mili-giây còn lại cho đến mốc 00:00:00 UTC tiếp theo (UTC Midnight Rollover).
+ * Dùng cho scheduler tự động làm mới dữ liệu chu kỳ ngày (nước uống, dashboard).
+ */
+export function getMsUntilNextUtcMidnight(referenceDate?: Date): number {
+  const d = referenceDate ?? new Date();
+  const nextMidnightUtc = Date.UTC(
+    d.getUTCFullYear(),
+    d.getUTCMonth(),
+    d.getUTCDate() + 1,
+    0,
+    0,
+    0,
+    0
+  );
+  return Math.max(0, nextMidnightUtc - d.getTime());
+}

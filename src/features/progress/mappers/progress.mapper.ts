@@ -42,11 +42,32 @@ export const SLEEP_QUALITY_LABELS: Record<SleepQualityEnum, string> = {
   [SleepQualityEnum.EXCELLENT]: 'Rất tốt',
 };
 
+/**
+ * Tính toán phân loại BMI theo chuẩn WHO nếu backend không trả về sẵn
+ */
 export function getBmiCategoryFromBmi(bmi: number): BmiCategoryEnum {
   if (bmi < 18.5) return BmiCategoryEnum.UNDERWEIGHT;
   if (bmi < 25.0) return BmiCategoryEnum.NORMAL_WEIGHT;
   if (bmi < 30.0) return BmiCategoryEnum.OVERWEIGHT;
   return BmiCategoryEnum.OBESE;
+}
+
+/**
+ * Chuyển đổi an toàn giá trị ngày tháng, phòng ngừa crash khi nhận chuỗi ngày dị thường
+ */
+function safeDate(input: unknown, fallback: Date = new Date()): Date {
+  if (!input) return fallback;
+  const d = input instanceof Date ? input : new Date(input as string | number);
+  return isNaN(d.getTime()) ? fallback : d;
+}
+
+/**
+ * Chuyển đổi an toàn số thực có thể null (bảo tồn null nếu dữ liệu chưa tồn tại, tránh ép về 0 gây sai lệch)
+ */
+function safeNullableNumber(input: unknown): number | null {
+  if (input === null || input === undefined || input === '') return null;
+  const n = Number(input);
+  return Number.isFinite(n) ? n : null;
 }
 
 export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetricRecord> {
@@ -58,7 +79,7 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
   }
 
   /**
-   * Chuyển đổi Dashboard Summary DTO sang UI Model
+   * Chuyển đổi Dashboard Summary DTO sang UI Model (Corrective D)
    * Lưu ý bảo toàn giá trị null đối với cân nặng và BMI chưa có dữ liệu (không ép về 0).
    */
   toDashboardSummary(dto?: DashboardSummaryResponseDto | null): DashboardSummary {
@@ -76,18 +97,23 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
       null
     );
 
-    const currentWeightKg =
-      rawWeight !== null && rawWeight !== undefined ? Number(rawWeight) : null;
-    const initialWeightKg =
-      rawInitialWeight !== null && rawInitialWeight !== undefined ? Number(rawInitialWeight) : null;
-    const weightDeltaKg = rawDelta !== null && rawDelta !== undefined ? Number(rawDelta) : null;
-    const currentBmi = rawBmi !== null && rawBmi !== undefined ? Number(rawBmi) : null;
-    const averageSleepHours = rawSleep !== null && rawSleep !== undefined ? Number(rawSleep) : null;
+    const currentWeightKg = safeNullableNumber(rawWeight);
+    const initialWeightKg = safeNullableNumber(rawInitialWeight);
+    const weightDeltaKg = safeNullableNumber(rawDelta);
+    const currentBmi = safeNullableNumber(rawBmi);
+    const averageSleepHours = safeNullableNumber(rawSleep);
+
+    const rawCategoryStr = safeString(pickField(dto, ['bmiCategory', 'bmi_category'], ''));
 
     let bmiCategory: BmiCategoryEnum | null = null;
     let bmiCategoryLabel: string | null = null;
 
-    if (currentBmi !== null && !isNaN(currentBmi)) {
+    if (Object.values(BmiCategoryEnum).includes(rawCategoryStr as BmiCategoryEnum)) {
+      // Ưu tiên giá trị phân loại chính thức từ Backend
+      bmiCategory = rawCategoryStr as BmiCategoryEnum;
+      bmiCategoryLabel = BMI_CATEGORY_LABELS[bmiCategory];
+    } else if (currentBmi !== null && currentBmi > 0) {
+      // Fallback tính toán từ BMI nếu backend không trả category
       bmiCategory = getBmiCategoryFromBmi(currentBmi);
       bmiCategoryLabel = BMI_CATEGORY_LABELS[bmiCategory];
     }
@@ -117,7 +143,7 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
    * Chuyển đổi phiên nhịn ăn hiện tại (trả về null nếu không có phiên active)
    */
   toCurrentFastingSession(dto?: CurrentFastingResponseDto | null): CurrentFastingSession | null {
-    if (!dto || !dto.sessionId) {
+    if (!dto || !dto.sessionId || String(dto.sessionId).trim() === '') {
       return null;
     }
 
@@ -131,8 +157,8 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
     return {
       sessionId: safeString(dto.sessionId),
       protocol: safeString(dto.protocol, '16:8'),
-      startedAt: new Date(dto.startedAt),
-      targetEndedAt: new Date(dto.targetEndedAt),
+      startedAt: safeDate(dto.startedAt),
+      targetEndedAt: safeDate(dto.targetEndedAt),
       targetHours,
       elapsedHours,
       remainingHours,
@@ -148,8 +174,8 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
     return {
       sessionId: safeString(dto.sessionId),
       protocol: safeString(dto.protocol),
-      startedAt: new Date(dto.startedAt),
-      targetEndedAt: new Date(dto.targetEndedAt),
+      startedAt: safeDate(dto.startedAt),
+      targetEndedAt: safeDate(dto.targetEndedAt),
       status: safeString(dto.status, 'InProgress'),
     };
   }
@@ -207,8 +233,8 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
 
     return {
       id: safeString(dto.id),
-      sleptAt: new Date(dto.sleptAt),
-      wokeAt: new Date(dto.wokeAt),
+      sleptAt: safeDate(dto.sleptAt),
+      wokeAt: safeDate(dto.wokeAt),
       sleepQuality,
       sleepQualityLabel: SLEEP_QUALITY_LABELS[sleepQuality] ?? 'Tốt',
       durationHours,
@@ -249,8 +275,8 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
     );
     const rawHr = pickField<number | null>(dto, ['restingHeartRate', 'resting_heart_rate'], null);
 
-    const systolic = rawSys !== null && rawSys !== undefined ? Number(rawSys) : null;
-    const diastolic = rawDia !== null && rawDia !== undefined ? Number(rawDia) : null;
+    const systolic = safeNullableNumber(rawSys);
+    const diastolic = safeNullableNumber(rawDia);
 
     let bloodPressureDisplay: string | null = null;
     if (systolic !== null && diastolic !== null) {
@@ -261,18 +287,18 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
 
     return {
       id: safeString(pickField(dto, ['id'], '')),
-      loggedAt: new Date(rawLoggedAt),
+      loggedAt: safeDate(rawLoggedAt),
       formattedLoggedAt: formatDisplayDateTime(rawLoggedAt),
       weightKg: safeNumber(pickField(dto, ['weightKg', 'weight_kg'], 0), 0),
       bmi: rawBmi,
       bmiCategory,
       bmiCategoryLabel: BMI_CATEGORY_LABELS[bmiCategory],
-      bodyFatPercent: rawFat !== null && rawFat !== undefined ? Number(rawFat) : null,
-      waistCircumferenceCm: rawWaist !== null && rawWaist !== undefined ? Number(rawWaist) : null,
+      bodyFatPercent: safeNullableNumber(rawFat),
+      waistCircumferenceCm: safeNullableNumber(rawWaist),
       systolicBloodPressure: systolic,
       diastolicBloodPressure: diastolic,
       bloodPressureDisplay,
-      restingHeartRate: rawHr !== null && rawHr !== undefined ? Number(rawHr) : null,
+      restingHeartRate: safeNullableNumber(rawHr),
     };
   }
 

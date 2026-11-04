@@ -1,17 +1,20 @@
 'use client';
 
 import * as React from 'react';
-import { LineChart as ChartIcon } from 'lucide-react';
+import { LineChart as ChartIcon, AlertTriangle, RotateCcw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { BodyMetricRecord } from '../types/progress.model';
 import { formatDateOnlyDisplay } from '../utils/progress-date';
 
 interface WeightTrendChartProps {
   metrics: BodyMetricRecord[];
   isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
 }
 
-export function WeightTrendChart({ metrics, isLoading }: WeightTrendChartProps) {
+export function WeightTrendChart({ metrics, isLoading, isError, onRetry }: WeightTrendChartProps) {
   // Sắp xếp theo thứ tự thời gian tăng dần để vẽ biểu đồ
   const chronologicalMetrics = React.useMemo(() => {
     return [...metrics].sort((a, b) => a.loggedAt.getTime() - b.loggedAt.getTime());
@@ -26,6 +29,35 @@ export function WeightTrendChart({ metrics, isLoading }: WeightTrendChartProps) 
         </CardHeader>
         <CardContent className="h-64 flex items-center justify-center">
           <div className="h-full w-full bg-muted/30 rounded-lg animate-pulse" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card className="border-border/60 shadow-xs border-destructive/20 bg-destructive/5">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-full bg-destructive/10 text-destructive">
+              <AlertTriangle className="size-4" />
+            </div>
+            <div>
+              <CardTitle className="text-base sm:text-lg text-destructive">
+                Không thể tải biểu đồ xu hướng
+              </CardTitle>
+              <CardDescription>
+                Đã xảy ra lỗi khi kết nối với máy chủ để lấy lịch sử chỉ số cân nặng.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="py-6 text-center space-y-3">
+          {onRetry && (
+            <Button variant="outline" size="sm" onClick={onRetry} className="gap-1.5 text-xs">
+              <RotateCcw className="size-3.5" /> Thử lại
+            </Button>
+          )}
         </CardContent>
       </Card>
     );

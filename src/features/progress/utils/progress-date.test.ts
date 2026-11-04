@@ -11,6 +11,7 @@ import {
   isFutureInstant,
   toLocalInputDateTimeString,
   localInputToUtcIsoString,
+  getMsUntilNextUtcMidnight,
 } from './progress-date';
 
 describe('Progress Date Utilities (Q01 / ADR005 Canonical UTC Policy)', () => {
@@ -151,6 +152,27 @@ describe('Progress Date Utilities (Q01 / ADR005 Canonical UTC Policy)', () => {
     it('roundtrips local datetime to UTC ISO string', () => {
       const iso = localInputToUtcIsoString('2026-10-25T14:30');
       expect(iso).toMatch(/^2026-10-25T\d{2}:\d{2}:00\.000Z$/);
+    });
+  });
+
+  describe('getMsUntilNextUtcMidnight', () => {
+    it('calculates exact milliseconds until next UTC midnight', () => {
+      // 2026-11-04 22:00:00.000 UTC -> next midnight is 2026-11-05 00:00:00.000 UTC (2 hours = 7,200,000 ms)
+      const ref = new Date(Date.UTC(2026, 10, 4, 22, 0, 0, 0));
+      const ms = getMsUntilNextUtcMidnight(ref);
+      expect(ms).toBe(2 * 60 * 60 * 1000);
+    });
+
+    it('calculates 1 millisecond before UTC midnight', () => {
+      const ref = new Date(Date.UTC(2026, 10, 4, 23, 59, 59, 999));
+      const ms = getMsUntilNextUtcMidnight(ref);
+      expect(ms).toBe(1);
+    });
+
+    it('calculates full 24 hours at exact 00:00:00 UTC', () => {
+      const ref = new Date(Date.UTC(2026, 10, 4, 0, 0, 0, 0));
+      const ms = getMsUntilNextUtcMidnight(ref);
+      expect(ms).toBe(24 * 60 * 60 * 1000);
     });
   });
 });

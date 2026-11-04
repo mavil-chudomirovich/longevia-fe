@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Droplets, Plus, CupSoda, Sparkles, Info } from 'lucide-react';
+import { Droplets, Plus, CupSoda, Sparkles, Info, AlertTriangle, RotateCcw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +21,7 @@ const QUICK_AMOUNTS = [
 ];
 
 export function WaterTracker() {
-  const { data: waterToday, isLoading } = useWaterTodayQuery();
+  const { data: waterToday, isLoading, isError, refetch, isFetching } = useWaterTodayQuery();
   const logMutation = useLogWaterMutation();
 
   const form = useForm<LogWaterFormValues>({
@@ -62,6 +62,40 @@ export function WaterTracker() {
               <Skeleton key={i} className="h-16 w-full" />
             ))}
           </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card className="border-border/60 shadow-xs border-destructive/20 bg-destructive/5">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-full bg-destructive/10 text-destructive">
+              <AlertTriangle className="size-5" />
+            </div>
+            <div>
+              <CardTitle className="text-lg sm:text-xl text-destructive">
+                Không thể tải dữ liệu nước uống
+              </CardTitle>
+              <CardDescription>
+                Đã xảy ra sự cố khi kết nối với máy chủ để lấy thông tin lượng nước hôm nay.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="gap-2"
+          >
+            <RotateCcw className={`size-4 ${isFetching ? 'animate-spin' : ''}`} />
+            {isFetching ? 'Đang thử lại...' : 'Thử lại'}
+          </Button>
         </CardContent>
       </Card>
     );

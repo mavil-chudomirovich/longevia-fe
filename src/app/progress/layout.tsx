@@ -3,11 +3,15 @@
 import * as React from 'react';
 import { AuthGuard } from '@/components/shared/auth-guard';
 import { ProgressSubNav } from '@/features/progress/components/progress-subnav';
+import { ProgressCacheSync } from '@/features/progress/components/progress-cache-sync';
 
 export default function ProgressLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard>
       <div className="min-h-[calc(100dvh-4rem)] bg-background flex flex-col">
+        {/* Đồng bộ vòng đời cache & chuyển ngày UTC cho module Tiến trình */}
+        <ProgressCacheSync />
+
         {/* Sub-navigation */}
         <ProgressSubNav />
 
