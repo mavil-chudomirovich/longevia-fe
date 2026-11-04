@@ -23,11 +23,16 @@ import {
 } from '../schemas/progress.schema';
 import { ErrorResponse } from '@/types/api';
 import { getUtcTodayDateString } from '../utils/progress-date';
+import { getProgressSessionContext, isProgressSessionActive } from '../utils/progress-session';
+import {
+  ProgressAuthError,
+  ProgressDataIntegrityError,
+} from '../errors/progress-data-integrity.error';
 
 /**
  * Domain-specific Query Key Factory cho module Tiến trình & Sức khỏe.
  * Toàn bộ khóa truy vấn đều được phân lập theo userId để đảm bảo bảo mật dữ liệu sức khỏe,
- * chống rò rỉ dữ liệu giữa các tài khoản khi đăng xuất / chuyển đổi người dùng (Corrective A).
+ * chống rò rỉ dữ liệu giữa các tài khoản khi đăng xuất / chuyển đổi người dùng (Corrective A & B).
  */
 export const progressKeys = {
   all: ['progress'] as const,
@@ -54,15 +59,29 @@ export async function clearProgressCache(queryClient: QueryClient, userId?: stri
 }
 
 /**
- * Internal hook lấy userId và xác định query có được phép kích hoạt hay không.
- * Ngăn chặn tuyệt đối việc phát request khi phiên chưa xác thực hoặc không có userId.
+ * Ngăn chặn hoàn toàn việc bypass xác thực bằng customUserId:
+ * 1. Query chỉ được phép kích hoạt khi phiên xác thực hợp lệ (isAuthenticated && user.id).
+ * 2. Nếu customUserId được truyền vào nhưng không khớp với authUserId đang đăng nhập,
+ *    VÔ HIỆU HÓA HOÀN TOÀN TRUY VẤN để ngăn chặn việc lưu dữ liệu của User A vào cache key của User B.
  */
 function useProgressAuth(customUserId?: string) {
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const effectiveUserId = customUserId ?? user?.id;
-  const isEnabled = Boolean(effectiveUserId && (customUserId ? true : isAuthenticated));
-  return { userId: effectiveUserId ?? '', isEnabled };
+  const authUserId = user?.id;
+
+  const isMatch = !customUserId || customUserId === authUserId;
+  const isEnabled = Boolean(isAuthenticated && authUserId && isMatch);
+
+  return { userId: isEnabled ? (authUserId ?? '') : '', isEnabled };
+}
+
+/**
+ * Context định danh cho mỗi lần kích hoạt mutation (Per-invocation Mutation Context - Corrective B).
+ * Đảm bảo liên kết chặt chẽ kết quả hoàn tất với đúng tài khoản và phiên đăng nhập đã khởi tạo nó.
+ */
+export interface ProgressMutationContext {
+  initiatingUserId: string;
+  initiatingSessionId: string;
 }
 
 // ==========================================
@@ -122,31 +141,72 @@ export function useMetricsHistoryQuery(filters?: GetMetricsHistoryFilters, custo
 }
 
 // ==========================================
-// 2. MUTATIONS
+// 2. MUTATIONS (Session-Safe & Invocation-Bound)
 // ==========================================
 
 export function useStartFastingMutation() {
   const queryClient = useQueryClient();
 
-  return useMutation<FastingSessionResult, AxiosError<ErrorResponse>, StartFastingFormValues>({
-    mutationFn: (values) => progressApi.startFasting(values),
-    onSuccess: () => {
-      toast.success('Bắt đầu phiên nhịn ăn thành công!');
-      const currentUserId = useAuthStore.getState().user?.id;
-      if (currentUserId) {
-        queryClient.invalidateQueries({ queryKey: progressKeys.fastingCurrent(currentUserId) });
-        queryClient.invalidateQueries({ queryKey: progressKeys.dashboard(currentUserId) });
-      } else {
-        queryClient.invalidateQueries({ queryKey: progressKeys.all });
+  return useMutation<
+    FastingSessionResult,
+    AxiosError<ErrorResponse> | ProgressAuthError | ProgressDataIntegrityError | Error,
+    StartFastingFormValues,
+    ProgressMutationContext
+  >({
+    mutationFn: async (values) => {
+      const session = getProgressSessionContext();
+      if (!session) {
+        throw new ProgressAuthError();
       }
+      return progressApi.startFasting(values);
     },
-    onError: (error) => {
-      if (error.response?.status === 409) {
+    onMutate: async () => {
+      const session = getProgressSessionContext();
+      if (!session) {
+        throw new ProgressAuthError();
+      }
+      return {
+        initiatingUserId: session.userId,
+        initiatingSessionId: session.sessionId,
+      };
+    },
+    onSuccess: (_result, _variables, context) => {
+      if (
+        !context ||
+        !isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)
+      ) {
+        return;
+      }
+      toast.success('Bắt đầu phiên nhịn ăn thành công!');
+      queryClient.invalidateQueries({
+        queryKey: progressKeys.fastingCurrent(context.initiatingUserId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: progressKeys.dashboard(context.initiatingUserId),
+      });
+    },
+    onError: (error, _variables, context) => {
+      if (error instanceof ProgressAuthError) {
+        toast.error(error.message);
+        return;
+      }
+      if (
+        !context ||
+        !isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)
+      ) {
+        return;
+      }
+      if (error instanceof ProgressDataIntegrityError) {
+        toast.error(error.message);
+        return;
+      }
+      const axiosError = error as AxiosError<ErrorResponse>;
+      if (axiosError.response?.status === 409) {
         toast.error('Bạn đang có một phiên nhịn ăn chưa kết thúc.');
       } else {
         const msg =
-          error.response?.data?.detail ||
-          error.response?.data?.title ||
+          axiosError.response?.data?.detail ||
+          axiosError.response?.data?.title ||
           'Không thể bắt đầu phiên nhịn ăn. Vui lòng thử lại.';
         toast.error(msg);
       }
@@ -157,9 +217,36 @@ export function useStartFastingMutation() {
 export function useEndFastingMutation() {
   const queryClient = useQueryClient();
 
-  return useMutation<EndFastingResult, AxiosError<ErrorResponse>, EndFastingFormValues>({
-    mutationFn: (values) => progressApi.endFasting(values),
-    onSuccess: (result) => {
+  return useMutation<
+    EndFastingResult,
+    AxiosError<ErrorResponse> | ProgressAuthError | ProgressDataIntegrityError | Error,
+    EndFastingFormValues,
+    ProgressMutationContext
+  >({
+    mutationFn: async (values) => {
+      const session = getProgressSessionContext();
+      if (!session) {
+        throw new ProgressAuthError();
+      }
+      return progressApi.endFasting(values);
+    },
+    onMutate: async () => {
+      const session = getProgressSessionContext();
+      if (!session) {
+        throw new ProgressAuthError();
+      }
+      return {
+        initiatingUserId: session.userId,
+        initiatingSessionId: session.sessionId,
+      };
+    },
+    onSuccess: (result, _variables, context) => {
+      if (
+        !context ||
+        !isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)
+      ) {
+        return;
+      }
       if (result.isGoalReached) {
         toast.success(
           `Chúc mừng! Bạn đã hoàn thành mục tiêu nhịn ăn (${result.formattedActualHours}).`
@@ -167,18 +254,32 @@ export function useEndFastingMutation() {
       } else {
         toast.info(`Đã kết thúc phiên nhịn ăn (${result.formattedActualHours}).`);
       }
-      const currentUserId = useAuthStore.getState().user?.id;
-      if (currentUserId) {
-        queryClient.invalidateQueries({ queryKey: progressKeys.fastingCurrent(currentUserId) });
-        queryClient.invalidateQueries({ queryKey: progressKeys.dashboard(currentUserId) });
-      } else {
-        queryClient.invalidateQueries({ queryKey: progressKeys.all });
-      }
+      queryClient.invalidateQueries({
+        queryKey: progressKeys.fastingCurrent(context.initiatingUserId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: progressKeys.dashboard(context.initiatingUserId),
+      });
     },
-    onError: (error) => {
+    onError: (error, _variables, context) => {
+      if (error instanceof ProgressAuthError) {
+        toast.error(error.message);
+        return;
+      }
+      if (
+        !context ||
+        !isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)
+      ) {
+        return;
+      }
+      if (error instanceof ProgressDataIntegrityError) {
+        toast.error(error.message);
+        return;
+      }
+      const axiosError = error as AxiosError<ErrorResponse>;
       const msg =
-        error.response?.data?.detail ||
-        error.response?.data?.title ||
+        axiosError.response?.data?.detail ||
+        axiosError.response?.data?.title ||
         'Không thể kết thúc phiên nhịn ăn. Vui lòng thử lại.';
       toast.error(msg);
     },
@@ -188,22 +289,63 @@ export function useEndFastingMutation() {
 export function useLogWaterMutation() {
   const queryClient = useQueryClient();
 
-  return useMutation<WaterSummary, AxiosError<ErrorResponse>, LogWaterFormValues>({
-    mutationFn: (values) => progressApi.logWater(values),
-    onSuccess: (data, variables) => {
-      toast.success(`Đã ghi nhận thêm ${variables.amountMl} ml nước uống.`);
-      const currentUserId = useAuthStore.getState().user?.id;
-      if (currentUserId) {
-        queryClient.invalidateQueries({ queryKey: progressKeys.water(currentUserId) });
-        queryClient.invalidateQueries({ queryKey: progressKeys.dashboard(currentUserId) });
-      } else {
-        queryClient.invalidateQueries({ queryKey: progressKeys.all });
+  return useMutation<
+    WaterSummary,
+    AxiosError<ErrorResponse> | ProgressAuthError | ProgressDataIntegrityError | Error,
+    LogWaterFormValues,
+    ProgressMutationContext
+  >({
+    mutationFn: async (values) => {
+      const session = getProgressSessionContext();
+      if (!session) {
+        throw new ProgressAuthError();
       }
+      return progressApi.logWater(values);
     },
-    onError: (error) => {
+    onMutate: async () => {
+      const session = getProgressSessionContext();
+      if (!session) {
+        throw new ProgressAuthError();
+      }
+      return {
+        initiatingUserId: session.userId,
+        initiatingSessionId: session.sessionId,
+      };
+    },
+    onSuccess: (_data, variables, context) => {
+      if (
+        !context ||
+        !isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)
+      ) {
+        return;
+      }
+      toast.success(`Đã ghi nhận thêm ${variables.amountMl} ml nước uống.`);
+      queryClient.invalidateQueries({
+        queryKey: progressKeys.water(context.initiatingUserId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: progressKeys.dashboard(context.initiatingUserId),
+      });
+    },
+    onError: (error, _variables, context) => {
+      if (error instanceof ProgressAuthError) {
+        toast.error(error.message);
+        return;
+      }
+      if (
+        !context ||
+        !isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)
+      ) {
+        return;
+      }
+      if (error instanceof ProgressDataIntegrityError) {
+        toast.error(error.message);
+        return;
+      }
+      const axiosError = error as AxiosError<ErrorResponse>;
       const msg =
-        error.response?.data?.detail ||
-        error.response?.data?.title ||
+        axiosError.response?.data?.detail ||
+        axiosError.response?.data?.title ||
         'Không thể ghi nhận nước uống. Vui lòng thử lại.';
       toast.error(msg);
     },
@@ -213,24 +355,63 @@ export function useLogWaterMutation() {
 export function useLogSleepMutation() {
   const queryClient = useQueryClient();
 
-  return useMutation<SleepRecord, AxiosError<ErrorResponse>, LogSleepFormValues>({
-    mutationFn: (values) => progressApi.logSleep(values),
-    onSuccess: (record) => {
-      toast.success(`Đã ghi nhận giấc ngủ (${record.formattedDuration}) thành công!`);
-      const currentUserId = useAuthStore.getState().user?.id;
-      if (currentUserId) {
-        queryClient.invalidateQueries({ queryKey: progressKeys.dashboard(currentUserId) });
-      } else {
-        queryClient.invalidateQueries({ queryKey: progressKeys.all });
+  return useMutation<
+    SleepRecord,
+    AxiosError<ErrorResponse> | ProgressAuthError | ProgressDataIntegrityError | Error,
+    LogSleepFormValues,
+    ProgressMutationContext
+  >({
+    mutationFn: async (values) => {
+      const session = getProgressSessionContext();
+      if (!session) {
+        throw new ProgressAuthError();
       }
+      return progressApi.logSleep(values);
     },
-    onError: (error) => {
-      if (error.response?.status === 409) {
+    onMutate: async () => {
+      const session = getProgressSessionContext();
+      if (!session) {
+        throw new ProgressAuthError();
+      }
+      return {
+        initiatingUserId: session.userId,
+        initiatingSessionId: session.sessionId,
+      };
+    },
+    onSuccess: (record, _variables, context) => {
+      if (
+        !context ||
+        !isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)
+      ) {
+        return;
+      }
+      toast.success(`Đã ghi nhận giấc ngủ (${record.formattedDuration}) thành công!`);
+      queryClient.invalidateQueries({
+        queryKey: progressKeys.dashboard(context.initiatingUserId),
+      });
+    },
+    onError: (error, _variables, context) => {
+      if (error instanceof ProgressAuthError) {
+        toast.error(error.message);
+        return;
+      }
+      if (
+        !context ||
+        !isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)
+      ) {
+        return;
+      }
+      if (error instanceof ProgressDataIntegrityError) {
+        toast.error(error.message);
+        return;
+      }
+      const axiosError = error as AxiosError<ErrorResponse>;
+      if (axiosError.response?.status === 409) {
         toast.error('Khoảng thời gian này đã trùng với một giấc ngủ đã được ghi nhận trước đó.');
       } else {
         const msg =
-          error.response?.data?.detail ||
-          error.response?.data?.title ||
+          axiosError.response?.data?.detail ||
+          axiosError.response?.data?.title ||
           'Không thể ghi nhận giấc ngủ. Vui lòng kiểm tra lại thời gian.';
         toast.error(msg);
       }
@@ -241,21 +422,62 @@ export function useLogSleepMutation() {
 export function useLogBodyMetricMutation() {
   const queryClient = useQueryClient();
 
-  return useMutation<BodyMetricRecord, AxiosError<ErrorResponse>, LogBodyMetricFormValues>({
-    mutationFn: (values) => progressApi.logBodyMetric(values),
-    onSuccess: (record) => {
-      toast.success(`Đã lưu chỉ số cơ thể! BMI: ${record.bmi} (${record.bmiCategoryLabel}).`);
-      const currentUserId = useAuthStore.getState().user?.id;
-      if (currentUserId) {
-        queryClient.invalidateQueries({ queryKey: progressKeys.dashboard(currentUserId) });
-        queryClient.invalidateQueries({ queryKey: progressKeys.metrics(currentUserId) });
-      } else {
-        queryClient.invalidateQueries({ queryKey: progressKeys.all });
+  return useMutation<
+    BodyMetricRecord,
+    AxiosError<ErrorResponse> | ProgressAuthError | ProgressDataIntegrityError | Error,
+    LogBodyMetricFormValues,
+    ProgressMutationContext
+  >({
+    mutationFn: async (values) => {
+      const session = getProgressSessionContext();
+      if (!session) {
+        throw new ProgressAuthError();
       }
+      return progressApi.logBodyMetric(values);
     },
-    onError: (error) => {
-      const status = error.response?.status;
-      const errorData = error.response?.data;
+    onMutate: async () => {
+      const session = getProgressSessionContext();
+      if (!session) {
+        throw new ProgressAuthError();
+      }
+      return {
+        initiatingUserId: session.userId,
+        initiatingSessionId: session.sessionId,
+      };
+    },
+    onSuccess: (record, _variables, context) => {
+      if (
+        !context ||
+        !isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)
+      ) {
+        return;
+      }
+      toast.success(`Đã lưu chỉ số cơ thể! BMI: ${record.bmi} (${record.bmiCategoryLabel}).`);
+      queryClient.invalidateQueries({
+        queryKey: progressKeys.dashboard(context.initiatingUserId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: progressKeys.metrics(context.initiatingUserId),
+      });
+    },
+    onError: (error, _variables, context) => {
+      if (error instanceof ProgressAuthError) {
+        toast.error(error.message);
+        return;
+      }
+      if (
+        !context ||
+        !isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)
+      ) {
+        return;
+      }
+      if (error instanceof ProgressDataIntegrityError) {
+        toast.error(error.message);
+        return;
+      }
+      const axiosError = error as AxiosError<ErrorResponse>;
+      const status = axiosError.response?.status;
+      const errorData = axiosError.response?.data;
       const detail = errorData?.detail || '';
 
       if (status === 422 || detail.includes('height_unavailable')) {

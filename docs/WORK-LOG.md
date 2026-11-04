@@ -4,6 +4,55 @@
 
 ---
 
+## [2026-11-04] Hoàn tất PR #1 Final Progress Corrective — Bảo toàn toàn vẹn dữ liệu thời gian & Phân lập phiên an toàn (Bảo — Dev 3)
+
+- **Người thực hiện**: Bảo — Progress Service Owner (Dev 3).
+- **Phạm vi sở hữu**: Progress & Biomarkers frontend (`src/features/progress/`, `src/app/progress/`).
+- **Mục tiêu**:
+  - Khắc phục triệt để 3 phát hiện P1 & P2 trong đợt đánh giá độc lập lần 2 của PR #1:
+    - **P1 — Data Integrity (Corrective A)**: Tuyệt đối không thay thế timestamp backend bị lỗi/thiếu bằng thời gian hiện tại (`new Date()`). Tạo `parseRequiredInstant` tuân thủ ISO 8601 strict có explicit timezone, từ chối ngày bất khả thi (VD: 30/02) và offset vượt ngưỡng (+25:00), ném `ProgressDataIntegrityError`.
+    - **P2 — Session Isolation (Corrective B)**: Ngăn chặn triệt để cross-account side-effects khi người dùng logout hoặc chuyển đổi tài khoản (User A -> User B). Quản lý phiên độc lập (`progress-session.ts`), ràng buộc mutation context theo `{ initiatingUserId, initiatingSessionId }`, chặn ngay mutation chưa xác thực trước khi gửi network, triệt tiêu toasts và cache invalidation của session cũ khi API phản hồi muộn.
+    - **P2 — Testing (Corrective C)**: Xây dựng bộ kiểm thử hành vi thực tế (Real React Behavioral Regression Tests) trong môi trường JSDOM bao phủ toàn bộ 16 kịch bản A qua O.
+    - **Audit useProgressAuth**: Loại bỏ hoàn toàn lỗ hổng xác thực khi truyền `customUserId`, chỉ kích hoạt truy vấn khi có session hợp lệ và `authUserId` khớp `customUserId`.
+
+- **Đã thực hiện**:
+  1. **Định dạng & Toàn vẹn Dữ liệu Thời gian (P1 — Corrective A)**:
+     - Tạo `src/features/progress/errors/progress-data-integrity.error.ts`: Định nghĩa `ProgressDataIntegrityError` và `ProgressAuthError`.
+     - `src/features/progress/utils/progress-date.ts`: Triển khai `parseRequiredInstant(value, fieldName, resourceName)`. Kiểm tra lịch nhuận, số ngày tối đa trong tháng, offset (-14:00 đến +14:00), yêu cầu timezone chỉ định (Z hoặc offset).
+     - `src/features/progress/mappers/progress.mapper.ts`: Loại bỏ hoàn toàn fallback `new Date()`. `toCurrentFastingSession`, `toFastingSessionResult`, `toEndFastingResult`, `toSleepRecord`, `toBodyMetricRecord`, `toMetricsHistory` đều bắt buộc timestamp hợp lệ.
+     - `src/features/progress/mappers/progress.mapper.test.ts`: Bổ sung 13 tests toàn diện cho Corrective A (tổng 33 unit tests pass 100%).
+  2. **Quản lý Phiên & Độc lập Mutation (P2 — Corrective B)**:
+     - Tạo `src/features/progress/utils/progress-session.ts`: Quản lý `activeSessionId`, `activeUserId`, `sessionEpoch`. Phân biệt đăng nhập lại cùng tài khoản (Session 1 vs Session 2), bảo toàn session ID khi token refresh âm thầm.
+     - `src/features/progress/queries/progress.queries.ts`:
+       - `useProgressAuth(customUserId)`: Khắc phục triệt để bypass, chỉ `isEnabled = Boolean(isAuthenticated && authUserId && isMatch)`.
+       - Toàn bộ 5 mutation hooks (`useStartFastingMutation`, `useEndFastingMutation`, `useLogWaterMutation`, `useLogSleepMutation`, `useLogBodyMetricMutation`): Bắt buộc kiểm tra phiên trong `mutationFn` và `onMutate`. Bỏ qua toast & invalidate queries nếu `isProgressSessionActive` trả về `false`.
+     - Cập nhật an toàn UI tiếp nối (`fasting-panel.tsx`, `sleep-log-form.tsx`, `body-metric-form.tsx`, `water-tracker.tsx`): Kiểm tra `isProgressSessionActive` trước khi hiển thị modal hoặc cập nhật state private; xóa sạch state riêng tư khi phiên thay đổi.
+  3. **Bộ Kiểm thử Hành vi React (P2 — Corrective C)**:
+     - Cài đặt `@testing-library/react@^16.2.0`, `@testing-library/dom`, `@testing-library/jest-dom@^6.6.3`, `jsdom@^26.0.0`.
+     - Tạo `src/features/progress/tests/progress.behavior.test.tsx` gồm 16 test cases bao phủ toàn bộ Scenarios A -> O:
+       - Scenario A: Mutation bình thường kích hoạt toast và invalidate đúng user queries.
+       - Scenario B: User logout khi mutation đang pending -> triệt tiêu toast và không invalidate cache.
+       - Scenario C: Chuyển tài khoản A -> B khi pending -> triệt tiêu toast A, không chạm cache B.
+       - Scenario D: Lỗi muộn khi chuyển tài khoản -> không hiển thị toast lỗi của A cho B.
+       - Scenario E: Đăng nhập lại cùng user (Session 1 vs 2) -> triệt tiêu side-effects của Session 1.
+       - Scenario F: Cách ly chỉ số cơ thể & BMI riêng tư -> không lộ cho user B và xóa state private khi chuyển user.
+       - Scenario G: Cách ly kết quả giấc ngủ riêng tư -> B không thấy kết quả vừa lưu của A.
+       - Scenario H: Cách ly modal hoàn thành nhịn ăn -> không mở dialog chúc mừng của A cho B.
+       - Scenario I: Giữ nguyên business error toasts (409 conflict, 422 height unavailable) trong active session.
+       - Scenario J: Mapper error hiển thị explicit error state card kèm nút Thử lại.
+       - Scenario K: `ProgressCacheSync` dọn dẹp cache User A khi User B vào layout.
+       - Scenario L: Chặn mutation unauthenticated trước khi dispatch network và ném `ProgressAuthError`.
+       - Scenario M: Concurrent mutations qua tài khoản chuyển đổi đều bị triệt tiêu an toàn.
+       - Scenario N: Token refresh bảo toàn quyền sở hữu mutation và hoàn tất thành công.
+       - Scenario O: Dọn dẹp triệt để cache của user cũ khỏi `queryClient` khi phiên kết thúc.
+
+- **Kết quả kiểm chứng (Verification Gates)**:
+  - `npx tsc --noEmit`: 0 lỗi type (0 errors).
+  - `npm test`: 11 test files, 146 tests PASS 100% (trong đó có 16 behavioral tests và 103 Progress unit tests).
+  - `npm run build`: Next.js 16 build thành công toàn bộ 15 static/dynamic routes.
+
+---
+
 ## [2026-11-04] Hoàn tất PR #1 Corrective — Phân lập Cache theo User, Lập lịch UTC Midnight & Trạng thái UI (Bảo — Dev 3)
 
 - **Người thực hiện**: Bảo — Progress Service Owner (Dev 3).
@@ -119,6 +168,55 @@
   - `npx tsc --noEmit`: 0 lỗi type.
   - `npm test`: 8 test suites, 92 tests pass 100% (trong đó có 68 tests cho Progress module).
   - `npm run build`: Build Next.js 16 thành công toàn bộ 15 static/dynamic routes.
+
+---
+
+## [2026-11-04] Hoàn tất PR #1 Final Progress Corrective — Bảo toàn toàn vẹn dữ liệu thời gian & Phân lập phiên an toàn (Bảo — Dev 3)
+
+- **Người thực hiện**: Bảo — Progress Service Owner (Dev 3).
+- **Phạm vi sở hữu**: Progress & Biomarkers frontend (`src/features/progress/`, `src/app/progress/`).
+- **Mục tiêu**:
+  - Khắc phục triệt để 3 phát hiện P1 & P2 trong đợt đánh giá độc lập lần 2 của PR #1:
+    - **P1 — Data Integrity (Corrective A)**: Tuyệt đối không thay thế timestamp backend bị lỗi/thiếu bằng thời gian hiện tại (`new Date()`). Tạo `parseRequiredInstant` tuân thủ ISO 8601 strict có explicit timezone, từ chối ngày bất khả thi (VD: 30/02) và offset vượt ngưỡng (+25:00), ném `ProgressDataIntegrityError`.
+    - **P2 — Session Isolation (Corrective B)**: Ngăn chặn triệt để cross-account side-effects khi người dùng logout hoặc chuyển đổi tài khoản (User A -> User B). Quản lý phiên độc lập (`progress-session.ts`), ràng buộc mutation context theo `{ initiatingUserId, initiatingSessionId }`, chặn ngay mutation chưa xác thực trước khi gửi network, triệt tiêu toasts và cache invalidation của session cũ khi API phản hồi muộn.
+    - **P2 — Testing (Corrective C)**: Xây dựng bộ kiểm thử hành vi thực tế (Real React Behavioral Regression Tests) trong môi trường JSDOM bao phủ toàn bộ 16 kịch bản A qua O.
+    - **Audit useProgressAuth**: Loại bỏ hoàn toàn lỗ hổng xác thực khi truyền `customUserId`, chỉ kích hoạt truy vấn khi có session hợp lệ và `authUserId` khớp `customUserId`.
+
+- **Đã thực hiện**:
+  1. **Định dạng & Toàn vẹn Dữ liệu Thời gian (P1 — Corrective A)**:
+     - Tạo `src/features/progress/errors/progress-data-integrity.error.ts`: Định nghĩa `ProgressDataIntegrityError` và `ProgressAuthError`.
+     - `src/features/progress/utils/progress-date.ts`: Triển khai `parseRequiredInstant(value, fieldName, resourceName)`. Kiểm tra lịch nhuận, số ngày tối đa trong tháng, offset (-14:00 đến +14:00), yêu cầu timezone chỉ định (Z hoặc offset).
+     - `src/features/progress/mappers/progress.mapper.ts`: Loại bỏ hoàn toàn fallback `new Date()`. `toCurrentFastingSession`, `toFastingSessionResult`, `toEndFastingResult`, `toSleepRecord`, `toBodyMetricRecord`, `toMetricsHistory` đều bắt buộc timestamp hợp lệ.
+     - `src/features/progress/mappers/progress.mapper.test.ts`: Bổ sung 13 tests toàn diện cho Corrective A (tổng 33 unit tests pass 100%).
+  2. **Quản lý Phiên & Độc lập Mutation (P2 — Corrective B)**:
+     - Tạo `src/features/progress/utils/progress-session.ts`: Quản lý `activeSessionId`, `activeUserId`, `sessionEpoch`. Phân biệt đăng nhập lại cùng tài khoản (Session 1 vs Session 2), bảo toàn session ID khi token refresh âm thầm.
+     - `src/features/progress/queries/progress.queries.ts`:
+       - `useProgressAuth(customUserId)`: Khắc phục triệt để bypass, chỉ `isEnabled = Boolean(isAuthenticated && authUserId && isMatch)`.
+       - Toàn bộ 5 mutation hooks (`useStartFastingMutation`, `useEndFastingMutation`, `useLogWaterMutation`, `useLogSleepMutation`, `useLogBodyMetricMutation`): Bắt buộc kiểm tra phiên trong `mutationFn` và `onMutate`. Bỏ qua toast & invalidate queries nếu `isProgressSessionActive` trả về `false`.
+     - Cập nhật an toàn UI tiếp nối (`fasting-panel.tsx`, `sleep-log-form.tsx`, `body-metric-form.tsx`, `water-tracker.tsx`): Kiểm tra `isProgressSessionActive` trước khi hiển thị modal hoặc cập nhật state private; xóa sạch state riêng tư khi phiên thay đổi.
+  3. **Bộ Kiểm thử Hành vi React (P2 — Corrective C)**:
+     - Cài đặt `@testing-library/react@^16.2.0`, `@testing-library/dom`, `@testing-library/jest-dom@^6.6.3`, `jsdom@^26.0.0`.
+     - Tạo `src/features/progress/tests/progress.behavior.test.tsx` gồm 16 test cases bao phủ toàn bộ Scenarios A -> O:
+       - Scenario A: Mutation bình thường kích hoạt toast và invalidate đúng user queries.
+       - Scenario B: User logout khi mutation đang pending -> triệt tiêu toast và không invalidate cache.
+       - Scenario C: Chuyển tài khoản A -> B khi pending -> triệt tiêu toast A, không chạm cache B.
+       - Scenario D: Lỗi muộn khi chuyển tài khoản -> không hiển thị toast lỗi của A cho B.
+       - Scenario E: Đăng nhập lại cùng user (Session 1 vs 2) -> triệt tiêu side-effects của Session 1.
+       - Scenario F: Cách ly chỉ số cơ thể & BMI riêng tư -> không lộ cho user B và xóa state private khi chuyển user.
+       - Scenario G: Cách ly kết quả giấc ngủ riêng tư -> B không thấy kết quả vừa lưu của A.
+       - Scenario H: Cách ly modal hoàn thành nhịn ăn -> không mở dialog chúc mừng của A cho B.
+       - Scenario I: Giữ nguyên business error toasts (409 conflict, 422 height unavailable) trong active session.
+       - Scenario J: Mapper error hiển thị explicit error state card kèm nút Thử lại.
+       - Scenario K: `ProgressCacheSync` dọn dẹp cache User A khi User B vào layout.
+       - Scenario L: Chặn mutation unauthenticated trước khi dispatch network và ném `ProgressAuthError`.
+       - Scenario M: Concurrent mutations qua tài khoản chuyển đổi đều bị triệt tiêu an toàn.
+       - Scenario N: Token refresh bảo toàn quyền sở hữu mutation và hoàn tất thành công.
+       - Scenario O: Dọn dẹp triệt để cache của user cũ khỏi `queryClient` khi phiên kết thúc.
+
+- **Kết quả kiểm chứng (Verification Gates)**:
+  - `npx tsc --noEmit`: 0 lỗi type (0 errors).
+  - `npm test`: 11 test files, 146 tests PASS 100% (trong đó có 16 behavioral tests và 103 Progress unit tests).
+  - `npm run build`: Next.js 16 build thành công toàn bộ 15 static/dynamic routes.
 
 ---
 

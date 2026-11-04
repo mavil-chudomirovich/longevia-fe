@@ -9,6 +9,103 @@
  * - Khoảng thời gian (fasting/sleep) tính theo chênh lệch instant (mili-giây), không trừ wall-clock.
  */
 
+import { ProgressDataIntegrityError } from '../errors/progress-data-integrity.error';
+
+function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+}
+
+function getDaysInMonth(year: number, month: number): number {
+  if (month === 2) return isLeapYear(year) ? 29 : 28;
+  if ([4, 6, 9, 11].includes(month)) return 30;
+  return 31;
+}
+
+const ISO_8601_STRICT_REGEX =
+  /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|([+-])(\d{2})(?::?(\d{2}))?)$/i;
+
+/**
+ * Phân tích cú pháp timestamp bắt buộc theo tiêu chuẩn ISO 8601 tuyệt đối có múi giờ (Corrective A).
+ * - Chấp nhận chuỗi ISO 8601 có explicit timezone ('Z' hoặc offset hợp lệ).
+ * - Chấp nhận đối tượng Date hợp lệ.
+ * - Từ chối giá trị rỗng/null/undefined (ném ProgressDataIntegrityError).
+ * - Từ chối chuỗi timestamp không có múi giờ (không chấp nhận giả định local time).
+ * - Từ chối ngày lịch bất khả thi (VD: 30/02) thay vì để JS Date tự động nhảy tháng.
+ * - Từ chối offset múi giờ bất khả thi (VD: +25:00).
+ * - Tuyệt đối không thay thế bằng thời gian hiện tại khi dữ liệu backend bị lỗi.
+ */
+export function parseRequiredInstant(
+  value: unknown,
+  fieldName: string,
+  resourceName?: string
+): Date {
+  if (value === null || value === undefined || value === '') {
+    throw new ProgressDataIntegrityError(
+      fieldName,
+      'PROGRESS_MISSING_REQUIRED_FIELD',
+      resourceName,
+      `Thiếu trường thời gian bắt buộc: ${fieldName}`
+    );
+  }
+
+  if (value instanceof Date) {
+    if (isNaN(value.getTime())) {
+      throw new ProgressDataIntegrityError(fieldName, 'PROGRESS_INVALID_TIMESTAMP', resourceName);
+    }
+    return value;
+  }
+
+  if (typeof value !== 'string') {
+    throw new ProgressDataIntegrityError(fieldName, 'PROGRESS_INVALID_TIMESTAMP', resourceName);
+  }
+
+  const trimmed = value.trim();
+  const match = ISO_8601_STRICT_REGEX.exec(trimmed);
+  if (!match) {
+    throw new ProgressDataIntegrityError(fieldName, 'PROGRESS_INVALID_TIMESTAMP', resourceName);
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hours = Number(match[4]);
+  const minutes = Number(match[5]);
+  const seconds = Number(match[6]);
+
+  if (month < 1 || month > 12) {
+    throw new ProgressDataIntegrityError(fieldName, 'PROGRESS_INVALID_TIMESTAMP', resourceName);
+  }
+
+  const maxDays = getDaysInMonth(year, month);
+  if (day < 1 || day > maxDays) {
+    throw new ProgressDataIntegrityError(fieldName, 'PROGRESS_INVALID_TIMESTAMP', resourceName);
+  }
+
+  if (hours > 23 || minutes > 59 || seconds > 59) {
+    throw new ProgressDataIntegrityError(fieldName, 'PROGRESS_INVALID_TIMESTAMP', resourceName);
+  }
+
+  // Kiểm tra offset múi giờ
+  const offsetSign = match[9];
+  if (offsetSign) {
+    const offsetHours = Number(match[10]);
+    const offsetMinutes = match[11] ? Number(match[11]) : 0;
+    if (offsetHours > 14 || offsetMinutes > 59) {
+      throw new ProgressDataIntegrityError(fieldName, 'PROGRESS_INVALID_TIMESTAMP', resourceName);
+    }
+    if (offsetHours === 14 && offsetMinutes > 0) {
+      throw new ProgressDataIntegrityError(fieldName, 'PROGRESS_INVALID_TIMESTAMP', resourceName);
+    }
+  }
+
+  const parsedDate = new Date(trimmed);
+  if (isNaN(parsedDate.getTime())) {
+    throw new ProgressDataIntegrityError(fieldName, 'PROGRESS_INVALID_TIMESTAMP', resourceName);
+  }
+
+  return parsedDate;
+}
+
 /**
  * Trả về chuỗi ngày YYYY-MM-DD theo lịch UTC.
  * Ví dụ: 00:30 ngày 05/11 tại Việt Nam (UTC+7) -> '2026-11-04' (vì UTC mới là 17:30 ngày 04/11).

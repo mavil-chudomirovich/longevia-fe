@@ -12,6 +12,11 @@ import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useWaterTodayQuery, useLogWaterMutation } from '../queries/progress.queries';
 import { logWaterSchema, LogWaterFormValues } from '../schemas/progress.schema';
+import {
+  getProgressSessionContext,
+  isProgressSessionActive,
+  useProgressSession,
+} from '../utils/progress-session';
 
 const QUICK_AMOUNTS = [
   { amount: 150, label: '150 ml', desc: 'Cốc nhỏ' },
@@ -21,6 +26,7 @@ const QUICK_AMOUNTS = [
 ];
 
 export function WaterTracker() {
+  const { sessionId, userId } = useProgressSession();
   const { data: waterToday, isLoading, isError, refetch, isFetching } = useWaterTodayQuery();
   const logMutation = useLogWaterMutation();
 
@@ -31,17 +37,36 @@ export function WaterTracker() {
     },
   });
 
+  // Reset form khi chuyển đổi tài khoản
+  React.useEffect(() => {
+    form.reset({ amountMl: 250 });
+  }, [sessionId, userId, form]);
+
   const handleQuickAdd = async (amountMl: number) => {
+    const sessionSnapshot = getProgressSessionContext();
     try {
       await logMutation.mutateAsync({ amountMl });
+      if (
+        !sessionSnapshot ||
+        !isProgressSessionActive(sessionSnapshot.userId, sessionSnapshot.sessionId)
+      ) {
+        return;
+      }
     } catch {
       // Đã xử lý toast tại mutation
     }
   };
 
   const onCustomSubmit = async (values: LogWaterFormValues) => {
+    const sessionSnapshot = getProgressSessionContext();
     try {
       await logMutation.mutateAsync(values);
+      if (
+        !sessionSnapshot ||
+        !isProgressSessionActive(sessionSnapshot.userId, sessionSnapshot.sessionId)
+      ) {
+        return;
+      }
       form.reset({ amountMl: 250 });
     } catch {
       // Đã xử lý toast tại mutation

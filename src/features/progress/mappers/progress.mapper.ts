@@ -26,7 +26,9 @@ import {
   formatDisplayDateTime,
   formatDurationHours,
   getUtcTodayDateString,
+  parseRequiredInstant,
 } from '../utils/progress-date';
+import { ProgressDataIntegrityError } from '../errors/progress-data-integrity.error';
 
 export const BMI_CATEGORY_LABELS: Record<BmiCategoryEnum, string> = {
   [BmiCategoryEnum.UNDERWEIGHT]: 'Thiếu cân',
@@ -50,15 +52,6 @@ export function getBmiCategoryFromBmi(bmi: number): BmiCategoryEnum {
   if (bmi < 25.0) return BmiCategoryEnum.NORMAL_WEIGHT;
   if (bmi < 30.0) return BmiCategoryEnum.OVERWEIGHT;
   return BmiCategoryEnum.OBESE;
-}
-
-/**
- * Chuyển đổi an toàn giá trị ngày tháng, phòng ngừa crash khi nhận chuỗi ngày dị thường
- */
-function safeDate(input: unknown, fallback: Date = new Date()): Date {
-  if (!input) return fallback;
-  const d = input instanceof Date ? input : new Date(input as string | number);
-  return isNaN(d.getTime()) ? fallback : d;
 }
 
 /**
@@ -140,12 +133,39 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
   }
 
   /**
-   * Chuyển đổi phiên nhịn ăn hiện tại (trả về null nếu không có phiên active)
+   * Chuyển đổi phiên nhịn ăn hiện tại (Corrective A).
+   * - dto = null hoặc undefined: trả về null (trạng thái hợp lệ: không có phiên nhịn ăn nào).
+   * - dto là object nhưng thiếu sessionId hoặc timestamp không hợp lệ: ném ProgressDataIntegrityError (không ngụy tạo thành null).
    */
   toCurrentFastingSession(dto?: CurrentFastingResponseDto | null): CurrentFastingSession | null {
-    if (!dto || !dto.sessionId || String(dto.sessionId).trim() === '') {
+    if (dto === null || dto === undefined) {
       return null;
     }
+
+    if (typeof dto !== 'object') {
+      throw new ProgressDataIntegrityError(
+        'dto',
+        'PROGRESS_DATA_INTEGRITY_VIOLATION',
+        'CurrentFasting'
+      );
+    }
+
+    const sessionId = safeString(dto.sessionId).trim();
+    if (!sessionId) {
+      throw new ProgressDataIntegrityError(
+        'sessionId',
+        'PROGRESS_MISSING_REQUIRED_FIELD',
+        'CurrentFasting',
+        'Thiếu mã phiên nhịn ăn (sessionId)'
+      );
+    }
+
+    const startedAt = parseRequiredInstant(dto.startedAt, 'startedAt', 'CurrentFasting');
+    const targetEndedAt = parseRequiredInstant(
+      dto.targetEndedAt,
+      'targetEndedAt',
+      'CurrentFasting'
+    );
 
     const targetHours = safeNumber(dto.targetHours, 16);
     const elapsedHours = Math.max(0, safeNumber(dto.elapsedHours, 0));
@@ -155,10 +175,10 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
     const visualPercent = Math.min(100, Math.max(0, progressPercent));
 
     return {
-      sessionId: safeString(dto.sessionId),
+      sessionId,
       protocol: safeString(dto.protocol, '16:8'),
-      startedAt: safeDate(dto.startedAt),
-      targetEndedAt: safeDate(dto.targetEndedAt),
+      startedAt,
+      targetEndedAt,
       targetHours,
       elapsedHours,
       remainingHours,
@@ -171,19 +191,49 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
   }
 
   toFastingSessionResult(dto: FastingSessionResponseDto): FastingSessionResult {
+    if (!dto || typeof dto !== 'object') {
+      throw new ProgressDataIntegrityError(
+        'dto',
+        'PROGRESS_MISSING_REQUIRED_FIELD',
+        'FastingSession'
+      );
+    }
+
+    const sessionId = safeString(dto.sessionId).trim();
+    if (!sessionId) {
+      throw new ProgressDataIntegrityError(
+        'sessionId',
+        'PROGRESS_MISSING_REQUIRED_FIELD',
+        'FastingSession'
+      );
+    }
+
     return {
-      sessionId: safeString(dto.sessionId),
+      sessionId,
       protocol: safeString(dto.protocol),
-      startedAt: safeDate(dto.startedAt),
-      targetEndedAt: safeDate(dto.targetEndedAt),
+      startedAt: parseRequiredInstant(dto.startedAt, 'startedAt', 'FastingSession'),
+      targetEndedAt: parseRequiredInstant(dto.targetEndedAt, 'targetEndedAt', 'FastingSession'),
       status: safeString(dto.status, 'InProgress'),
     };
   }
 
   toEndFastingResult(dto: EndFastingResponseDto): EndFastingResult {
+    if (!dto || typeof dto !== 'object') {
+      throw new ProgressDataIntegrityError('dto', 'PROGRESS_MISSING_REQUIRED_FIELD', 'EndFasting');
+    }
+
+    const sessionId = safeString(dto.sessionId).trim();
+    if (!sessionId) {
+      throw new ProgressDataIntegrityError(
+        'sessionId',
+        'PROGRESS_MISSING_REQUIRED_FIELD',
+        'EndFasting'
+      );
+    }
+
     const actualHours = safeNumber(dto.actualHours, 0);
     return {
-      sessionId: safeString(dto.sessionId),
+      sessionId,
       actualHours,
       targetHours: safeNumber(dto.targetHours, 0),
       isGoalReached: Boolean(dto.isGoalReached),
@@ -221,9 +271,22 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
   }
 
   /**
-   * Chuyển đổi bản ghi giấc ngủ
+   * Chuyển đổi bản ghi giấc ngủ (Corrective A).
+   * Yêu cầu timestamps sleptAt và wokeAt phải hợp lệ theo chuẩn ISO 8601 có múi giờ.
    */
   toSleepRecord(dto: SleepResponseDto): SleepRecord {
+    if (!dto || typeof dto !== 'object') {
+      throw new ProgressDataIntegrityError('dto', 'PROGRESS_MISSING_REQUIRED_FIELD', 'SleepRecord');
+    }
+
+    const id = safeString(dto.id).trim();
+    if (!id) {
+      throw new ProgressDataIntegrityError('id', 'PROGRESS_MISSING_REQUIRED_FIELD', 'SleepRecord');
+    }
+
+    const sleptAt = parseRequiredInstant(dto.sleptAt, 'sleptAt', 'SleepRecord');
+    const wokeAt = parseRequiredInstant(dto.wokeAt, 'wokeAt', 'SleepRecord');
+
     const rawQuality = safeString(dto.sleepQuality, 'Good') as SleepQualityEnum;
     const sleepQuality = Object.values(SleepQualityEnum).includes(rawQuality)
       ? rawQuality
@@ -232,9 +295,9 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
     const durationHours = safeNumber(dto.durationHours, 0);
 
     return {
-      id: safeString(dto.id),
-      sleptAt: safeDate(dto.sleptAt),
-      wokeAt: safeDate(dto.wokeAt),
+      id,
+      sleptAt,
+      wokeAt,
       sleepQuality,
       sleepQualityLabel: SLEEP_QUALITY_LABELS[sleepQuality] ?? 'Tốt',
       durationHours,
@@ -244,9 +307,22 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
   }
 
   /**
-   * Chuyển đổi chỉ số cơ thể sang Model sạch
+   * Chuyển đổi chỉ số cơ thể sang Model sạch (Corrective A).
+   * - Tuyệt đối không fallback sang new Date().toISOString() cho loggedAt.
+   * - formattedLoggedAt hiển thị chuẩn xác từ chính instant đã được thẩm định.
    */
   toBodyMetricRecord(dto: BodyMetricResponseDto | null | undefined): BodyMetricRecord {
+    if (!dto || typeof dto !== 'object') {
+      throw new ProgressDataIntegrityError(
+        'dto',
+        'PROGRESS_MISSING_REQUIRED_FIELD',
+        'BodyMetricRecord'
+      );
+    }
+
+    const rawLoggedAt = pickField(dto, ['loggedAt', 'logged_at'], null);
+    const loggedAt = parseRequiredInstant(rawLoggedAt, 'loggedAt', 'BodyMetricRecord');
+
     const rawBmi = safeNumber(pickField(dto, ['bmi'], 0), 0);
     const rawCategoryStr = safeString(pickField(dto, ['bmiCategory', 'bmi_category'], ''));
 
@@ -283,12 +359,10 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
       bloodPressureDisplay = `${systolic}/${diastolic} mmHg`;
     }
 
-    const rawLoggedAt = pickField(dto, ['loggedAt', 'logged_at'], new Date().toISOString());
-
     return {
       id: safeString(pickField(dto, ['id'], '')),
-      loggedAt: safeDate(rawLoggedAt),
-      formattedLoggedAt: formatDisplayDateTime(rawLoggedAt),
+      loggedAt,
+      formattedLoggedAt: formatDisplayDateTime(loggedAt),
       weightKg: safeNumber(pickField(dto, ['weightKg', 'weight_kg'], 0), 0),
       bmi: rawBmi,
       bmiCategory,
@@ -303,17 +377,34 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
   }
 
   /**
-   * Chuyển đổi lịch sử chỉ số phân trang
+   * Chuyển đổi lịch sử chỉ số phân trang (Corrective A).
+   * Nếu có bất kỳ item nào bị lỗi dữ liệu, ném ProgressDataIntegrityError để UI hiển thị trạng thái lỗi,
+   * không âm thầm nuốt lỗi hay ngụy tạo dữ liệu sai lệch.
    */
   toMetricsHistory(dto?: MetricsHistoryResponseDto | null): MetricsHistory {
+    if (dto === null || dto === undefined) {
+      return {
+        items: [],
+        pageNumber: 1,
+        pageSize: 20,
+        totalCount: 0,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPrevPage: false,
+      };
+    }
+
     const rawItems = safeArray<BodyMetricResponseDto>(pickField(dto, ['items'], []));
     const pageNumber = Math.max(1, safeNumber(pickField(dto, ['pageNumber', 'page_number'], 1), 1));
     const pageSize = Math.max(1, safeNumber(pickField(dto, ['pageSize', 'page_size'], 20), 20));
     const totalCount = Math.max(0, safeNumber(pickField(dto, ['totalCount', 'total_count'], 0), 0));
     const totalPages = Math.max(0, safeNumber(pickField(dto, ['totalPages', 'total_pages'], 0), 0));
 
+    // Thẩm định từng bản ghi trong lịch sử
+    const items = rawItems.map((item) => this.toBodyMetricRecord(item));
+
     return {
-      items: rawItems.map((item) => this.toBodyMetricRecord(item)),
+      items,
       pageNumber,
       pageSize,
       totalCount,

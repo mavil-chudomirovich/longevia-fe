@@ -13,6 +13,11 @@ import { useLogSleepMutation } from '../queries/progress.queries';
 import { logSleepSchema, LogSleepFormValues } from '../schemas/progress.schema';
 import { SleepRecord } from '../types/progress.model';
 import { formatDurationHours, toLocalInputDateTimeString } from '../utils/progress-date';
+import {
+  getProgressSessionContext,
+  isProgressSessionActive,
+  useProgressSession,
+} from '../utils/progress-session';
 
 const QUALITY_OPTIONS: Array<{
   value: 'Poor' | 'Fair' | 'Good' | 'Excellent';
@@ -26,8 +31,14 @@ const QUALITY_OPTIONS: Array<{
 ];
 
 export function SleepLogForm() {
+  const { sessionId, userId } = useProgressSession();
   const logMutation = useLogSleepMutation();
   const [lastLoggedSleep, setLastLoggedSleep] = React.useState<SleepRecord | null>(null);
+
+  // Xóa kết quả riêng tư khi chuyển đổi tài khoản hoặc đăng xuất
+  React.useEffect(() => {
+    setLastLoggedSleep(null);
+  }, [sessionId, userId]);
 
   // Mặc định: Giấc ngủ từ 23:00 tối qua đến 07:00 sáng nay
   const getDefaultTimes = () => {
@@ -70,8 +81,15 @@ export function SleepLogForm() {
   }, [sleptAtWatch, wokeAtWatch]);
 
   const onSubmit = async (values: LogSleepFormValues) => {
+    const sessionSnapshot = getProgressSessionContext();
     try {
       const record = await logMutation.mutateAsync(values);
+      if (
+        !sessionSnapshot ||
+        !isProgressSessionActive(sessionSnapshot.userId, sessionSnapshot.sessionId)
+      ) {
+        return;
+      }
       setLastLoggedSleep(record);
       // Giữ nguyên form nhưng reset sang giá trị mặc định mới
       form.reset({
@@ -106,7 +124,12 @@ export function SleepLogForm() {
               {/* Giờ đi ngủ */}
               <div className="space-y-2">
                 <Label htmlFor="sleep-slept-at">Thời điểm đi ngủ (Slept At)</Label>
-                <Input id="sleep-slept-at" type="datetime-local" {...form.register('sleptAt')} />
+                <Input
+                  id="sleep-slept-at"
+                  type="datetime-local"
+                  defaultValue={getDefaultTimes().sleptAt}
+                  {...form.register('sleptAt')}
+                />
                 {form.formState.errors.sleptAt && (
                   <p className="text-xs text-destructive">
                     {form.formState.errors.sleptAt.message}
@@ -117,7 +140,12 @@ export function SleepLogForm() {
               {/* Giờ thức dậy */}
               <div className="space-y-2">
                 <Label htmlFor="sleep-woke-at">Thời điểm thức dậy (Woke At)</Label>
-                <Input id="sleep-woke-at" type="datetime-local" {...form.register('wokeAt')} />
+                <Input
+                  id="sleep-woke-at"
+                  type="datetime-local"
+                  defaultValue={getDefaultTimes().wokeAt}
+                  {...form.register('wokeAt')}
+                />
                 {form.formState.errors.wokeAt && (
                   <p className="text-xs text-destructive">{form.formState.errors.wokeAt.message}</p>
                 )}

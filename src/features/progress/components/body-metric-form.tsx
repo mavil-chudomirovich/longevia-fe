@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import axios from 'axios';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Scale, Activity, Heart, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
@@ -14,14 +15,31 @@ import { useLogBodyMetricMutation } from '../queries/progress.queries';
 import { logBodyMetricSchema, LogBodyMetricFormValues } from '../schemas/progress.schema';
 import { BodyMetricRecord, BmiCategoryEnum } from '../types/progress.model';
 import { toLocalInputDateTimeString } from '../utils/progress-date';
+import {
+  getProgressSessionContext,
+  isProgressSessionActive,
+  useProgressSession,
+} from '../utils/progress-session';
 
 interface BodyMetricFormProps {
   onSuccessLogged?: (record: BodyMetricRecord) => void;
 }
 
+const toNullableNumber = (v: unknown): number | null => {
+  if (v === '' || v === null || v === undefined) return null;
+  const n = Number(v);
+  return isNaN(n) ? null : n;
+};
+
 export function BodyMetricForm({ onSuccessLogged }: BodyMetricFormProps) {
+  const { sessionId, userId } = useProgressSession();
   const logMutation = useLogBodyMetricMutation();
   const [lastSavedRecord, setLastSavedRecord] = React.useState<BodyMetricRecord | null>(null);
+
+  // Xóa kết quả lưu trữ cá nhân khi phiên đăng nhập đổi hoặc logout
+  React.useEffect(() => {
+    setLastSavedRecord(null);
+  }, [sessionId, userId]);
 
   const form = useForm<LogBodyMetricFormValues>({
     resolver: zodResolver(logBodyMetricSchema),
@@ -37,8 +55,15 @@ export function BodyMetricForm({ onSuccessLogged }: BodyMetricFormProps) {
   });
 
   const onSubmit = async (values: LogBodyMetricFormValues) => {
+    const sessionSnapshot = getProgressSessionContext();
     try {
       const record = await logMutation.mutateAsync(values);
+      if (
+        !sessionSnapshot ||
+        !isProgressSessionActive(sessionSnapshot.userId, sessionSnapshot.sessionId)
+      ) {
+        return;
+      }
       setLastSavedRecord(record);
       if (onSuccessLogged) {
         onSuccessLogged(record);
@@ -103,8 +128,11 @@ export function BodyMetricForm({ onSuccessLogged }: BodyMetricFormProps) {
                     step="0.1"
                     min="25.0"
                     max="300.0"
+                    defaultValue={70.0}
                     placeholder="VD: 68.5"
-                    {...form.register('weightKg', { valueAsNumber: true })}
+                    {...form.register('weightKg', {
+                      setValueAs: (v) => (v === '' ? NaN : Number(v)),
+                    })}
                     className="tabular-nums pr-12 font-medium"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium pointer-events-none">
@@ -122,7 +150,12 @@ export function BodyMetricForm({ onSuccessLogged }: BodyMetricFormProps) {
                 <Label htmlFor="metric-logged-at" className="font-semibold">
                   Thời điểm ghi nhận
                 </Label>
-                <Input id="metric-logged-at" type="datetime-local" {...form.register('loggedAt')} />
+                <Input
+                  id="metric-logged-at"
+                  type="datetime-local"
+                  defaultValue={toLocalInputDateTimeString(new Date())}
+                  {...form.register('loggedAt')}
+                />
                 {form.formState.errors.loggedAt && (
                   <p className="text-xs text-destructive">
                     {form.formState.errors.loggedAt.message}
@@ -146,7 +179,7 @@ export function BodyMetricForm({ onSuccessLogged }: BodyMetricFormProps) {
                     max="100.0"
                     placeholder="VD: 18.5"
                     {...form.register('bodyFatPercent', {
-                      setValueAs: (v) => (v === '' ? null : Number(v)),
+                      setValueAs: toNullableNumber,
                     })}
                     className="tabular-nums pr-12"
                   />
@@ -174,7 +207,7 @@ export function BodyMetricForm({ onSuccessLogged }: BodyMetricFormProps) {
                     max="300.0"
                     placeholder="VD: 78.0"
                     {...form.register('waistCircumferenceCm', {
-                      setValueAs: (v) => (v === '' ? null : Number(v)),
+                      setValueAs: toNullableNumber,
                     })}
                     className="tabular-nums pr-12"
                   />
@@ -208,7 +241,7 @@ export function BodyMetricForm({ onSuccessLogged }: BodyMetricFormProps) {
                       type="number"
                       placeholder="VD: 120"
                       {...form.register('systolicBloodPressure', {
-                        setValueAs: (v) => (v === '' ? null : Number(v)),
+                        setValueAs: toNullableNumber,
                       })}
                       className="tabular-nums pr-16"
                     />
@@ -233,7 +266,7 @@ export function BodyMetricForm({ onSuccessLogged }: BodyMetricFormProps) {
                       type="number"
                       placeholder="VD: 80"
                       {...form.register('diastolicBloodPressure', {
-                        setValueAs: (v) => (v === '' ? null : Number(v)),
+                        setValueAs: toNullableNumber,
                       })}
                       className="tabular-nums pr-16"
                     />
@@ -258,7 +291,7 @@ export function BodyMetricForm({ onSuccessLogged }: BodyMetricFormProps) {
                       type="number"
                       placeholder="VD: 65"
                       {...form.register('restingHeartRate', {
-                        setValueAs: (v) => (v === '' ? null : Number(v)),
+                        setValueAs: toNullableNumber,
                       })}
                       className="tabular-nums pr-12"
                     />
@@ -327,27 +360,29 @@ export function BodyMetricForm({ onSuccessLogged }: BodyMetricFormProps) {
       )}
 
       {/* Banner trợ giúp khi gặp lỗi thiếu chiều cao hồ sơ */}
-      {logMutation.isError && logMutation.error?.response?.status === 422 && (
-        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
-          <AlertCircle className="size-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <span className="text-sm font-bold text-foreground">
-              Cần cập nhật chiều cao trong Hồ sơ người dùng
-            </span>
-            <p className="text-xs text-muted-foreground text-pretty">
-              Dịch vụ Progress cần thông tin chiều cao để tính toán BMI chuẩn xác. Vui lòng mở trang
-              Hồ sơ cá nhân để thiết lập chiều cao.
-            </p>
-            <div className="pt-1">
-              <Button variant="outline" size="sm" asChild className="h-7 text-xs gap-1">
-                <Link href="/profile">
-                  Đến trang Hồ sơ cá nhân <ArrowRight className="size-3" />
-                </Link>
-              </Button>
+      {logMutation.isError &&
+        axios.isAxiosError(logMutation.error) &&
+        logMutation.error?.response?.status === 422 && (
+          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
+            <AlertCircle className="size-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <span className="text-sm font-bold text-foreground">
+                Cần cập nhật chiều cao trong Hồ sơ người dùng
+              </span>
+              <p className="text-xs text-muted-foreground text-pretty">
+                Dịch vụ Progress cần thông tin chiều cao để tính toán BMI chuẩn xác. Vui lòng mở
+                trang Hồ sơ cá nhân để thiết lập chiều cao.
+              </p>
+              <div className="pt-1">
+                <Button variant="outline" size="sm" asChild className="h-7 text-xs gap-1">
+                  <Link href="/profile">
+                    Đến trang Hồ sơ cá nhân <ArrowRight className="size-3" />
+                  </Link>
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
     </div>
   );
 }

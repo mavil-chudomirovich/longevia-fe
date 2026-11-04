@@ -36,8 +36,14 @@ import {
   formatDurationHours,
   toLocalInputDateTimeString,
 } from '../utils/progress-date';
+import {
+  getProgressSessionContext,
+  isProgressSessionActive,
+  useProgressSession,
+} from '../utils/progress-session';
 
 export function FastingPanel() {
+  const { sessionId, userId } = useProgressSession();
   const {
     data: currentSession,
     isLoading: isLoadingCurrent,
@@ -54,6 +60,12 @@ export function FastingPanel() {
     targetHours: number;
     isGoalReached: boolean;
   } | null>(null);
+
+  // Tự động xóa sạch modal kết quả và đóng dialog khi người dùng đăng xuất hoặc đổi tài khoản
+  React.useEffect(() => {
+    setCompletedResultModal(null);
+    setConfirmEndOpen(false);
+  }, [sessionId, userId]);
 
   // Form bắt đầu nhịn ăn
   const form = useForm<StartFastingFormValues>({
@@ -117,8 +129,15 @@ export function FastingPanel() {
   }, [currentSession, nowInstant]);
 
   const onStartSubmit = async (values: StartFastingFormValues) => {
+    const sessionSnapshot = getProgressSessionContext();
     try {
       await startMutation.mutateAsync(values);
+      if (
+        !sessionSnapshot ||
+        !isProgressSessionActive(sessionSnapshot.userId, sessionSnapshot.sessionId)
+      ) {
+        return;
+      }
       form.reset({
         protocol: '16:8',
         startedAt: toLocalInputDateTimeString(new Date()),
@@ -131,11 +150,19 @@ export function FastingPanel() {
 
   const handleConfirmEnd = async () => {
     if (!currentSession) return;
+    const sessionSnapshot = getProgressSessionContext();
     try {
       const result = await endMutation.mutateAsync({
         sessionId: currentSession.sessionId,
         endedAt: toLocalInputDateTimeString(new Date()),
       });
+      if (
+        !sessionSnapshot ||
+        !isProgressSessionActive(sessionSnapshot.userId, sessionSnapshot.sessionId)
+      ) {
+        setConfirmEndOpen(false);
+        return;
+      }
       setConfirmEndOpen(false);
       setCompletedResultModal({
         actualHours: result.actualHours,

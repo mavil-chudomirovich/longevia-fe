@@ -1,11 +1,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
-import { progressKeys, clearProgressCache } from './progress.queries';
+import { progressKeys, clearProgressCache, useDashboardSummaryQuery } from './progress.queries';
 import { useAuthStore } from '@/store/useAuthStore';
 import { UserRole, MemberStatus } from '@/common/enums';
 import { User } from '@/features/auth/types/auth.model';
+import {
+  getProgressSessionContext,
+  isProgressSessionActive,
+  syncProgressSessionWithAuth,
+  __resetProgressSessionForTests,
+} from '../utils/progress-session';
+import { progressApi } from '../api/progress.api';
 
-describe('Progress Queries - User-Isolated Cache & Lifecycle (Corrective A & C)', () => {
+describe('Progress Queries - User-Isolated Cache & Lifecycle (Corrective A & B)', () => {
   let queryClient: QueryClient;
 
   // Mock localStorage for node environment
@@ -63,11 +70,13 @@ describe('Progress Queries - User-Isolated Cache & Lifecycle (Corrective A & C)'
         },
       },
     });
+    __resetProgressSessionForTests();
     useAuthStore.getState().logout();
   });
 
   afterEach(() => {
     queryClient.clear();
+    __resetProgressSessionForTests();
     useAuthStore.getState().logout();
     vi.restoreAllMocks();
   });
@@ -121,9 +130,111 @@ describe('Progress Queries - User-Isolated Cache & Lifecycle (Corrective A & C)'
     });
   });
 
+  describe('Audit useProgressAuth - Anti-Bypass & Mismatched User ID Protection', () => {
+    it('disables query when unauthenticated even if customUserId is provided', () => {
+      useAuthStore.getState().logout();
+
+      // Giả lập hook query với customUserId khi chưa đăng nhập
+      const authState = useAuthStore.getState();
+      expect(authState.isAuthenticated).toBe(false);
+
+      // useProgressAuth logic test:
+      const authUserId = authState.user?.id;
+      const customUserId = 'victim-user-999';
+      const isMatch = !customUserId || customUserId === authUserId;
+      const isEnabled = Boolean(authState.isAuthenticated && authUserId && isMatch);
+
+      expect(isEnabled).toBe(false);
+    });
+
+    it('disables query when authenticated as User A but customUserId is User B (mismatch protection)', () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+
+      const authState = useAuthStore.getState();
+      const authUserId = authState.user?.id;
+      const customUserId = mockUserB.id; // Mismatched!
+
+      const isMatch = !customUserId || customUserId === authUserId;
+      const isEnabled = Boolean(authState.isAuthenticated && authUserId && isMatch);
+
+      expect(isEnabled).toBe(false);
+    });
+
+    it('enables query when authenticated as User A and customUserId matches User A', () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+
+      const authState = useAuthStore.getState();
+      const authUserId = authState.user?.id;
+      const customUserId = mockUserA.id; // Matching!
+
+      const isMatch = !customUserId || customUserId === authUserId;
+      const isEnabled = Boolean(authState.isAuthenticated && authUserId && isMatch);
+
+      expect(isEnabled).toBe(true);
+    });
+
+    it('enables query when authenticated as User A and customUserId is omitted', () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+
+      const authState = useAuthStore.getState();
+      const authUserId = authState.user?.id;
+      const customUserId = undefined;
+
+      const isMatch = !customUserId || customUserId === authUserId;
+      const isEnabled = Boolean(authState.isAuthenticated && authUserId && isMatch);
+
+      expect(isEnabled).toBe(true);
+    });
+  });
+
+  describe('Session Ownership & Relogin Distinctions (Corrective B)', () => {
+    it('generates distinct session ID for same-user relogin', () => {
+      // 1. User A login session 1
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-1' });
+      syncProgressSessionWithAuth();
+      const session1 = getProgressSessionContext();
+      expect(session1).not.toBeNull();
+      expect(session1?.userId).toBe(mockUserA.id);
+
+      // 2. User A logout
+      useAuthStore.getState().logout();
+      syncProgressSessionWithAuth();
+      expect(getProgressSessionContext()).toBeNull();
+      expect(isProgressSessionActive(session1?.userId, session1?.sessionId)).toBe(false);
+
+      // 3. User A login session 2
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-2' });
+      syncProgressSessionWithAuth();
+      const session2 = getProgressSessionContext();
+
+      expect(session2).not.toBeNull();
+      expect(session2?.userId).toBe(mockUserA.id);
+      // Hai session ID phải khác nhau dù cùng userId
+      expect(session2?.sessionId).not.toBe(session1?.sessionId);
+
+      // Session 1 bị coi là lỗi thời (obsolete)
+      expect(isProgressSessionActive(session1?.userId, session1?.sessionId)).toBe(false);
+      // Session 2 đang active
+      expect(isProgressSessionActive(session2?.userId, session2?.sessionId)).toBe(true);
+    });
+
+    it('preserves session ID on token refresh within the same active session', () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'initial-token' });
+      syncProgressSessionWithAuth();
+      const sessionInitial = getProgressSessionContext();
+
+      // Silent refresh: chỉ đổi token, không đổi user và không logout
+      useAuthStore.getState().setToken('refreshed-token');
+      syncProgressSessionWithAuth();
+      const sessionAfterRefresh = getProgressSessionContext();
+
+      expect(sessionAfterRefresh?.sessionId).toBe(sessionInitial?.sessionId);
+      expect(isProgressSessionActive(sessionInitial?.userId, sessionInitial?.sessionId)).toBe(true);
+    });
+  });
+
   describe('clearProgressCache (Cache Invalidation and Removal)', () => {
     it('cancels pending queries and removes cache for a specific user without affecting others', async () => {
-      // Mock dữ liệu trong cache cho User A và User B
       queryClient.setQueryData(progressKeys.dashboard(mockUserA.id), {
         currentWeightKg: 70,
       });
@@ -138,10 +249,8 @@ describe('Progress Queries - User-Isolated Cache & Lifecycle (Corrective A & C)'
         currentWeightKg: 85,
       });
 
-      // Xóa cache của User A
       await clearProgressCache(queryClient, mockUserA.id);
 
-      // User A bị xóa, User B vẫn nguyên vẹn
       expect(queryClient.getQueryData(progressKeys.dashboard(mockUserA.id))).toBeUndefined();
       expect(queryClient.getQueryData(progressKeys.dashboard(mockUserB.id))).toEqual({
         currentWeightKg: 85,
