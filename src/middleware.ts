@@ -49,13 +49,16 @@ const CONTRIBUTOR_ROLES = ['CONTRIBUTOR', 'ADMIN'];
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // BE set HttpOnly cookie sau login (proxy /api/v1 giữ cùng-domain).
+  // BE set HttpOnly cookie sau login (proxy /api giữ cùng-domain).
   // Chấp nhận cả 2 tên để tương thích BE cũ/mới: accessToken | access_token
   const accessToken =
     request.cookies.get('accessToken')?.value ?? request.cookies.get('access_token')?.value;
 
-  // Ví dụ bảo vệ route dashboard:
-  const isProtectedPath = pathname.startsWith('/dashboard') || pathname.startsWith('/profile');
+  // Bảo vệ route dashboard, profile, và progress (Theo dõi sức khỏe):
+  const isProtectedPath =
+    pathname.startsWith('/dashboard') ||
+    pathname.startsWith('/profile') ||
+    pathname.startsWith('/progress');
   const isAdminPath = pathname.startsWith('/admin');
   const isContributorPath = pathname.startsWith('/contributor');
 
@@ -107,6 +110,7 @@ export const config = {
     '/profile/:path*',
     '/admin/:path*',
     '/contributor/:path*',
+    '/progress/:path*',
     '/login',
   ],
 };

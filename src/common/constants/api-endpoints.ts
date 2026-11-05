@@ -5,6 +5,17 @@ export const API_ENDPOINTS = {
     REFRESH: '/auth/refresh',
     LOGOUT: '/auth/logout',
   },
+  PROGRESS: {
+    DASHBOARD_SUMMARY: '/progress/dashboard/summary',
+    FASTING_CURRENT: '/progress/fasting/current',
+    FASTING_START: '/progress/fasting/start',
+    FASTING_END: '/progress/fasting/end',
+    WATER_TODAY: '/progress/water/today',
+    WATER_LOG: '/progress/water/log',
+    SLEEP_LOG: '/progress/sleep/log',
+    METRICS: '/progress/metrics',
+    METRICS_HISTORY: '/progress/metrics/history',
+  },
   USERS: {
     ME: '/users/me',
     HEALTH_PROFILE: '/users/me/health-profile',

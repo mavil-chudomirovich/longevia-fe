@@ -1,0 +1,215 @@
+import * as React from 'react';
+import { useAuthStore } from '@/store/useAuthStore';
+
+let sessionEpoch = 0;
+let activeSessionId = '';
+let activeUserId: string | null = null;
+let lastAuthToken: string | null = null;
+let isSubscribed = false;
+
+const sessionAbortControllers = new Map<string, Set<AbortController>>();
+
+/**
+ * Đăng ký AbortController cho một phiên mutation cụ thể.
+ * Tự động hủy yêu cầu mạng khi phiên kết thúc hoặc chuyển đổi người dùng.
+ */
+export function registerSessionAbortController(
+  sessionId: string,
+  controller: AbortController
+): () => void {
+  let controllers = sessionAbortControllers.get(sessionId);
+  if (!controllers) {
+    controllers = new Set<AbortController>();
+    sessionAbortControllers.set(sessionId, controllers);
+  }
+  controllers.add(controller);
+
+  let unregistered = false;
+  return () => {
+    if (unregistered) return;
+    unregistered = true;
+    unregisterSessionAbortController(sessionId, controller);
+  };
+}
+
+/**
+ * Hủy đăng ký một AbortController cụ thể khỏi phiên.
+ */
+export function unregisterSessionAbortController(
+  sessionId: string,
+  controller: AbortController
+): void {
+  const set = sessionAbortControllers.get(sessionId);
+  if (set) {
+    set.delete(controller);
+    if (set.size === 0) {
+      sessionAbortControllers.delete(sessionId);
+    }
+  }
+}
+
+/**
+ * Trả về số lượng AbortController đang được đăng ký (dành cho kiểm thử hồi quy).
+ */
+export function getActiveSessionAbortControllerCount(sessionId?: string): number {
+  if (sessionId) {
+    return sessionAbortControllers.get(sessionId)?.size ?? 0;
+  }
+  let total = 0;
+  for (const set of sessionAbortControllers.values()) {
+    total += set.size;
+  }
+  return total;
+}
+
+/**
+ * Hủy toàn bộ các yêu cầu HTTP đang chạy của một phiên cụ thể.
+ */
+export function abortSessionControllers(sessionId: string): void {
+  const controllers = sessionAbortControllers.get(sessionId);
+  if (controllers) {
+    for (const controller of controllers) {
+      try {
+        controller.abort();
+      } catch {
+        // bỏ qua lỗi abort nếu đã kết thúc
+      }
+    }
+    sessionAbortControllers.delete(sessionId);
+  }
+}
+
+/**
+ * Hủy toàn bộ các controller đang hoạt động của mọi phiên.
+ */
+export function abortAllSessionControllers(): void {
+  for (const [, controllers] of sessionAbortControllers.entries()) {
+    for (const controller of controllers) {
+      try {
+        controller.abort();
+      } catch {
+        // bỏ qua
+      }
+    }
+  }
+  sessionAbortControllers.clear();
+}
+
+function generateSessionId(userId: string): string {
+  return `sess_${userId}_${++sessionEpoch}_${Date.now()}`;
+}
+
+export function syncProgressSessionWithAuth(): void {
+  const state = useAuthStore.getState();
+  const isAuthValid =
+    Boolean(state.isAuthenticated) && Boolean(state.user?.id) && Boolean(state.token);
+
+  if (!isAuthValid) {
+    if (activeSessionId) {
+      abortSessionControllers(activeSessionId);
+    }
+    activeSessionId = '';
+    activeUserId = null;
+    lastAuthToken = null;
+    return;
+  }
+
+  const newUserId = state.user!.id;
+  const newToken = state.token;
+
+  // Nếu user thay đổi, hoặc session trước đó đã hết hạn/chưa có:
+  if (activeUserId !== newUserId || !activeSessionId || lastAuthToken === null) {
+    if (activeSessionId) {
+      abortSessionControllers(activeSessionId);
+    }
+    activeUserId = newUserId;
+    activeSessionId = generateSessionId(newUserId);
+    lastAuthToken = newToken;
+  } else if (lastAuthToken !== newToken) {
+    // Token refresh hợp lệ trong cùng một phiên: duy trì sessionId để không làm gián đoạn mutations đang chạy
+    lastAuthToken = newToken;
+  }
+}
+
+function ensureSessionSubscribed(): void {
+  if (isSubscribed) return;
+  isSubscribed = true;
+  syncProgressSessionWithAuth();
+  useAuthStore.subscribe(() => {
+    syncProgressSessionWithAuth();
+  });
+}
+
+/**
+ * Trả về thông tin phiên xác thực hiện tại của module Progress (Corrective B).
+ * Trả về null nếu người dùng chưa đăng nhập hoặc phiên đã hết hiệu lực.
+ */
+export function getProgressSessionContext(): {
+  userId: string;
+  sessionId: string;
+} | null {
+  ensureSessionSubscribed();
+  syncProgressSessionWithAuth();
+
+  if (!activeUserId || !activeSessionId) {
+    return null;
+  }
+  return {
+    userId: activeUserId,
+    sessionId: activeSessionId,
+  };
+}
+
+/**
+ * Kiểm tra xem phiên mutation ban đầu có còn đang hoạt động hay không.
+ * Ngăn chặn tuyệt đối việc hoàn tất của User A làm thay đổi UI hay invalidation cache của User B (hoặc session mới của chính User A).
+ */
+export function isProgressSessionActive(
+  initiatingUserId?: string,
+  initiatingSessionId?: string
+): boolean {
+  ensureSessionSubscribed();
+  syncProgressSessionWithAuth();
+
+  if (!initiatingUserId || !initiatingSessionId) return false;
+  return (
+    activeUserId === initiatingUserId &&
+    activeSessionId === initiatingSessionId &&
+    Boolean(activeSessionId)
+  );
+}
+
+/**
+ * Hook theo dõi phiên đăng nhập của module Progress trong các component React.
+ */
+export function useProgressSession() {
+  const user = useAuthStore((s) => s.user);
+  const token = useAuthStore((s) => s.token);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+
+  return React.useMemo(() => {
+    ensureSessionSubscribed();
+    syncProgressSessionWithAuth();
+    // Reference state from selector subscriptions to guarantee dependency tracking
+    void user?.id;
+    void token;
+    void isAuthenticated;
+    return {
+      userId: activeUserId,
+      sessionId: activeSessionId,
+      isAuthenticated: Boolean(activeUserId && activeSessionId),
+    };
+  }, [user?.id, token, isAuthenticated]);
+}
+
+/**
+ * Helper dành riêng cho môi trường kiểm thử để reset trạng thái session giữa các test case.
+ */
+export function __resetProgressSessionForTests(): void {
+  abortAllSessionControllers();
+  activeSessionId = '';
+  activeUserId = null;
+  lastAuthToken = null;
+  sessionEpoch = 0;
+  syncProgressSessionWithAuth();
+}

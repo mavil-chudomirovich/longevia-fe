@@ -1,7 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { toast } from 'sonner';
 import { ErrorResponse } from '@/types/api';
-import { getAccessToken, setAccessToken, clearAccessToken } from './auth-token';
+import { getAccessToken, setAccessToken } from './auth-token';
 import { useAuthStore } from '@/store/useAuthStore';
 import { API_BASE_URL } from './env';
 import { sharedRefresh, forceLogout } from './auth-refresh';
@@ -28,6 +28,11 @@ const api = axios.create({
 // KHÔNG đọc trực tiếp localStorage ở đây nữa để tránh lệch với HttpOnly cookie.
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    // Chuẩn hóa tránh double /api/api nếu URL gọi bắt đầu bằng /api/
+    if (config.url?.startsWith('/api/')) {
+      config.url = config.url.replace(/^\/api/, '');
+    }
+
     const storeToken = useAuthStore.getState().token;
     const token = getAccessToken() ?? storeToken;
     // Tự sync lại memory nếu store còn token (trường hợp hydrate sau F5)
@@ -43,7 +48,7 @@ api.interceptors.request.use(
 );
 
 /** Route cần đăng nhập theo `middleware.ts` — redirect về login kèm `from` khi mất phiên. */
-const PROTECTED_PREFIXES = ['/dashboard', '/profile', '/admin'];
+const PROTECTED_PREFIXES = ['/dashboard', '/profile', '/admin', '/progress'];
 
 /**
  * Đưa về `/login?from=<path>` khi mất phiên mà đang ở route bảo vệ.
