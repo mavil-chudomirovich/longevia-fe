@@ -38,6 +38,7 @@ import {
 } from '../utils/progress-session';
 import {
   ProgressAuthError,
+  ProgressSessionObsoleteError,
   ProgressDataIntegrityError,
 } from '../errors/progress-data-integrity.error';
 
@@ -157,7 +158,11 @@ export function useMetricsHistoryQuery(filters?: GetMetricsHistoryFilters, custo
 // ==========================================
 
 export type ProgressMutationError =
-  AxiosError<ErrorResponse> | ProgressAuthError | ProgressDataIntegrityError | Error;
+  | AxiosError<ErrorResponse>
+  | ProgressAuthError
+  | ProgressSessionObsoleteError
+  | ProgressDataIntegrityError
+  | Error;
 
 interface SessionMutationInput<TVariables> {
   values: TVariables;
@@ -186,6 +191,10 @@ function handleProgressMutationError(
   }
 
   if (error instanceof ProgressAuthError) {
+    // Không hiển thị toast cho lỗi phiên obsolete ngầm khi chuyển tài khoản
+    if (error.code === 'PROGRESS_SESSION_OBSOLETE') {
+      return;
+    }
     toast.error(error.message);
     return;
   }
@@ -229,6 +238,10 @@ function handleProgressMutationError(
   }
 }
 
+/**
+ * Test seam interface dành riêng cho môi trường kiểm thử hành vi race condition.
+ * KHÔNG sử dụng trong code production.
+ */
 export interface ProgressMutationTestSeams {
   beforeDispatch?: () => Promise<void> | void;
 }
@@ -265,13 +278,13 @@ function useSessionBoundMutation<TData, TVariables>(config: {
       // Tái kiểm tra phiên NGAY TRƯỚC KHI gửi yêu cầu HTTP ra mạng
       if (!isProgressSessionActive(initiatingSession.userId, initiatingSession.sessionId)) {
         abortController.abort();
-        throw new ProgressAuthError();
+        throw new ProgressSessionObsoleteError();
       }
       return config.mutationFn(values, abortController.signal);
     },
     onMutate: async ({ initiatingSession }) => {
       if (!isProgressSessionActive(initiatingSession.userId, initiatingSession.sessionId)) {
-        throw new ProgressAuthError();
+        throw new ProgressSessionObsoleteError();
       }
       return {
         initiatingUserId: initiatingSession.userId,
@@ -381,29 +394,59 @@ function useSessionBoundMutation<TData, TVariables>(config: {
       const initiatingSessionId = session.sessionId;
 
       try {
-        return await mutation.mutateAsync(
+        const result = await mutation.mutateAsync(
           { values, initiatingSession: session, abortController: controller },
           {
             onSuccess: (data, _vars, ctx, fnCtx) => {
               // Finding A: Chỉ thực thi per-call onSuccess nếu phiên khởi tạo vẫn active
               if (isProgressSessionActive(initiatingUserId, initiatingSessionId)) {
-                options?.onSuccess?.(data, values, ctx, fnCtx);
+                try {
+                  options?.onSuccess?.(data, values, ctx, fnCtx);
+                } catch (consumerError) {
+                  console.error('Progress mutation consumer onSuccess error:', consumerError);
+                }
               }
             },
             onError: (err, _vars, ctx, fnCtx) => {
               // Finding A: Chỉ thực thi per-call onError nếu phiên khởi tạo vẫn active
               if (isProgressSessionActive(initiatingUserId, initiatingSessionId)) {
-                options?.onError?.(err, values, ctx, fnCtx);
+                try {
+                  options?.onError?.(err, values, ctx, fnCtx);
+                } catch (consumerError) {
+                  console.error('Progress mutation consumer onError error:', consumerError);
+                }
               }
             },
             onSettled: (data, err, _vars, ctx, fnCtx) => {
               // Finding A: Chỉ thực thi per-call onSettled nếu phiên khởi tạo vẫn active
               if (isProgressSessionActive(initiatingUserId, initiatingSessionId)) {
-                options?.onSettled?.(data, err, values, ctx, fnCtx);
+                try {
+                  options?.onSettled?.(data, err, values, ctx, fnCtx);
+                } catch (consumerError) {
+                  console.error('Progress mutation consumer onSettled error:', consumerError);
+                }
               }
             },
           }
         );
+
+        // Finding A (Post-settlement session validation):
+        // Sau khi underlying Promise giải quyết thành công, xác thực lại phiên khởi tạo.
+        // Ngăn chặn tuyệt đối việc trả về kết quả riêng tư của User A cho người gọi đang hoạt động dưới User B.
+        if (!isProgressSessionActive(initiatingUserId, initiatingSessionId)) {
+          throw new ProgressSessionObsoleteError();
+        }
+
+        return result;
+      } catch (err) {
+        // Nếu phiên khởi tạo đã trở nên obsolete trong quá trình thực thi:
+        if (!isProgressSessionActive(initiatingUserId, initiatingSessionId)) {
+          if (err instanceof ProgressAuthError) {
+            throw err;
+          }
+          throw new ProgressSessionObsoleteError();
+        }
+        throw err;
       } finally {
         unregister();
       }

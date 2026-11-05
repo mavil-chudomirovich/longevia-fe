@@ -4,6 +4,48 @@
 
 ---
 
+## [2026-11-05] Hoàn tất PR #1 Final Two-Finding Corrective — Reject Obsolete mutateAsync() Results & Deterministic Dispatch-Time Race Seams (Bảo — Dev 3)
+
+- **Người thực hiện**: Bảo — Progress Service Owner (Dev 3).
+- **Phạm vi sở hữu**: Progress & Biomarkers frontend (`src/features/progress/`, `src/app/progress/`).
+- **Mục tiêu**:
+  - Khắc phục triệt để 2 phát hiện cuối cùng trong đợt rà soát độc lập của PR #1:
+    - **Finding A (P2 — Obsolete `mutateAsync()` Results Must Reject Instead of Resolving)**:
+      - Trong `useSessionBoundMutation`, sau khi underlying Promise giải quyết thành công, tái kiểm tra phiên thông qua `isProgressSessionActive(initiatingUserId, initiatingSessionId)`.
+      - Nếu phiên đã trở nên obsolete (User A đăng xuất, chuyển sang User B, hoặc User A đăng nhập lại với sessionId mới), `mutateAsync` ném lỗi có kiểu rõ ràng `ProgressSessionObsoleteError` (`code = 'PROGRESS_SESSION_OBSOLETE'`), ngăn chặn tuyệt đối việc trả về kết quả riêng tư của User A cho người gọi đang hoạt động dưới User B.
+      - Triệt tiêu hoàn toàn toast thành công, toast lỗi ngầm, và vô hiệu hóa triệt để việc cập nhật / làm mới cache chéo tài khoản.
+      - Đảm bảo giải phóng tài nguyên `AbortController` vô điều kiện trong khối `finally`.
+    - **Finding B (P2 — Deterministic Dispatch-Time Race Reproduction via Two-Signal Protocol)**:
+      - Thay thế việc dispatch không có điểm neo đồng bộ bằng giao thức 2 tín hiệu rõ ràng qua `__setProgressMutationTestSeams`:
+        - `enteredBeforeDispatch.resolve()`: Bằng chứng toán học khẳng định luồng thực thi đã tạm dừng bên trong điểm nối vòng đời trước khi bất kỳ thay đổi xác thực nào xảy ra.
+        - `resumeBeforeDispatch.promise`: Khóa luồng thực thi cho tới khi trạng thái xác thực đã chuyển đổi xong xuôi trong test.
+      - Kiểm chứng toán học tuyệt đối:
+        - Trường hợp 1 (User A -> Đăng xuất -> User B): 0 HTTP requests được gửi ra mạng, 0 toast cho User B, cache User B nguyên vẹn, controller count = 0, ném `ProgressSessionObsoleteError`.
+        - Trường hợp 2 (User A -> Đăng xuất -> User A đăng nhập lại với sessionId mới): 0 HTTP requests được gửi ra mạng, 0 toast, controller count = 0, ném `ProgressSessionObsoleteError`.
+        - Trường hợp 3 (User A -> Silent token refresh trong cùng active session): Yêu cầu HTTP được dispatch bình thường, toast thành công hiển thị, kết quả hoàn tất chuẩn xác, controller count = 0.
+
+- **Đã thực hiện**:
+  1. `src/features/progress/errors/progress-data-integrity.error.ts`:
+     - Thêm lớp lỗi `ProgressSessionObsoleteError extends ProgressAuthError` với `code: 'PROGRESS_SESSION_OBSOLETE'`, bảo toàn tính tương thích ngược `instanceof ProgressAuthError === true`.
+  2. `src/features/progress/queries/progress.queries.ts`:
+     - Cập nhật `handleProgressMutationError` triệt tiêu toast lỗi khi `error.code === 'PROGRESS_SESSION_OBSOLETE'`.
+     - Trong `mutationFn` và `onMutate`, ném `ProgressSessionObsoleteError` khi phát hiện phiên obsolete trước dispatch.
+     - Trong `mutateAsync`:
+       - Thêm kiểm tra xác thực sau khi hoàn tất: `if (!isProgressSessionActive(initiatingUserId, initiatingSessionId)) throw new ProgressSessionObsoleteError();`.
+       - Bọc consumer callbacks trong `try ... catch` để ngăn ngừa lỗi người gọi làm gián đoạn dọn dẹp.
+       - Luôn thu hồi controller trong khối `finally { unregister(); }`.
+  3. `src/features/progress/tests/progress.behavior.test.tsx`:
+     - Mở rộng suite Finding A bao phủ trọn vẹn 12 kịch bản: `mutateAsync` thành công trong phiên active, `mutateAsync` reject khi logout/switch account/same-user relogin, bảo toàn kết quả khi token refresh, giữ nguyên lỗi backend không bao bọc sai, giải phóng controller khi callback throw và phân lập đa mutation đồng thời.
+     - Nâng cấp suite Finding B1 (Scenario Q) với giao thức 2 tín hiệu deferred (`enteredBeforeDispatch` & `resumeBeforeDispatch`) cho 3 ca kiểm thử race condition: Account Switch, Session ID Renewal, và Token Refresh.
+
+- **Kết quả kiểm chứng (Verification Gates)**:
+  - `npx tsc --noEmit`: 0 lỗi type (0 errors).
+  - `npm test`: 11 test files, 179 tests PASS 100% (48 behavioral tests, 8 API tests, 33 mapper tests, 26 date tests, 20 schema tests, 13 query tests, 4 rollover tests, 27 common/auth tests).
+  - `npx eslint src/features/progress`: 0 lỗi lint (0 errors, 0 warnings trên behavior test).
+  - `npm run build`: Next.js 16 production build thành công toàn bộ 15 routes tĩnh/động.
+
+---
+
 ## [2026-11-05] Hoàn tất PR #1 Final Corrective & Verification — Guard Mutation Callbacks, Async Race Seams, Axios Transport Adapter & Session-Keyed Forms (Bảo — Dev 3)
 
 - **Người thực hiện**: Bảo — Progress Service Owner (Dev 3).

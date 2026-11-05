@@ -46,7 +46,10 @@ import {
 } from '../utils/progress-session';
 import { UserRole, MemberStatus } from '@/common/enums';
 import { User } from '@/features/auth/types/auth.model';
-import { ProgressAuthError } from '../errors/progress-data-integrity.error';
+import {
+  ProgressAuthError,
+  ProgressSessionObsoleteError,
+} from '../errors/progress-data-integrity.error';
 
 // Mock Sonner toast
 vi.mock('sonner', () => ({
@@ -987,7 +990,32 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       expect(getActiveSessionAbortControllerCount()).toBe(0);
     });
 
-    it('mutateAsync rejects with ProgressAuthError but suppresses caller callbacks on obsolete session', async () => {
+    it('mutateAsync resolves with expected payload in an active session', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      const expectedPayload: WaterSummary = {
+        date: '2026-11-04',
+        consumedMl: 500,
+        targetMl: 2500,
+        percentComplete: 20,
+        visualPercent: 20,
+        remainingMl: 2000,
+      };
+      vi.spyOn(progressApi, 'logWater').mockResolvedValueOnce(expectedPayload);
+
+      const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
+
+      let data: WaterSummary | null = null;
+      await act(async () => {
+        data = await result.current.mutateAsync({ amountMl: 500 });
+      });
+
+      expect(data).toEqual(expectedPayload);
+      expect(getActiveSessionAbortControllerCount()).toBe(0);
+    });
+
+    it('mutateAsync rejects with ProgressSessionObsoleteError and suppresses callbacks when User A logs out during pending mutation', async () => {
       useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
       syncProgressSessionWithAuth();
 
@@ -1009,6 +1037,8 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
           });
       });
 
+      expect(getActiveSessionAbortControllerCount()).toBeGreaterThan(0);
+
       // User A logs out
       act(() => {
         useAuthStore.getState().logout();
@@ -1027,9 +1057,175 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       });
 
       expect(caughtError).toBeInstanceOf(ProgressAuthError);
+      expect(caughtError).toBeInstanceOf(ProgressSessionObsoleteError);
+      expect((caughtError as ProgressSessionObsoleteError).code).toBe('PROGRESS_SESSION_OBSOLETE');
       expect(onSuccess).not.toHaveBeenCalled();
       expect(onError).not.toHaveBeenCalled();
       expect(onSettled).not.toHaveBeenCalled();
+      expect(toast.success).not.toHaveBeenCalled();
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(getActiveSessionAbortControllerCount()).toBe(0);
+    });
+
+    it('mutateAsync rejects with ProgressSessionObsoleteError and isolates private data when switching to User B during pending mutation', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      const deferred = createDeferred<WaterSummary>();
+      vi.spyOn(progressApi, 'logWater').mockReturnValueOnce(deferred.promise);
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      const onSuccess = vi.fn();
+      const onError = vi.fn();
+      const onSettled = vi.fn();
+
+      const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
+
+      let userAResult: WaterSummary | null = null;
+      let caughtError: unknown = null;
+      act(() => {
+        result.current
+          .mutateAsync({ amountMl: 250 }, { onSuccess, onError, onSettled })
+          .then((res) => {
+            userAResult = res;
+          })
+          .catch((err) => {
+            caughtError = err;
+          });
+      });
+
+      // Switch to User B
+      act(() => {
+        useAuthStore.getState().logout();
+        useAuthStore.setState({ user: mockUserB, isAuthenticated: true, token: 'token-b' });
+        syncProgressSessionWithAuth();
+      });
+
+      await act(async () => {
+        deferred.resolve({
+          date: '2026-11-04',
+          consumedMl: 250,
+          targetMl: 2500,
+          percentComplete: 10,
+          visualPercent: 10,
+          remainingMl: 2250,
+        });
+      });
+
+      expect(userAResult).toBeNull();
+      expect(caughtError).toBeInstanceOf(ProgressAuthError);
+      expect(caughtError).toBeInstanceOf(ProgressSessionObsoleteError);
+      expect((caughtError as ProgressSessionObsoleteError).code).toBe('PROGRESS_SESSION_OBSOLETE');
+      expect(onSuccess).not.toHaveBeenCalled();
+      expect(onError).not.toHaveBeenCalled();
+      expect(onSettled).not.toHaveBeenCalled();
+      expect(toast.success).not.toHaveBeenCalled();
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(invalidateSpy).not.toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: progressKeys.user(mockUserB.id) })
+      );
+      expect(getActiveSessionAbortControllerCount()).toBe(0);
+    });
+
+    it('mutateAsync rejects with ProgressSessionObsoleteError when same user relogins (new session ID) during pending mutation', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      const deferred = createDeferred<WaterSummary>();
+      vi.spyOn(progressApi, 'logWater').mockReturnValueOnce(deferred.promise);
+
+      const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
+
+      let caughtError: unknown = null;
+      act(() => {
+        result.current.mutateAsync({ amountMl: 250 }).catch((err) => {
+          caughtError = err;
+        });
+      });
+
+      // User A logs out and logs back in (generating a distinct sessionId)
+      act(() => {
+        useAuthStore.getState().logout();
+        useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a-relogin' });
+        syncProgressSessionWithAuth();
+      });
+
+      await act(async () => {
+        deferred.resolve({
+          date: '2026-11-04',
+          consumedMl: 250,
+          targetMl: 2500,
+          percentComplete: 10,
+          visualPercent: 10,
+          remainingMl: 2250,
+        });
+      });
+
+      expect(caughtError).toBeInstanceOf(ProgressAuthError);
+      expect(caughtError).toBeInstanceOf(ProgressSessionObsoleteError);
+      expect((caughtError as ProgressSessionObsoleteError).code).toBe('PROGRESS_SESSION_OBSOLETE');
+      expect(toast.success).not.toHaveBeenCalled();
+      expect(getActiveSessionAbortControllerCount()).toBe(0);
+    });
+
+    it('mutateAsync resolves normally when token refreshes within the same active session', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-initial' });
+      syncProgressSessionWithAuth();
+
+      const deferred = createDeferred<WaterSummary>();
+      vi.spyOn(progressApi, 'logWater').mockReturnValueOnce(deferred.promise);
+
+      const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
+
+      let data: WaterSummary | null = null;
+      act(() => {
+        result.current.mutateAsync({ amountMl: 250 }).then((res) => {
+          data = res;
+        });
+      });
+
+      // Silent token refresh in same active session
+      act(() => {
+        useAuthStore.getState().setToken('token-refreshed');
+        syncProgressSessionWithAuth();
+      });
+
+      await act(async () => {
+        deferred.resolve({
+          date: '2026-11-04',
+          consumedMl: 250,
+          targetMl: 2500,
+          percentComplete: 10,
+          visualPercent: 10,
+          remainingMl: 2250,
+        });
+      });
+
+      expect(data).toEqual(expect.objectContaining({ consumedMl: 250 }));
+      expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('250 ml'));
+      expect(getActiveSessionAbortControllerCount()).toBe(0);
+    });
+
+    it('mutateAsync preserves backend error rejection in active session without wrapping in obsolete error', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      const backendError = new Error('Database write constraint violation');
+      vi.spyOn(progressApi, 'logWater').mockRejectedValueOnce(backendError);
+
+      const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
+
+      let caughtError: unknown = null;
+      await act(async () => {
+        try {
+          await result.current.mutateAsync({ amountMl: 250 });
+        } catch (err) {
+          caughtError = err;
+        }
+      });
+
+      expect(caughtError).toBe(backendError);
+      expect(caughtError).not.toBeInstanceOf(ProgressSessionObsoleteError);
       expect(getActiveSessionAbortControllerCount()).toBe(0);
     });
 
@@ -1064,7 +1260,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       expect(getActiveSessionAbortControllerCount()).toBe(0);
     });
 
-    it('tracks concurrent mutations with independent controllers and cleans up on settlement', async () => {
+    it('tracks concurrent mutations with independent controllers and cleans up on settlement across success, error, obsolete', async () => {
       useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
       syncProgressSessionWithAuth();
 
@@ -1129,22 +1325,33 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       const apiSpy = vi.spyOn(progressApi, 'logWater');
       const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
-      const seamPause = createDeferred<void>();
+      const enteredBeforeDispatch = createDeferred<void>();
+      const resumeBeforeDispatch = createDeferred<void>();
 
       __setProgressMutationTestSeams({
         beforeDispatch: async () => {
-          await seamPause.promise;
+          enteredBeforeDispatch.resolve();
+          await resumeBeforeDispatch.promise;
         },
       });
 
       const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
 
       let mutationError: unknown = null;
-      act(() => {
-        result.current.mutateAsync({ amountMl: 250 }).catch((err) => {
+      let promiseSettled = false;
+      const mutationPromise = result.current
+        .mutateAsync({ amountMl: 250 })
+        .catch((err) => {
           mutationError = err;
+        })
+        .finally(() => {
+          promiseSettled = true;
         });
-      });
+
+      // Khẳng định luồng thực thi ĐÃ VÀO TRONG beforeDispatch trước khi can thiệp session
+      await enteredBeforeDispatch.promise;
+      expect(promiseSettled).toBe(false);
+      expect(getActiveSessionAbortControllerCount()).toBeGreaterThan(0);
 
       // Account switches to User B while mutation is paused before dispatch
       act(() => {
@@ -1154,9 +1361,8 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       });
 
       // Resume execution
-      await act(async () => {
-        seamPause.resolve();
-      });
+      resumeBeforeDispatch.resolve();
+      await mutationPromise;
 
       expect(apiSpy).not.toHaveBeenCalled();
       expect(toast.success).not.toHaveBeenCalled();
@@ -1165,6 +1371,11 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
         expect.objectContaining({ queryKey: progressKeys.user(mockUserB.id) })
       );
       expect(mutationError).toBeInstanceOf(ProgressAuthError);
+      expect(mutationError).toBeInstanceOf(ProgressSessionObsoleteError);
+      expect((mutationError as ProgressSessionObsoleteError).code).toBe(
+        'PROGRESS_SESSION_OBSOLETE'
+      );
+      expect(getActiveSessionAbortControllerCount()).toBe(0);
     });
 
     it('aborts before HTTP dispatch when same user logs out and logs back in (session ID renewal)', async () => {
@@ -1172,22 +1383,33 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       syncProgressSessionWithAuth();
 
       const apiSpy = vi.spyOn(progressApi, 'logWater');
-      const seamPause = createDeferred<void>();
+      const enteredBeforeDispatch = createDeferred<void>();
+      const resumeBeforeDispatch = createDeferred<void>();
 
       __setProgressMutationTestSeams({
         beforeDispatch: async () => {
-          await seamPause.promise;
+          enteredBeforeDispatch.resolve();
+          await resumeBeforeDispatch.promise;
         },
       });
 
       const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
 
       let mutationError: unknown = null;
-      act(() => {
-        result.current.mutateAsync({ amountMl: 250 }).catch((err) => {
+      let promiseSettled = false;
+      const mutationPromise = result.current
+        .mutateAsync({ amountMl: 250 })
+        .catch((err) => {
           mutationError = err;
+        })
+        .finally(() => {
+          promiseSettled = true;
         });
-      });
+
+      // Khẳng định luồng thực thi ĐÃ VÀO TRONG beforeDispatch trước khi can thiệp session
+      await enteredBeforeDispatch.promise;
+      expect(promiseSettled).toBe(false);
+      expect(getActiveSessionAbortControllerCount()).toBeGreaterThan(0);
 
       // Same user logs out and logs back in (creates a fresh sessionId)
       act(() => {
@@ -1197,13 +1419,18 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       });
 
       // Resume execution
-      await act(async () => {
-        seamPause.resolve();
-      });
+      resumeBeforeDispatch.resolve();
+      await mutationPromise;
 
       expect(apiSpy).not.toHaveBeenCalled();
       expect(toast.success).not.toHaveBeenCalled();
+      expect(toast.error).not.toHaveBeenCalled();
       expect(mutationError).toBeInstanceOf(ProgressAuthError);
+      expect(mutationError).toBeInstanceOf(ProgressSessionObsoleteError);
+      expect((mutationError as ProgressSessionObsoleteError).code).toBe(
+        'PROGRESS_SESSION_OBSOLETE'
+      );
+      expect(getActiveSessionAbortControllerCount()).toBe(0);
     });
 
     it('permits HTTP dispatch when token refreshes for the same active session', async () => {
@@ -1219,22 +1446,33 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
         remainingMl: 2250,
       });
 
-      const seamPause = createDeferred<void>();
+      const enteredBeforeDispatch = createDeferred<void>();
+      const resumeBeforeDispatch = createDeferred<void>();
 
       __setProgressMutationTestSeams({
         beforeDispatch: async () => {
-          await seamPause.promise;
+          enteredBeforeDispatch.resolve();
+          await resumeBeforeDispatch.promise;
         },
       });
 
       const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
 
       let mutationResult: WaterSummary | null = null;
-      act(() => {
-        result.current.mutateAsync({ amountMl: 250 }).then((res) => {
+      let promiseSettled = false;
+      const mutationPromise = result.current
+        .mutateAsync({ amountMl: 250 })
+        .then((res) => {
           mutationResult = res;
+        })
+        .finally(() => {
+          promiseSettled = true;
         });
-      });
+
+      // Khẳng định luồng thực thi ĐÃ VÀO TRONG beforeDispatch trước khi đổi token
+      await enteredBeforeDispatch.promise;
+      expect(promiseSettled).toBe(false);
+      expect(getActiveSessionAbortControllerCount()).toBeGreaterThan(0);
 
       // Silent token refresh: user and sessionId unchanged
       act(() => {
@@ -1243,12 +1481,12 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       });
 
       // Resume execution
-      await act(async () => {
-        seamPause.resolve();
-      });
+      resumeBeforeDispatch.resolve();
+      await mutationPromise;
 
       expect(mutationResult).toEqual(expect.objectContaining({ consumedMl: 250 }));
       expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('250 ml'));
+      expect(getActiveSessionAbortControllerCount()).toBe(0);
     });
   });
 
