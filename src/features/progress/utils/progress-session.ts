@@ -24,15 +24,42 @@ export function registerSessionAbortController(
   }
   controllers.add(controller);
 
+  let unregistered = false;
   return () => {
-    const set = sessionAbortControllers.get(sessionId);
-    if (set) {
-      set.delete(controller);
-      if (set.size === 0) {
-        sessionAbortControllers.delete(sessionId);
-      }
-    }
+    if (unregistered) return;
+    unregistered = true;
+    unregisterSessionAbortController(sessionId, controller);
   };
+}
+
+/**
+ * Hủy đăng ký một AbortController cụ thể khỏi phiên.
+ */
+export function unregisterSessionAbortController(
+  sessionId: string,
+  controller: AbortController
+): void {
+  const set = sessionAbortControllers.get(sessionId);
+  if (set) {
+    set.delete(controller);
+    if (set.size === 0) {
+      sessionAbortControllers.delete(sessionId);
+    }
+  }
+}
+
+/**
+ * Trả về số lượng AbortController đang được đăng ký (dành cho kiểm thử hồi quy).
+ */
+export function getActiveSessionAbortControllerCount(sessionId?: string): number {
+  if (sessionId) {
+    return sessionAbortControllers.get(sessionId)?.size ?? 0;
+  }
+  let total = 0;
+  for (const set of sessionAbortControllers.values()) {
+    total += set.size;
+  }
+  return total;
 }
 
 /**
@@ -163,6 +190,10 @@ export function useProgressSession() {
   return React.useMemo(() => {
     ensureSessionSubscribed();
     syncProgressSessionWithAuth();
+    // Reference state from selector subscriptions to guarantee dependency tracking
+    void user?.id;
+    void token;
+    void isAuthenticated;
     return {
       userId: activeUserId,
       sessionId: activeSessionId,

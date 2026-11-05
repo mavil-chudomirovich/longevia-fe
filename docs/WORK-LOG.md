@@ -4,7 +4,40 @@
 
 ---
 
-## [2026-11-05] Hoàn tất PR #1 Session Safety Final Corrective — An toàn Dispatch, Triệt tiêu Stale Toast & Khóa Dữ liệu Private tại Render (Bảo — Dev 3)
+## [2026-11-05] Hoàn tất PR #1 Final Corrective & Verification — Guard Mutation Callbacks, Async Race Seams, Axios Transport Adapter & Session-Keyed Forms (Bảo — Dev 3)
+
+- **Người thực hiện**: Bảo — Progress Service Owner (Dev 3).
+- **Phạm vi sở hữu**: Progress & Biomarkers frontend (`src/features/progress/`, `src/app/progress/`).
+- **Mục tiêu**:
+  - Khắc phục triệt để 4 mục trong đợt đánh giá độc lập cuối cùng của PR #1:
+    - **Finding A (P2 — Guard Optional Mutation Callbacks)**: Bảo vệ toàn bộ callback người gọi (`onSuccess`, `onError`, `onSettled`) trong cả `mutate()` và `mutateAsync()` bằng `isProgressSessionActive(initiatingUserId, initiatingSessionId)`. Đảm bảo giải phóng tài nguyên AbortController vô điều kiện trong `onSettled` nội bộ và khối `finally`, không bao giờ phụ thuộc vào consumer callbacks. Bảo toàn cơ chế reject Promise của `mutateAsync` khi phiên bị hủy.
+    - **Finding B1 (P2 — Scenario Q Replacement: Real Asynchronous Race Reproduction)**: Thay thế test unauthenticated nông cạn bằng kịch bản race condition không đồng bộ thực tế qua điểm dừng vòng đời (lifecycle seam: `__setProgressMutationTestSeams`). Kiểm chứng triệt để: User A bắt đầu mutation -> tạm dừng trước dispatch -> chuyển sang User B / cùng User đăng nhập lại (session renewal) -> tiếp tục: xác minh 0 HTTP request được gửi ra backend, 0 toast cho User B, cache User B nguyên vẹn. Ngược lại, token refresh trong cùng phiên vẫn cho phép mutation tiếp diễn bình thường.
+    - **Finding B2 (P2 — Scenario P Replacement: Real Axios Interceptor Testing)**: Chấm dứt việc mock trực tiếp các phương thức của `progressApi`. Kiểm thử xuyên suốt qua `progressApi` và đối tượng Axios dùng chung (`api`) bằng transport adapter mạng giả lập (`api.defaults.adapter`), giữ nguyên 100% request và response interceptors của `src/lib/axios.ts`. Xác thực các mã lỗi (409, 422, 502, 503, 500, 403, 429, mất kết nối mạng) trong phiên active chỉ hiển thị duy nhất 1 toast từ Progress (0 duplicate toast từ Axios nhờ `silent: true`); và triệt tiêu 100% toast khi phiên đã chuyển sang User B.
+    - **Finding B3 (Preserve Mapper End-to-End Test)**: Bảo toàn kịch bản Scenario J qua Axios boundary với payload ngày không hợp lệ 30/02 ném `ProgressDataIntegrityError` hiển thị error card rõ ràng kèm nút thử lại, tuyệt đối không tạo ngày giả mạo.
+    - **Finding C (P2 — Remove React Render-Phase Form Resets)**: Loại bỏ hoàn toàn `form.reset()` trong render phase (`formSessionRef.current !== sessionId`) tại `body-metric-form.tsx`, `sleep-log-form.tsx`, và `water-tracker.tsx`. Tách thành các session-keyed inner form components (`key={sessionId || 'unauthenticated'}`), cho phép React remount form một cách tự nhiên với giá trị mặc định sạch khi phiên thay đổi, bảo toàn bản nháp của người dùng khi token refresh âm thầm, và tương thích hoàn toàn với React StrictMode.
+
+- **Đã thực hiện**:
+  1. `src/features/progress/utils/progress-session.ts`: Thêm `unregisterSessionAbortController` và `getActiveSessionAbortControllerCount` phục vụ kiểm tra dọn dẹp tài nguyên. Hàm hủy đăng ký được bảo đảm tính idempotent.
+  2. `src/features/progress/queries/progress.queries.ts`:
+     - Thiết lập test seam `__setProgressMutationTestSeams` cho phép can thiệp dừng trước khi dispatch HTTP.
+     - Trong `useSessionBoundMutation`: Cấu hình `onSettled` nội bộ trên `useMutation` để luôn luôn thu hồi AbortController.
+     - Bọc per-call caller callbacks (`options?.onSuccess`, `options?.onError`, `options?.onSettled`) qua điều kiện `isProgressSessionActive`. Bọc `try ... catch ... finally { unregister(); }` ngăn lỗi từ consumer làm hỏng vòng đời dọn dẹp.
+  3. UI Components (`body-metric-form.tsx`, `sleep-log-form.tsx`, `water-tracker.tsx`):
+     - Xóa bỏ `formSessionRef` và lệnh gọi `form.reset()` trong render phase.
+     - Cấu trúc lại theo pattern Component/ComponentInner với `key={sessionId || 'unauthenticated'}`.
+     - Bảo toàn việc dẫn xuất đồng bộ dữ liệu riêng tư (`visibleRecord`, `visibleSleepRecord`) tại render commit.
+  4. `src/features/progress/tests/progress.behavior.test.tsx`:
+     - Bổ sung bộ test Finding A (7 tests) kiểm tra callbacks và dọn dẹp controller.
+     - Bổ sung bộ test Finding B1 (3 tests) kiểm tra race condition dispatch qua test seams.
+     - Bổ sung bộ test Finding B2 (9 tests) kiểm tra lỗi qua `api.defaults.adapter` thực tế với đầy đủ các mã lỗi.
+     - Bổ sung bộ test Finding C (6 tests) kiểm tra phân lập form draft qua tài khoản, giữ nháp qua token refresh, an toàn khi mutation hoàn tất muộn và chạy mượt mà trong React.StrictMode.
+  5. `docs/handoffs/progress-to-identity-auth-blocker.md`, `docs/PROGRESS.md`, `docs/WORK-LOG.md`: Cập nhật chi tiết tiến độ, quyết định thiết kế và bằng chứng kiểm thử.
+
+- **Kết quả kiểm chứng (Verification Gates)**:
+  - `npx tsc --noEmit`: 0 lỗi type (0 errors).
+  - `npm test`: 11 test files, 174 tests PASS 100% (43 behavioral regression tests, 8 API tests, 33 mapper tests, 26 date tests, 20 schema tests, 13 query tests, 4 rollover tests, 27 common/auth tests).
+  - `npx eslint src/features/progress`: 0 lỗi lint (0 errors).
+  - `npm run build`: Next.js 16 production build thành công toàn bộ 15 routes tĩnh/động.
 
 - **Người thực hiện**: Bảo — Progress Service Owner (Dev 3).
 - **Phạm vi sở hữu**: Progress & Biomarkers frontend (`src/features/progress/`, `src/app/progress/`).

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/useAuthStore';
-import { clearProgressCache, progressKeys } from '../queries/progress.queries';
+import { clearProgressCache } from '../queries/progress.queries';
 import { useUtcDayRollover } from '../hooks/useUtcDayRollover';
 
 /**

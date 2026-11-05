@@ -13,17 +13,26 @@ import {
 } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { AxiosError, type InternalAxiosRequestConfig, type AxiosResponse } from 'axios';
 import { useAuthStore } from '@/store/useAuthStore';
 import api from '@/lib/axios';
 import { progressApi } from '../api/progress.api';
 import {
+  WaterSummary,
+  SleepRecord,
+  BodyMetricRecord,
+  EndFastingResult,
+  FastingStatusEnum,
+  SleepQualityEnum,
+  BmiCategoryEnum,
+} from '../types/progress.model';
+import {
   progressKeys,
-  clearProgressCache,
   useStartFastingMutation,
-  useEndFastingMutation,
   useLogWaterMutation,
   useLogSleepMutation,
   useLogBodyMetricMutation,
+  __setProgressMutationTestSeams,
 } from '../queries/progress.queries';
 import { FastingPanel } from '../components/fasting-panel';
 import { SleepLogForm } from '../components/sleep-log-form';
@@ -33,13 +42,11 @@ import { ProgressCacheSync } from '../components/progress-cache-sync';
 import {
   __resetProgressSessionForTests,
   syncProgressSessionWithAuth,
+  getActiveSessionAbortControllerCount,
 } from '../utils/progress-session';
 import { UserRole, MemberStatus } from '@/common/enums';
 import { User } from '@/features/auth/types/auth.model';
-import {
-  ProgressAuthError,
-  ProgressDataIntegrityError,
-} from '../errors/progress-data-integrity.error';
+import { ProgressAuthError } from '../errors/progress-data-integrity.error';
 
 // Mock Sonner toast
 vi.mock('sonner', () => ({
@@ -77,7 +84,7 @@ class ResizeObserverMock {
   unobserve = vi.fn();
   disconnect = vi.fn();
 }
-globalThis.ResizeObserver = ResizeObserverMock as any;
+globalThis.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
 
 describe('Progress Module - Real React Behavioral Regression Tests (Corrective C)', () => {
   let queryClient: QueryClient;
@@ -107,8 +114,10 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
   };
 
   const createWrapper = () => {
-    return ({ children }: { children: React.ReactNode }) =>
+    const QueryWrapper = ({ children }: { children: React.ReactNode }) =>
       React.createElement(QueryClientProvider, { client: queryClient }, children);
+    QueryWrapper.displayName = 'QueryWrapper';
+    return QueryWrapper;
   };
 
   function createDeferred<T>() {
@@ -171,6 +180,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
     cleanup();
     queryClient.clear();
     __resetProgressSessionForTests();
+    __setProgressMutationTestSeams(null);
     useAuthStore.getState().logout();
     vi.restoreAllMocks();
   });
@@ -213,7 +223,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
       syncProgressSessionWithAuth();
 
-      const deferred = createDeferred<any>();
+      const deferred = createDeferred<WaterSummary>();
       vi.spyOn(progressApi, 'logWater').mockReturnValueOnce(deferred.promise);
       const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
@@ -253,7 +263,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
       syncProgressSessionWithAuth();
 
-      const deferred = createDeferred<any>();
+      const deferred = createDeferred<WaterSummary>();
       vi.spyOn(progressApi, 'logWater').mockReturnValueOnce(deferred.promise);
       const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
@@ -296,7 +306,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
       syncProgressSessionWithAuth();
 
-      const deferred = createDeferred<any>();
+      const deferred = createDeferred<WaterSummary>();
       vi.spyOn(progressApi, 'logWater').mockReturnValueOnce(deferred.promise);
 
       render(<WaterTracker />, { wrapper: createWrapper() });
@@ -327,7 +337,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-session-1' });
       syncProgressSessionWithAuth();
 
-      const deferred = createDeferred<any>();
+      const deferred = createDeferred<WaterSummary>();
       vi.spyOn(progressApi, 'logWater').mockReturnValueOnce(deferred.promise);
       const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
@@ -369,7 +379,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
       syncProgressSessionWithAuth();
 
-      const deferred = createDeferred<any>();
+      const deferred = createDeferred<BodyMetricRecord>();
       vi.spyOn(progressApi, 'logBodyMetric').mockReturnValueOnce(deferred.promise);
 
       const onSuccessLogged = vi.fn();
@@ -400,7 +410,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
           formattedLoggedAt: '19:00 - 04/11/2026',
           weightKg: 95.5,
           bmi: 31.2,
-          bmiCategory: 'Obese',
+          bmiCategory: BmiCategoryEnum.OBESE,
           bmiCategoryLabel: 'Béo phì',
           bodyFatPercent: 28,
           waistCircumferenceCm: 100,
@@ -423,7 +433,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
       syncProgressSessionWithAuth();
 
-      const deferred = createDeferred<any>();
+      const deferred = createDeferred<SleepRecord>();
       vi.spyOn(progressApi, 'logSleep').mockReturnValueOnce(deferred.promise);
 
       const { rerender } = render(<SleepLogForm />, { wrapper: createWrapper() });
@@ -448,7 +458,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
           id: 'sleep-private-a',
           sleptAt: new Date('2026-11-03T23:00:00Z'),
           wokeAt: new Date('2026-11-04T08:00:00Z'),
-          sleepQuality: 'Good',
+          sleepQuality: SleepQualityEnum.GOOD,
           sleepQualityLabel: 'Tốt',
           durationHours: 9,
           formattedDuration: '9 giờ',
@@ -478,11 +488,11 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
         progressPercent: 103,
         visualPercent: 100,
         isGoalReached: true,
-        status: 'InProgress' as any,
+        status: FastingStatusEnum.IN_PROGRESS,
         statusLabel: 'Đang nhịn ăn',
       });
 
-      const deferred = createDeferred<any>();
+      const deferred = createDeferred<EndFastingResult>();
       vi.spyOn(progressApi, 'endFasting').mockReturnValueOnce(deferred.promise);
 
       const { rerender } = render(<FastingPanel />, { wrapper: createWrapper() });
@@ -512,7 +522,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
           actualHours: 16.5,
           targetHours: 16,
           isGoalReached: true,
-          status: 'Completed',
+          status: FastingStatusEnum.COMPLETED,
           formattedActualHours: '16 giờ 30 phút',
         });
       });
@@ -557,7 +567,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
           data: { detail: 'progress.height_unavailable' },
         },
       };
-      const apiSpy = vi.spyOn(progressApi, 'logBodyMetric').mockRejectedValueOnce(axiosError);
+      vi.spyOn(progressApi, 'logBodyMetric').mockRejectedValueOnce(axiosError);
 
       render(<BodyMetricForm />, { wrapper: createWrapper() });
 
@@ -594,9 +604,9 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
               targetEndedAt: '2026-02-30T20:00:00Z',
               status: 'InProgress',
             },
-          } as any;
+          } as unknown as AxiosResponse;
         }
-        return { data: null } as any;
+        return { data: null } as unknown as AxiosResponse;
       });
 
       render(<FastingPanel />, { wrapper: createWrapper() });
@@ -695,8 +705,8 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
       syncProgressSessionWithAuth();
 
-      const deferredWater = createDeferred<any>();
-      const deferredSleep = createDeferred<any>();
+      const deferredWater = createDeferred<WaterSummary>();
+      const deferredSleep = createDeferred<SleepRecord>();
       vi.spyOn(progressApi, 'logWater').mockReturnValueOnce(deferredWater.promise);
       vi.spyOn(progressApi, 'logSleep').mockReturnValueOnce(deferredSleep.promise);
       const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
@@ -739,7 +749,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
           id: 'sleep-concurrent',
           sleptAt: new Date('2026-11-03T23:00:00Z'),
           wokeAt: new Date('2026-11-04T08:00:00Z'),
-          sleepQuality: 'Good',
+          sleepQuality: SleepQualityEnum.GOOD,
           sleepQualityLabel: 'Tốt',
           durationHours: 9,
           formattedDuration: '9 giờ',
@@ -761,7 +771,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-initial' });
       syncProgressSessionWithAuth();
 
-      const deferred = createDeferred<any>();
+      const deferred = createDeferred<WaterSummary>();
       vi.spyOn(progressApi, 'logWater').mockReturnValueOnce(deferred.promise);
       const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
@@ -823,115 +833,796 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
     });
   });
 
-  describe('Scenario P — Server, gateway and network error toasts in active vs switched session', () => {
-    it('displays 502 Bad Gateway error toast in active session', async () => {
+  describe('Finding A — Guard optional mutation callbacks against obsolete sessions and verify controller cleanup', () => {
+    it('invokes caller onSuccess and onSettled callbacks exactly once for active session', async () => {
       useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
       syncProgressSessionWithAuth();
 
-      vi.spyOn(progressApi, 'getCurrentFasting').mockResolvedValue(null);
-      const axiosError = {
-        isAxiosError: true,
-        response: {
+      vi.spyOn(progressApi, 'logWater').mockResolvedValueOnce({
+        date: '2026-11-04',
+        consumedMl: 250,
+        targetMl: 2500,
+        percentComplete: 10,
+        visualPercent: 10,
+        remainingMl: 2250,
+      });
+
+      const onSuccess = vi.fn();
+      const onError = vi.fn();
+      const onSettled = vi.fn();
+
+      const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
+
+      await act(async () => {
+        result.current.mutate({ amountMl: 250 }, { onSuccess, onError, onSettled });
+      });
+
+      await waitFor(() => {
+        expect(onSuccess).toHaveBeenCalledTimes(1);
+      });
+      expect(onSuccess).toHaveBeenCalledWith(
+        expect.objectContaining({ consumedMl: 250 }),
+        { amountMl: 250 },
+        expect.anything(),
+        expect.anything()
+      );
+      expect(onError).not.toHaveBeenCalled();
+      expect(onSettled).toHaveBeenCalledTimes(1);
+      expect(getActiveSessionAbortControllerCount()).toBe(0);
+    });
+
+    it('invokes caller onError and onSettled callbacks exactly once when active mutation fails', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      const error = new Error('Network failure');
+      vi.spyOn(progressApi, 'logWater').mockRejectedValueOnce(error);
+
+      const onSuccess = vi.fn();
+      const onError = vi.fn();
+      const onSettled = vi.fn();
+
+      const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
+
+      await act(async () => {
+        result.current.mutate({ amountMl: 250 }, { onSuccess, onError, onSettled });
+      });
+
+      await waitFor(() => {
+        expect(onError).toHaveBeenCalledTimes(1);
+      });
+      expect(onError).toHaveBeenCalledWith(
+        error,
+        { amountMl: 250 },
+        expect.anything(),
+        expect.anything()
+      );
+      expect(onSuccess).not.toHaveBeenCalled();
+      expect(onSettled).toHaveBeenCalledTimes(1);
+      expect(getActiveSessionAbortControllerCount()).toBe(0);
+    });
+
+    it('suppresses caller onSuccess, onError, and onSettled callbacks when session logs out before completion', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      const deferred = createDeferred<WaterSummary>();
+      vi.spyOn(progressApi, 'logWater').mockReturnValueOnce(deferred.promise);
+
+      const onSuccess = vi.fn();
+      const onError = vi.fn();
+      const onSettled = vi.fn();
+
+      const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
+
+      act(() => {
+        result.current.mutate({ amountMl: 250 }, { onSuccess, onError, onSettled });
+      });
+
+      expect(getActiveSessionAbortControllerCount()).toBeGreaterThan(0);
+
+      // User A logs out
+      act(() => {
+        useAuthStore.getState().logout();
+        syncProgressSessionWithAuth();
+      });
+
+      // Mutation settles late
+      await act(async () => {
+        deferred.resolve({
+          date: '2026-11-04',
+          consumedMl: 250,
+          targetMl: 2500,
+          percentComplete: 10,
+          visualPercent: 10,
+          remainingMl: 2250,
+        });
+      });
+
+      expect(onSuccess).not.toHaveBeenCalled();
+      expect(onError).not.toHaveBeenCalled();
+      expect(onSettled).not.toHaveBeenCalled();
+      expect(toast.success).not.toHaveBeenCalled();
+      expect(getActiveSessionAbortControllerCount()).toBe(0);
+    });
+
+    it('suppresses caller callbacks when account switches to User B before completion', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      const deferred = createDeferred<WaterSummary>();
+      vi.spyOn(progressApi, 'logWater').mockReturnValueOnce(deferred.promise);
+
+      const onSuccess = vi.fn();
+      const onError = vi.fn();
+      const onSettled = vi.fn();
+
+      const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
+
+      act(() => {
+        result.current.mutate({ amountMl: 250 }, { onSuccess, onError, onSettled });
+      });
+
+      // Switch to User B
+      act(() => {
+        useAuthStore.getState().logout();
+        useAuthStore.setState({ user: mockUserB, isAuthenticated: true, token: 'token-b' });
+        syncProgressSessionWithAuth();
+      });
+
+      await act(async () => {
+        deferred.resolve({
+          date: '2026-11-04',
+          consumedMl: 250,
+          targetMl: 2500,
+          percentComplete: 10,
+          visualPercent: 10,
+          remainingMl: 2250,
+        });
+      });
+
+      expect(onSuccess).not.toHaveBeenCalled();
+      expect(onError).not.toHaveBeenCalled();
+      expect(onSettled).not.toHaveBeenCalled();
+      expect(getActiveSessionAbortControllerCount()).toBe(0);
+    });
+
+    it('mutateAsync rejects with ProgressAuthError but suppresses caller callbacks on obsolete session', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      const deferred = createDeferred<WaterSummary>();
+      vi.spyOn(progressApi, 'logWater').mockReturnValueOnce(deferred.promise);
+
+      const onSuccess = vi.fn();
+      const onError = vi.fn();
+      const onSettled = vi.fn();
+
+      const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
+
+      let caughtError: unknown = null;
+      act(() => {
+        result.current
+          .mutateAsync({ amountMl: 250 }, { onSuccess, onError, onSettled })
+          .catch((err) => {
+            caughtError = err;
+          });
+      });
+
+      // User A logs out
+      act(() => {
+        useAuthStore.getState().logout();
+        syncProgressSessionWithAuth();
+      });
+
+      await act(async () => {
+        deferred.resolve({
+          date: '2026-11-04',
+          consumedMl: 250,
+          targetMl: 2500,
+          percentComplete: 10,
+          visualPercent: 10,
+          remainingMl: 2250,
+        });
+      });
+
+      expect(caughtError).toBeInstanceOf(ProgressAuthError);
+      expect(onSuccess).not.toHaveBeenCalled();
+      expect(onError).not.toHaveBeenCalled();
+      expect(onSettled).not.toHaveBeenCalled();
+      expect(getActiveSessionAbortControllerCount()).toBe(0);
+    });
+
+    it('unconditionally unregisters controller even when consumer onSuccess callback throws an error', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      vi.spyOn(progressApi, 'logWater').mockResolvedValueOnce({
+        date: '2026-11-04',
+        consumedMl: 250,
+        targetMl: 2500,
+        percentComplete: 10,
+        visualPercent: 10,
+        remainingMl: 2250,
+      });
+
+      const explodingCallback = vi.fn(() => {
+        throw new Error('Consumer callback exploded');
+      });
+
+      const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
+
+      try {
+        await act(async () => {
+          result.current.mutate({ amountMl: 250 }, { onSuccess: explodingCallback });
+        });
+      } catch {
+        // Consumer callback error caught here
+      }
+
+      expect(explodingCallback).toHaveBeenCalled();
+      expect(getActiveSessionAbortControllerCount()).toBe(0);
+    });
+
+    it('tracks concurrent mutations with independent controllers and cleans up on settlement', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      const deferredWater = createDeferred<WaterSummary>();
+      const deferredSleep = createDeferred<SleepRecord>();
+      vi.spyOn(progressApi, 'logWater').mockReturnValueOnce(deferredWater.promise);
+      vi.spyOn(progressApi, 'logSleep').mockReturnValueOnce(deferredSleep.promise);
+
+      const { result: waterHook } = renderHook(() => useLogWaterMutation(), {
+        wrapper: createWrapper(),
+      });
+      const { result: sleepHook } = renderHook(() => useLogSleepMutation(), {
+        wrapper: createWrapper(),
+      });
+
+      act(() => {
+        waterHook.current.mutate({ amountMl: 250 });
+        sleepHook.current.mutate({
+          sleptAt: '2026-11-03T23:00:00Z',
+          wokeAt: '2026-11-04T07:00:00Z',
+          sleepQuality: 'Good',
+        });
+      });
+
+      expect(getActiveSessionAbortControllerCount()).toBe(2);
+
+      await act(async () => {
+        deferredWater.resolve({
+          date: '2026-11-04',
+          consumedMl: 250,
+          targetMl: 2500,
+          percentComplete: 10,
+          visualPercent: 10,
+          remainingMl: 2250,
+        });
+      });
+
+      expect(getActiveSessionAbortControllerCount()).toBe(1);
+
+      await act(async () => {
+        deferredSleep.resolve({
+          id: 'sleep-concurrent-cleanup',
+          sleptAt: new Date(),
+          wokeAt: new Date(),
+          sleepQuality: SleepQualityEnum.GOOD,
+          sleepQualityLabel: 'Tốt',
+          durationHours: 8,
+          formattedDuration: '8 giờ',
+          date: '2026-11-04',
+        });
+      });
+
+      expect(getActiveSessionAbortControllerCount()).toBe(0);
+    });
+  });
+
+  describe('Finding B1 (Scenario Q) — Deterministic dispatch-time race reproduction via test seams', () => {
+    it('aborts before HTTP dispatch when session switches to User B during lifecycle pause', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      const apiSpy = vi.spyOn(progressApi, 'logWater');
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      const seamPause = createDeferred<void>();
+
+      __setProgressMutationTestSeams({
+        beforeDispatch: async () => {
+          await seamPause.promise;
+        },
+      });
+
+      const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
+
+      let mutationError: unknown = null;
+      act(() => {
+        result.current.mutateAsync({ amountMl: 250 }).catch((err) => {
+          mutationError = err;
+        });
+      });
+
+      // Account switches to User B while mutation is paused before dispatch
+      act(() => {
+        useAuthStore.getState().logout();
+        useAuthStore.setState({ user: mockUserB, isAuthenticated: true, token: 'token-b' });
+        syncProgressSessionWithAuth();
+      });
+
+      // Resume execution
+      await act(async () => {
+        seamPause.resolve();
+      });
+
+      expect(apiSpy).not.toHaveBeenCalled();
+      expect(toast.success).not.toHaveBeenCalled();
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(invalidateSpy).not.toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: progressKeys.user(mockUserB.id) })
+      );
+      expect(mutationError).toBeInstanceOf(ProgressAuthError);
+    });
+
+    it('aborts before HTTP dispatch when same user logs out and logs back in (session ID renewal)', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      const apiSpy = vi.spyOn(progressApi, 'logWater');
+      const seamPause = createDeferred<void>();
+
+      __setProgressMutationTestSeams({
+        beforeDispatch: async () => {
+          await seamPause.promise;
+        },
+      });
+
+      const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
+
+      let mutationError: unknown = null;
+      act(() => {
+        result.current.mutateAsync({ amountMl: 250 }).catch((err) => {
+          mutationError = err;
+        });
+      });
+
+      // Same user logs out and logs back in (creates a fresh sessionId)
+      act(() => {
+        useAuthStore.getState().logout();
+        useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a-relogin' });
+        syncProgressSessionWithAuth();
+      });
+
+      // Resume execution
+      await act(async () => {
+        seamPause.resolve();
+      });
+
+      expect(apiSpy).not.toHaveBeenCalled();
+      expect(toast.success).not.toHaveBeenCalled();
+      expect(mutationError).toBeInstanceOf(ProgressAuthError);
+    });
+
+    it('permits HTTP dispatch when token refreshes for the same active session', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-initial' });
+      syncProgressSessionWithAuth();
+
+      vi.spyOn(progressApi, 'logWater').mockResolvedValueOnce({
+        date: '2026-11-04',
+        consumedMl: 250,
+        targetMl: 2500,
+        percentComplete: 10,
+        visualPercent: 10,
+        remainingMl: 2250,
+      });
+
+      const seamPause = createDeferred<void>();
+
+      __setProgressMutationTestSeams({
+        beforeDispatch: async () => {
+          await seamPause.promise;
+        },
+      });
+
+      const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
+
+      let mutationResult: WaterSummary | null = null;
+      act(() => {
+        result.current.mutateAsync({ amountMl: 250 }).then((res) => {
+          mutationResult = res;
+        });
+      });
+
+      // Silent token refresh: user and sessionId unchanged
+      act(() => {
+        useAuthStore.getState().setToken('token-refreshed');
+        syncProgressSessionWithAuth();
+      });
+
+      // Resume execution
+      await act(async () => {
+        seamPause.resolve();
+      });
+
+      expect(mutationResult).toEqual(expect.objectContaining({ consumedMl: 250 }));
+      expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('250 ml'));
+    });
+  });
+
+  describe('Finding B2 (Scenario P) — Real Axios transport and interceptor error handling', () => {
+    let originalAdapter: unknown;
+
+    beforeEach(() => {
+      originalAdapter = api.defaults.adapter;
+      // Do not mock progressApi methods in this suite so calls route through actual progressApi -> Axios
+      vi.spyOn(progressApi, 'logWater').mockRestore();
+      vi.spyOn(progressApi, 'startFasting').mockRestore();
+      vi.spyOn(progressApi, 'logBodyMetric').mockRestore();
+    });
+
+    afterEach(() => {
+      api.defaults.adapter = originalAdapter as typeof api.defaults.adapter;
+    });
+
+    const createMockAxiosError = (
+      config: InternalAxiosRequestConfig,
+      options: {
+        status?: number;
+        statusText?: string;
+        data?: unknown;
+        isNetwork?: boolean;
+      }
+    ) => {
+      if (options.isNetwork) {
+        return new AxiosError('Network Error', 'ERR_NETWORK', config, {}, undefined);
+      }
+      return new AxiosError(
+        `Request failed with status code ${options.status}`,
+        'ERR_BAD_RESPONSE',
+        config,
+        {},
+        {
+          status: options.status!,
+          statusText: options.statusText || String(options.status),
+          headers: {},
+          config,
+          data: options.data,
+        }
+      );
+    };
+
+    it('displays 502 Bad Gateway error toast in active session through real Axios interceptor with zero duplicate toast', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      api.defaults.adapter = async (config) => {
+        throw createMockAxiosError(config, {
           status: 502,
+          statusText: 'Bad Gateway',
           data: { detail: 'Bad Gateway' },
-        },
+        });
       };
-      vi.spyOn(progressApi, 'startFasting').mockRejectedValueOnce(axiosError);
 
-      render(<FastingPanel />, { wrapper: createWrapper() });
+      const { result } = renderHook(() => useStartFastingMutation(), { wrapper: createWrapper() });
 
-      const startBtn = await screen.findByText(/bắt đầu nhịn ăn ngay/i);
       await act(async () => {
-        fireEvent.click(startBtn);
+        try {
+          await result.current.mutateAsync({
+            protocol: '16:8',
+            startedAt: '2026-11-04T12:00:00Z',
+            targetHours: 16,
+          });
+        } catch {
+          // Expected rejection
+        }
       });
 
-      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('502 Gateway'));
+      expect(toast.error).toHaveBeenCalledTimes(1);
+      expect(toast.error).toHaveBeenCalledWith(
+        'Lỗi kết nối với dịch vụ máy chủ (502 Gateway). Vui lòng thử lại sau.'
+      );
     });
 
-    it('displays 503 Service Unavailable error toast in active session', async () => {
+    it('displays 503 Service Unavailable error toast in active session through real Axios interceptor with zero duplicate toast', async () => {
       useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
       syncProgressSessionWithAuth();
 
-      const axiosError = {
-        isAxiosError: true,
-        response: {
+      api.defaults.adapter = async (config) => {
+        throw createMockAxiosError(config, {
           status: 503,
+          statusText: 'Service Unavailable',
           data: { detail: 'Service Unavailable' },
-        },
+        });
       };
-      vi.spyOn(progressApi, 'logWater').mockRejectedValueOnce(axiosError);
 
-      render(<WaterTracker />, { wrapper: createWrapper() });
+      const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
 
-      const quick250Btn = await screen.findByText('+250 ml');
       await act(async () => {
-        fireEvent.click(quick250Btn);
+        try {
+          await result.current.mutateAsync({ amountMl: 250 });
+        } catch {
+          // Expected rejection
+        }
       });
 
-      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('503 Service Unavailable'));
+      expect(toast.error).toHaveBeenCalledTimes(1);
+      expect(toast.error).toHaveBeenCalledWith(
+        'Dịch vụ tạm thời không khả dụng (503 Service Unavailable). Vui lòng thử lại sau ít phút.'
+      );
     });
 
-    it('displays 500 server error toast in active session', async () => {
+    it('displays 500 server error toast in active session through real Axios interceptor with zero duplicate toast', async () => {
       useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
       syncProgressSessionWithAuth();
 
-      const axiosError = {
-        isAxiosError: true,
-        response: {
+      api.defaults.adapter = async (config) => {
+        throw createMockAxiosError(config, {
           status: 500,
-          data: { detail: 'Internal Server Error' },
-        },
+          statusText: 'Internal Server Error',
+          data: { detail: 'Database crash' },
+        });
       };
-      vi.spyOn(progressApi, 'logWater').mockRejectedValueOnce(axiosError);
 
-      render(<WaterTracker />, { wrapper: createWrapper() });
+      const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
 
-      const quick250Btn = await screen.findByText('+250 ml');
       await act(async () => {
-        fireEvent.click(quick250Btn);
+        try {
+          await result.current.mutateAsync({ amountMl: 250 });
+        } catch {
+          // Expected rejection
+        }
       });
 
+      expect(toast.error).toHaveBeenCalledTimes(1);
       expect(toast.error).toHaveBeenCalledWith('Lỗi hệ thống máy chủ. Vui lòng thử lại sau.');
     });
 
-    it('displays network disconnection error toast in active session', async () => {
+    it('displays network disconnection error toast in active session through real Axios interceptor with zero duplicate toast', async () => {
       useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
       syncProgressSessionWithAuth();
 
-      const axiosError = {
-        isAxiosError: true,
-        request: {},
-        response: undefined,
+      api.defaults.adapter = async (config) => {
+        throw createMockAxiosError(config, { isNetwork: true });
       };
-      vi.spyOn(progressApi, 'logWater').mockRejectedValueOnce(axiosError);
 
-      render(<WaterTracker />, { wrapper: createWrapper() });
+      const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
 
-      const quick250Btn = await screen.findByText('+250 ml');
       await act(async () => {
-        fireEvent.click(quick250Btn);
+        try {
+          await result.current.mutateAsync({ amountMl: 250 });
+        } catch {
+          // Expected rejection
+        }
       });
 
+      expect(toast.error).toHaveBeenCalledTimes(1);
       expect(toast.error).toHaveBeenCalledWith(
         'Không thể kết nối đến máy chủ. Vui lòng kiểm tra đường truyền.'
       );
     });
 
-    it('suppresses 502/503/500/network error toasts completely when session switches to User B', async () => {
+    it('displays 409 conflict error toast through real Axios interceptor in active session', async () => {
       useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
       syncProgressSessionWithAuth();
 
-      const deferred = createDeferred<any>();
-      vi.spyOn(progressApi, 'logWater').mockReturnValueOnce(deferred.promise);
+      api.defaults.adapter = async (config) => {
+        throw createMockAxiosError(config, {
+          status: 409,
+          data: { detail: 'Already fasting' },
+        });
+      };
+
+      const { result } = renderHook(() => useStartFastingMutation(), { wrapper: createWrapper() });
+
+      await act(async () => {
+        try {
+          await result.current.mutateAsync({
+            protocol: '16:8',
+            startedAt: '2026-11-04T12:00:00Z',
+            targetHours: 16,
+          });
+        } catch {
+          // Expected rejection
+        }
+      });
+
+      expect(toast.error).toHaveBeenCalledTimes(1);
+      expect(toast.error).toHaveBeenCalledWith('Bạn đang có một phiên nhịn ăn chưa kết thúc.');
+    });
+
+    it('displays 422 height unavailable error toast through real Axios interceptor in active session', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      api.defaults.adapter = async (config) => {
+        throw createMockAxiosError(config, {
+          status: 422,
+          data: { detail: 'progress.height_unavailable' },
+        });
+      };
+
+      const { result } = renderHook(() => useLogBodyMetricMutation(), {
+        wrapper: createWrapper(),
+      });
+
+      await act(async () => {
+        try {
+          await result.current.mutateAsync({
+            loggedAt: '2026-11-04T12:00:00Z',
+            weightKg: 80,
+          });
+        } catch {
+          // Expected rejection
+        }
+      });
+
+      expect(toast.error).toHaveBeenCalledTimes(1);
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringContaining('Hồ sơ của bạn chưa có thông tin chiều cao')
+      );
+    });
+
+    it('displays 403 forbidden error toast through real Axios interceptor in active session', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      api.defaults.adapter = async (config) => {
+        throw createMockAxiosError(config, {
+          status: 403,
+          data: {},
+        });
+      };
+
+      const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
+
+      await act(async () => {
+        try {
+          await result.current.mutateAsync({ amountMl: 250 });
+        } catch {
+          // Expected rejection
+        }
+      });
+
+      expect(toast.error).toHaveBeenCalledTimes(1);
+      expect(toast.error).toHaveBeenCalledWith('Bạn không có quyền thực hiện thao tác này.');
+    });
+
+    it('displays 429 rate limit error toast through real Axios interceptor in active session', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      api.defaults.adapter = async (config) => {
+        throw createMockAxiosError(config, {
+          status: 429,
+          data: { detail: 'Too many requests' },
+        });
+      };
+
+      const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
+
+      await act(async () => {
+        try {
+          await result.current.mutateAsync({ amountMl: 250 });
+        } catch {
+          // Expected rejection
+        }
+      });
+
+      expect(toast.error).toHaveBeenCalledTimes(1);
+      expect(toast.error).toHaveBeenCalledWith(
+        'Bạn đang gửi quá nhiều yêu cầu. Vui lòng thử lại sau.'
+      );
+    });
+
+    it('completely suppresses error toasts when session switches to User B during network transport', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      const deferredAdapter = createDeferred<void>();
+
+      api.defaults.adapter = async (config) => {
+        await deferredAdapter.promise;
+        throw createMockAxiosError(config, {
+          status: 500,
+          data: { detail: 'Internal failure' },
+        });
+      };
+
+      const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
+
+      act(() => {
+        result.current.mutate({ amountMl: 250 });
+      });
+
+      // User A switches to User B while request is inside Axios transport
+      act(() => {
+        useAuthStore.getState().logout();
+        useAuthStore.setState({ user: mockUserB, isAuthenticated: true, token: 'token-b' });
+        syncProgressSessionWithAuth();
+      });
+
+      // Network transport completes with error
+      await act(async () => {
+        deferredAdapter.resolve();
+      });
+
+      // Neither Axios nor Progress queries may show error toast to User B
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Finding C — Session-keyed form lifecycle and form value isolation', () => {
+    it('isolates BodyMetricForm draft inputs across account switches', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      const { rerender } = render(<BodyMetricForm />, { wrapper: createWrapper() });
+
+      const weightInput = screen.getByLabelText(/cân nặng/i);
+      const waistInput = screen.getByLabelText(/vòng eo/i);
+
+      // User A types draft inputs
+      fireEvent.change(weightInput, { target: { value: '85.5' } });
+      fireEvent.change(waistInput, { target: { value: '92' } });
+
+      expect(weightInput).toHaveValue(85.5);
+      expect(waistInput).toHaveValue(92);
+
+      // Switch to User B
+      act(() => {
+        useAuthStore.getState().logout();
+        useAuthStore.setState({ user: mockUserB, isAuthenticated: true, token: 'token-b' });
+        syncProgressSessionWithAuth();
+      });
+
+      rerender(<BodyMetricForm />);
+
+      // User B receives clean default values, not User A's unsubmitted draft
+      const newWeightInput = screen.getByLabelText(/cân nặng/i);
+      const newWaistInput = screen.getByLabelText(/vòng eo/i);
+      expect(newWeightInput).toHaveValue(70);
+      expect(newWaistInput).toHaveValue(null);
+    });
+
+    it('isolates SleepLogForm draft quality selection across account switches', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      const { rerender } = render(<SleepLogForm />, { wrapper: createWrapper() });
+
+      // User A selects Poor (Kém)
+      const poorRadio = screen.getByRole('radio', { name: /kém/i });
+      fireEvent.click(poorRadio);
+      expect(poorRadio).toBeChecked();
+
+      // Switch to User B
+      act(() => {
+        useAuthStore.getState().logout();
+        useAuthStore.setState({ user: mockUserB, isAuthenticated: true, token: 'token-b' });
+        syncProgressSessionWithAuth();
+      });
+
+      rerender(<SleepLogForm />);
+
+      // User B has default Good (Tốt) selected, not Poor
+      const goodRadio = screen.getByRole('radio', { name: /^tốt\b/i });
+      expect(goodRadio).toBeChecked();
+    });
+
+    it('isolates WaterTracker custom amount input across account switches', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
 
       const { rerender } = render(<WaterTracker />, { wrapper: createWrapper() });
 
-      const quick250Btn = await screen.findByText('+250 ml');
-      await act(async () => {
-        fireEvent.click(quick250Btn);
-      });
+      const customInput = await screen.findByRole('spinbutton');
+      fireEvent.change(customInput, { target: { value: '600' } });
+      expect(customInput).toHaveValue(600);
 
-      // User A chuyển sang User B
+      // Switch to User B
       act(() => {
         useAuthStore.getState().logout();
         useAuthStore.setState({ user: mockUserB, isAuthenticated: true, token: 'token-b' });
@@ -940,45 +1631,102 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
 
       rerender(<WaterTracker />);
 
-      // Request ban đầu của User A bị lỗi 500 từ server
-      await act(async () => {
-        deferred.reject({
-          isAxiosError: true,
-          response: { status: 500, data: { detail: 'Server exploded' } },
-        });
-      });
-
-      // Tuyệt đối không hiển thị toast lỗi của User A cho User B!
-      expect(toast.error).not.toHaveBeenCalled();
+      // User B receives default 250ml
+      const newCustomInput = await screen.findByRole('spinbutton');
+      expect(newCustomInput).toHaveValue(250);
     });
-  });
 
-  describe('Scenario Q — Dispatch-time session mismatch prevention', () => {
-    it('aborts and issues zero HTTP calls if session is invalidated before mutationFn executes', async () => {
-      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+    it('preserves user draft inputs through token refresh in the same active session', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-initial' });
       syncProgressSessionWithAuth();
 
-      const apiSpy = vi.spyOn(progressApi, 'logWater');
+      render(<BodyMetricForm />, { wrapper: createWrapper() });
 
-      const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
+      const weightInput = screen.getByLabelText(/cân nặng/i);
+      fireEvent.change(weightInput, { target: { value: '82.5' } });
+      expect(weightInput).toHaveValue(82.5);
 
-      // User A logs out
+      // Silent token refresh occurs
       act(() => {
-        useAuthStore.getState().logout();
+        useAuthStore.getState().setToken('token-refreshed');
         syncProgressSessionWithAuth();
       });
 
-      // Gọi mutate khi phiên đã mất
+      // SessionId is unchanged -> inner component was not remounted -> draft preserved
+      expect(weightInput).toHaveValue(82.5);
+    });
+
+    it('prevents late mutation resolution from resetting the other user active form', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      const deferred = createDeferred<BodyMetricRecord>();
+      vi.spyOn(progressApi, 'logBodyMetric').mockReturnValueOnce(deferred.promise);
+
+      const { rerender } = render(<BodyMetricForm />, { wrapper: createWrapper() });
+
+      // User A submits form
+      const submitBtn = screen.getByRole('button', { name: /lưu chỉ số cơ thể/i });
       await act(async () => {
-        try {
-          await result.current.mutateAsync({ amountMl: 250 });
-        } catch {
-          // Expected auth error
-        }
+        fireEvent.submit(submitBtn.closest('form')!);
       });
 
-      // Không có bất kỳ HTTP call nào được dispatch
-      expect(apiSpy).not.toHaveBeenCalled();
+      // Account switches to User B
+      act(() => {
+        useAuthStore.getState().logout();
+        useAuthStore.setState({ user: mockUserB, isAuthenticated: true, token: 'token-b' });
+        syncProgressSessionWithAuth();
+      });
+
+      rerender(<BodyMetricForm />);
+
+      // User B enters 65kg
+      const userBWeight = screen.getByLabelText(/cân nặng/i);
+      fireEvent.change(userBWeight, { target: { value: '65' } });
+      expect(userBWeight).toHaveValue(65);
+
+      // User A's mutation resolves late
+      await act(async () => {
+        deferred.resolve({
+          id: 'metric-late',
+          loggedAt: new Date(),
+          formattedLoggedAt: '12:00',
+          weightKg: 88,
+          bmi: 27,
+          bmiCategory: BmiCategoryEnum.OVERWEIGHT,
+          bmiCategoryLabel: 'Thừa cân',
+          bodyFatPercent: null,
+          waistCircumferenceCm: null,
+          systolicBloodPressure: null,
+          diastolicBloodPressure: null,
+          bloodPressureDisplay: null,
+          restingHeartRate: null,
+        });
+      });
+
+      // User B's form still has 65kg and was not reset or overwritten
+      expect(userBWeight).toHaveValue(65);
+    });
+
+    it('renders cleanly in React.StrictMode without render-phase mutation warnings', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      // Wrap in React.StrictMode to guarantee double-render lifecycle safety
+      const { unmount } = render(
+        <React.StrictMode>
+          <BodyMetricForm />
+          <SleepLogForm />
+          <WaterTracker />
+        </React.StrictMode>,
+        { wrapper: createWrapper() }
+      );
+
+      expect(screen.getByRole('button', { name: /lưu chỉ số cơ thể/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /lưu ghi nhận giấc ngủ/i })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: /ghi nhận/i })).toBeInTheDocument();
+
+      unmount();
     });
   });
 
@@ -987,7 +1735,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
       syncProgressSessionWithAuth();
 
-      const deferred = createDeferred<any>();
+      const deferred = createDeferred<BodyMetricRecord>();
       vi.spyOn(progressApi, 'logBodyMetric').mockReturnValueOnce(deferred.promise);
 
       const { rerender } = render(<BodyMetricForm />, { wrapper: createWrapper() });
@@ -1005,7 +1753,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
           formattedLoggedAt: '19:00 - 04/11/2026',
           weightKg: 88.0,
           bmi: 27.5,
-          bmiCategory: 'Overweight',
+          bmiCategory: BmiCategoryEnum.OVERWEIGHT,
           bmiCategoryLabel: 'Thừa cân',
           bodyFatPercent: 25,
           waistCircumferenceCm: 90,

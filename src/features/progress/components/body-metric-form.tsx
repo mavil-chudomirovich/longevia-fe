@@ -38,14 +38,19 @@ interface SavedMetricState {
 }
 
 export function BodyMetricForm({ onSuccessLogged }: BodyMetricFormProps) {
+  const { sessionId } = useProgressSession();
+  // Finding C: Khóa phiên ổn định (stable session key) giúp React tái khởi tạo form sạch sẽ
+  // khi phiên đăng nhập thay đổi mà không gọi form.reset() trong render phase.
+  // Trong quá trình token refresh âm thầm cùng phiên, sessionId được giữ nguyên nên form không bị unmount.
+  return (
+    <BodyMetricFormInner key={sessionId || 'unauthenticated'} onSuccessLogged={onSuccessLogged} />
+  );
+}
+
+function BodyMetricFormInner({ onSuccessLogged }: BodyMetricFormProps) {
   const { sessionId, userId } = useProgressSession();
   const logMutation = useLogBodyMetricMutation();
   const [savedRecordState, setSavedRecordState] = React.useState<SavedMetricState | null>(null);
-
-  // Xóa kết quả lưu trữ cá nhân khi phiên đăng nhập đổi hoặc logout
-  React.useEffect(() => {
-    setSavedRecordState(null);
-  }, [sessionId, userId]);
 
   // Ràng buộc quyền sở hữu phiên đồng bộ tại thời điểm render:
   // Loại bỏ triệt để nguy cơ hiển thị flash kết quả riêng tư của User A trong frame commit đầu tiên của User B
@@ -74,20 +79,6 @@ export function BodyMetricForm({ onSuccessLogged }: BodyMetricFormProps) {
       restingHeartRate: null,
     },
   });
-
-  const formSessionRef = React.useRef(sessionId);
-  if (formSessionRef.current !== sessionId) {
-    formSessionRef.current = sessionId;
-    form.reset({
-      loggedAt: toLocalInputDateTimeString(new Date()),
-      weightKg: 70.0,
-      bodyFatPercent: null,
-      waistCircumferenceCm: null,
-      systolicBloodPressure: null,
-      diastolicBloodPressure: null,
-      restingHeartRate: null,
-    });
-  }
 
   const onSubmit = async (values: LogBodyMetricFormValues) => {
     const sessionSnapshot = getProgressSessionContext();

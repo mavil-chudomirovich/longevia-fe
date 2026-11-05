@@ -37,6 +37,13 @@ interface SavedSleepState {
 }
 
 export function SleepLogForm() {
+  const { sessionId } = useProgressSession();
+  // Finding C: Khóa phiên ổn định (stable session key) giúp React tái khởi tạo form sạch sẽ
+  // khi phiên đăng nhập thay đổi mà không gọi form.reset() trong render phase.
+  return <SleepLogFormInner key={sessionId || 'unauthenticated'} />;
+}
+
+function SleepLogFormInner() {
   const { sessionId, userId } = useProgressSession();
   const logMutation = useLogSleepMutation();
   const [savedSleepState, setSavedSleepState] = React.useState<SavedSleepState | null>(null);
@@ -81,15 +88,6 @@ export function SleepLogForm() {
       sleepQuality: 'Good',
     },
   });
-
-  const formSessionRef = React.useRef(sessionId);
-  if (formSessionRef.current !== sessionId) {
-    formSessionRef.current = sessionId;
-    form.reset({
-      ...getDefaultTimes(),
-      sleepQuality: 'Good',
-    });
-  }
 
   const sleptAtWatch = form.watch('sleptAt');
   const wokeAtWatch = form.watch('wokeAt');

@@ -34,6 +34,7 @@ import {
   getProgressSessionContext,
   isProgressSessionActive,
   registerSessionAbortController,
+  unregisterSessionAbortController,
 } from '../utils/progress-session';
 import {
   ProgressAuthError,
@@ -174,7 +175,7 @@ function handleProgressMutationError(
   if (
     axios.isCancel(error) ||
     (error instanceof Error && error.name === 'AbortError') ||
-    (error as any)?.code === 'ERR_CANCELED'
+    (error as { code?: string })?.code === 'ERR_CANCELED'
   ) {
     return;
   }
@@ -228,6 +229,16 @@ function handleProgressMutationError(
   }
 }
 
+export interface ProgressMutationTestSeams {
+  beforeDispatch?: () => Promise<void> | void;
+}
+
+let progressMutationTestSeams: ProgressMutationTestSeams | null = null;
+
+export function __setProgressMutationTestSeams(seams: ProgressMutationTestSeams | null): void {
+  progressMutationTestSeams = seams;
+}
+
 function useSessionBoundMutation<TData, TVariables>(config: {
   mutationFn: (values: TVariables, signal: AbortSignal) => Promise<TData>;
   onSuccess?: (data: TData, variables: TVariables, context: ProgressMutationContext) => void;
@@ -246,6 +257,11 @@ function useSessionBoundMutation<TData, TVariables>(config: {
     ProgressMutationContext
   >({
     mutationFn: async ({ values, initiatingSession, abortController }) => {
+      // Cho phép test seam can thiệp tạm dừng có kiểm soát trước khi dispatch (Finding B1)
+      if (progressMutationTestSeams?.beforeDispatch) {
+        await progressMutationTestSeams.beforeDispatch();
+      }
+
       // Tái kiểm tra phiên NGAY TRƯỚC KHI gửi yêu cầu HTTP ra mạng
       if (!isProgressSessionActive(initiatingSession.userId, initiatingSession.sessionId)) {
         abortController.abort();
@@ -268,6 +284,12 @@ function useSessionBoundMutation<TData, TVariables>(config: {
     onError: (error, input, context) => {
       config.onError?.(error, input.values, context);
     },
+    onSettled: (_data, _error, input) => {
+      // Dọn dẹp tài nguyên nội bộ: LUÔN chạy độc lập với việc consumer callbacks có bị triệt tiêu hay không
+      if (input?.abortController && input?.initiatingSession?.sessionId) {
+        unregisterSessionAbortController(input.initiatingSession.sessionId, input.abortController);
+      }
+    },
   });
 
   const mutate = React.useCallback(
@@ -285,24 +307,56 @@ function useSessionBoundMutation<TData, TVariables>(config: {
             meta: undefined,
           });
         }
+        if (options?.onSettled) {
+          options.onSettled(undefined, authError, values, undefined, {
+            client: queryClient,
+            meta: undefined,
+          });
+        }
         return;
       }
       const controller = new AbortController();
       const unregister = registerSessionAbortController(session.sessionId, controller);
+      const initiatingUserId = session.userId;
+      const initiatingSessionId = session.sessionId;
+
       mutation.mutate(
         { values, initiatingSession: session, abortController: controller },
         {
           onSuccess: (data, _vars, ctx, fnCtx) => {
-            unregister();
-            options?.onSuccess?.(data, values, ctx, fnCtx);
+            // Finding A: Chỉ thực thi per-call onSuccess nếu phiên khởi tạo vẫn active
+            if (isProgressSessionActive(initiatingUserId, initiatingSessionId)) {
+              try {
+                options?.onSuccess?.(data, values, ctx, fnCtx);
+              } catch (consumerError) {
+                console.error('Progress mutation consumer onSuccess error:', consumerError);
+              } finally {
+                unregister();
+              }
+            }
           },
           onError: (err, _vars, ctx, fnCtx) => {
-            unregister();
-            options?.onError?.(err, values, ctx, fnCtx);
+            // Finding A: Chỉ thực thi per-call onError nếu phiên khởi tạo vẫn active
+            if (isProgressSessionActive(initiatingUserId, initiatingSessionId)) {
+              try {
+                options?.onError?.(err, values, ctx, fnCtx);
+              } catch (consumerError) {
+                console.error('Progress mutation consumer onError error:', consumerError);
+              } finally {
+                unregister();
+              }
+            }
           },
           onSettled: (data, err, _vars, ctx, fnCtx) => {
             unregister();
-            options?.onSettled?.(data, err, values, ctx, fnCtx);
+            // Finding A: Chỉ thực thi per-call onSettled nếu phiên khởi tạo vẫn active
+            if (isProgressSessionActive(initiatingUserId, initiatingSessionId)) {
+              try {
+                options?.onSettled?.(data, err, values, ctx, fnCtx);
+              } catch (consumerError) {
+                console.error('Progress mutation consumer onSettled error:', consumerError);
+              }
+            }
           },
         }
       );
@@ -323,21 +377,30 @@ function useSessionBoundMutation<TData, TVariables>(config: {
       }
       const controller = new AbortController();
       const unregister = registerSessionAbortController(session.sessionId, controller);
+      const initiatingUserId = session.userId;
+      const initiatingSessionId = session.sessionId;
+
       try {
         return await mutation.mutateAsync(
           { values, initiatingSession: session, abortController: controller },
           {
             onSuccess: (data, _vars, ctx, fnCtx) => {
-              unregister();
-              options?.onSuccess?.(data, values, ctx, fnCtx);
+              // Finding A: Chỉ thực thi per-call onSuccess nếu phiên khởi tạo vẫn active
+              if (isProgressSessionActive(initiatingUserId, initiatingSessionId)) {
+                options?.onSuccess?.(data, values, ctx, fnCtx);
+              }
             },
             onError: (err, _vars, ctx, fnCtx) => {
-              unregister();
-              options?.onError?.(err, values, ctx, fnCtx);
+              // Finding A: Chỉ thực thi per-call onError nếu phiên khởi tạo vẫn active
+              if (isProgressSessionActive(initiatingUserId, initiatingSessionId)) {
+                options?.onError?.(err, values, ctx, fnCtx);
+              }
             },
             onSettled: (data, err, _vars, ctx, fnCtx) => {
-              unregister();
-              options?.onSettled?.(data, err, values, ctx, fnCtx);
+              // Finding A: Chỉ thực thi per-call onSettled nếu phiên khởi tạo vẫn active
+              if (isProgressSessionActive(initiatingUserId, initiatingSessionId)) {
+                options?.onSettled?.(data, err, values, ctx, fnCtx);
+              }
             },
           }
         );

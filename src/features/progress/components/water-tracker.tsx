@@ -26,7 +26,13 @@ const QUICK_AMOUNTS = [
 ];
 
 export function WaterTracker() {
-  const { sessionId, userId } = useProgressSession();
+  const { sessionId } = useProgressSession();
+  // Finding C: Khóa phiên ổn định (stable session key) giúp React tái khởi tạo form sạch sẽ
+  // khi phiên đăng nhập thay đổi mà không gọi form.reset() trong render phase.
+  return <WaterTrackerInner key={sessionId || 'unauthenticated'} />;
+}
+
+function WaterTrackerInner() {
   const { data: waterToday, isLoading, isError, refetch, isFetching } = useWaterTodayQuery();
   const logMutation = useLogWaterMutation();
 
@@ -36,18 +42,6 @@ export function WaterTracker() {
       amountMl: 250,
     },
   });
-
-  // Đồng bộ hóa trạng thái form ngay tại thời điểm render khi phiên thay đổi
-  const sessionRef = React.useRef(sessionId);
-  if (sessionRef.current !== sessionId) {
-    sessionRef.current = sessionId;
-    form.reset({ amountMl: 250 });
-  }
-
-  // Reset form khi chuyển đổi tài khoản (dọn dẹp bổ sung)
-  React.useEffect(() => {
-    form.reset({ amountMl: 250 });
-  }, [sessionId, userId, form]);
 
   const handleQuickAdd = async (amountMl: number) => {
     const sessionSnapshot = getProgressSessionContext();
