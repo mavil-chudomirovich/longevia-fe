@@ -87,6 +87,22 @@ Theo mã nguồn backend tại `src/Services/Identity/Identity.Api/Endpoints/Aut
        set({ token: null, user: null, isAuthenticated: false });
      };
      ```
+4. **Giới hạn thông báo lỗi toàn cục trên Axios Response Interceptor (401 Refresh Failure Toast):**
+   - Trong tệp `src/lib/axios.ts` (dòng 157-165), interceptor response toàn cục được cấu hình để luôn phát ra thông báo lỗi qua `toast.error` khi làm mới token thất bại, bất kể cờ `silent` của request:
+     ```typescript
+     if (!hasShownSessionExpiredToast) {
+       const refreshCode =
+         err instanceof AxiosError ? err.response?.data?.error?.code : undefined;
+       toast.error(
+         refreshCode === 'REFRESH_TOKEN_REUSED'
+           ? 'Phiên đăng nhập đã bị thu hồi trên thiết bị khác. Vui lòng đăng nhập lại.'
+           : 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
+       );
+       hasShownSessionExpiredToast = true;
+     }
+     ```
+   - Phía Progress đã thiết lập `silent: true` cho toàn bộ các mutation HTTP calls trong `progress.api.ts` để triệt tiêu hoàn toàn các toast 5xx, 403, 429 và mất mạng khi phiên đã kết thúc/chuyển đổi.
+   - Tuy nhiên, toast 401 refresh failure nằm hoàn toàn trong mã nguồn hạ tầng dùng chung (`src/lib/axios.ts` thuộc phạm vi sở hữu của Nguyên & Duy), do đó không thể can thiệp từ feature code Progress mà không vi phạm ranh giới sở hữu mã nguồn. Kiến nghị Nguyên/Duy xem xét bổ sung kiểm tra cờ `silent` hoặc trạng thái đăng xuất chủ động trước khi toast nếu cần tối ưu trải nghiệm.
 
 ---
 

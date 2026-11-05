@@ -37,7 +37,14 @@ export function WaterTracker() {
     },
   });
 
-  // Reset form khi chuyển đổi tài khoản
+  // Đồng bộ hóa trạng thái form ngay tại thời điểm render khi phiên thay đổi
+  const sessionRef = React.useRef(sessionId);
+  if (sessionRef.current !== sessionId) {
+    sessionRef.current = sessionId;
+    form.reset({ amountMl: 250 });
+  }
+
+  // Reset form khi chuyển đổi tài khoản (dọn dẹp bổ sung)
   React.useEffect(() => {
     form.reset({ amountMl: 250 });
   }, [sessionId, userId, form]);

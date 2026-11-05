@@ -4,6 +4,37 @@
 
 ---
 
+## [2026-11-05] Hoàn tất PR #1 Session Safety Final Corrective — An toàn Dispatch, Triệt tiêu Stale Toast & Khóa Dữ liệu Private tại Render (Bảo — Dev 3)
+
+- **Người thực hiện**: Bảo — Progress Service Owner (Dev 3).
+- **Phạm vi sở hữu**: Progress & Biomarkers frontend (`src/features/progress/`, `src/app/progress/`).
+- **Mục tiêu**:
+  - Khắc phục triệt để 4 phát hiện P1 & P2 về an toàn phiên trong đợt đánh giá độc lập PR #1:
+    - **Finding 1 (P1 — Mutation Context & HTTP Dispatch Session Mismatch)**: Loại bỏ race condition khi tài khoản thay đổi trước khi `mutationFn` thực thi. Đăng ký và quản lý `AbortController` cho từng phiên (`progress-session.ts`). Tái kiểm tra phiên ngay trước khi gửi request ra mạng trong `mutationFn`; hủy controller và chặn dispatch (0 network calls) nếu phiên không còn active.
+    - **Finding 2 (P2 — Stale Toasts from Shared Axios Interceptor)**: Cấu hình `silent: true`, `showErrorToast: false` và `signal` cho toàn bộ 5 mutation endpoints trong `progress.api.ts`. Chuyển toàn bộ việc xử lý lỗi (409, 422, 502, 503, 500+, network failure) về mutation hooks, chỉ hiển thị toast khi phiên khởi tạo vẫn active; triệt tiêu 100% stale toast khi người dùng logout / chuyển tài khoản.
+    - **Finding 3 (P2 — Previously Displayed Private Results Leaking during Session Transition)**: Thay thế việc xóa trễ qua `useEffect` bằng cơ chế kiểm tra quyền sở hữu phiên đồng bộ ngay tại thời điểm render (synchronous render-time derivation) trong `BodyMetricForm`, `SleepLogForm`, `FastingPanel`, và `WaterTracker`. Loại bỏ hoàn toàn flash commit dữ liệu riêng tư của User A cho User B.
+    - **Finding 4 (P2 — Behavioral Coverage & False Confidence Gaps)**: Mở rộng bộ kiểm thử hành vi thực tế (tổng 24 test cases A-R) bao phủ:
+      - Pipeline thực tế Axios `api.get` boundary -> `progressMapper` ném `ProgressDataIntegrityError` -> UI render error card.
+      - Vòng đời cache khi `ProgressCacheSync` đã mount sẵn và dọn dẹp không đồng bộ User A bảo toàn 100% cache User B.
+      - Xử lý lỗi máy chủ & gateway (502, 503, 500, network error) trong phiên active và triệt tiêu khi phiên đã chuyển.
+      - Ngăn chặn dispatch HTTP call tại thời điểm dispatch khi phiên mất hiệu lực.
+      - Bảo vệ dữ liệu riêng tư đồng bộ ngay tại render commit đầu tiên khi đổi tài khoản.
+
+- **Đã thực hiện**:
+  1. `src/features/progress/utils/progress-session.ts`: Thêm `registerSessionAbortController`, `abortSessionControllers`, `abortAllSessionControllers`. Tự động hủy toàn bộ active controllers khi logout hoặc chuyển session.
+  2. `src/features/progress/api/progress.api.ts`: Cập nhật `startFasting`, `endFasting`, `logWater`, `logSleep`, `logBodyMetric` nhận `signal?: AbortSignal` và gửi `{ silent: true, showErrorToast: false, signal }`.
+  3. `src/features/progress/queries/progress.queries.ts`: Triển khai `useSessionBoundMutation` kiểm tra phiên tức thì khi `mutate`/`mutateAsync`, revalidate trước khi dispatch trong `mutationFn`, xử lý toàn diện lỗi 502/503/500/network trong `handleProgressMutationError` và chỉ toast khi phiên active.
+  4. UI Components (`body-metric-form.tsx`, `sleep-log-form.tsx`, `fasting-panel.tsx`, `water-tracker.tsx`): Ràng buộc `{ record, ownerUserId, ownerSessionId }` và tính toán `visibleRecord` đồng bộ trong render trước JSX.
+  5. `docs/handoffs/progress-to-identity-auth-blocker.md`: Phân tích và ghi nhận giới hạn toast 401 refresh failure của Axios interceptor thuộc phạm vi Auth/Identity.
+  6. `src/features/progress/tests/progress.behavior.test.tsx`: Mở rộng lên 24 kịch bản kiểm thử hành vi thực tế (Scenarios A-R).
+
+- **Kết quả kiểm chứng (Verification Gates)**:
+  - `npx tsc --noEmit`: 0 lỗi type (0 errors).
+  - `npm test`: 11 test files, 155 tests PASS 100% (24 behavioral tests, 8 API tests, 33 mapper tests, 26 date tests, 20 schema tests, 13 query tests, 4 rollover tests, 27 common/auth tests).
+  - `npm run build`: Next.js 16 build thành công toàn bộ 15 static/dynamic routes.
+
+---
+
 ## [2026-11-04] Hoàn tất PR #1 Final Progress Corrective — Bảo toàn toàn vẹn dữ liệu thời gian & Phân lập phiên an toàn (Bảo — Dev 3)
 
 - **Người thực hiện**: Bảo — Progress Service Owner (Dev 3).

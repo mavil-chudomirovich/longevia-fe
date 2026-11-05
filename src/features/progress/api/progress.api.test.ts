@@ -87,7 +87,7 @@ describe('progressApi Unit Tests', () => {
         startedAt: '2026-10-25T08:00:00.000Z',
         targetHours: 16,
       },
-      { showErrorToast: false }
+      { silent: true, showErrorToast: false, signal: undefined }
     );
     expect(result.sessionId).toBe('sess-123');
   });
@@ -107,7 +107,7 @@ describe('progressApi Unit Tests', () => {
     expect(api.post).toHaveBeenCalledWith(
       API_ENDPOINTS.PROGRESS.WATER_LOG,
       { amountMl: 500 },
-      { showErrorToast: false }
+      { silent: true, showErrorToast: false, signal: undefined }
     );
     expect(result.consumedMl).toBe(500);
     expect(result.remainingMl).toBe(2000);
@@ -138,7 +138,7 @@ describe('progressApi Unit Tests', () => {
         wokeAt: '2026-10-25T07:00:00.000Z',
         sleepQuality: 'Good',
       },
-      { showErrorToast: false }
+      { silent: true, showErrorToast: false, signal: undefined }
     );
     expect(result.sleepQualityLabel).toBe('Tốt');
   });
@@ -180,7 +180,7 @@ describe('progressApi Unit Tests', () => {
         diastolicBloodPressure: 80,
         restingHeartRate: 65,
       },
-      { showErrorToast: false }
+      { silent: true, showErrorToast: false, signal: undefined }
     );
     expect(result.bmi).toBe(22.86);
     expect(result.bmiCategoryLabel).toBe('Bình thường');
@@ -216,5 +216,39 @@ describe('progressApi Unit Tests', () => {
     expect(result.pageNumber).toBe(2);
     expect(result.hasPrevPage).toBe(true);
     expect(result.hasNextPage).toBe(false);
+  });
+
+  it('forwards AbortSignal to mutation requests', async () => {
+    const controller = new AbortController();
+    vi.mocked(api.post).mockResolvedValueOnce({
+      data: {
+        sessionId: 'sess-end',
+        actualHours: 16.0,
+        targetHours: 16,
+        isGoalReached: true,
+        status: 'Completed',
+      },
+    });
+
+    await progressApi.endFasting(
+      {
+        sessionId: 'sess-123',
+        endedAt: '2026-10-25T16:00:00.000Z',
+      },
+      controller.signal
+    );
+
+    expect(api.post).toHaveBeenCalledWith(
+      API_ENDPOINTS.PROGRESS.FASTING_END,
+      {
+        sessionId: 'sess-123',
+        endedAt: '2026-10-25T16:00:00.000Z',
+      },
+      {
+        silent: true,
+        showErrorToast: false,
+        signal: controller.signal,
+      }
+    );
   });
 });

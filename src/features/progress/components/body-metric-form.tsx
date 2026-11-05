@@ -31,15 +31,36 @@ const toNullableNumber = (v: unknown): number | null => {
   return isNaN(n) ? null : n;
 };
 
+interface SavedMetricState {
+  record: BodyMetricRecord;
+  ownerUserId: string;
+  ownerSessionId: string;
+}
+
 export function BodyMetricForm({ onSuccessLogged }: BodyMetricFormProps) {
   const { sessionId, userId } = useProgressSession();
   const logMutation = useLogBodyMetricMutation();
-  const [lastSavedRecord, setLastSavedRecord] = React.useState<BodyMetricRecord | null>(null);
+  const [savedRecordState, setSavedRecordState] = React.useState<SavedMetricState | null>(null);
 
   // Xóa kết quả lưu trữ cá nhân khi phiên đăng nhập đổi hoặc logout
   React.useEffect(() => {
-    setLastSavedRecord(null);
+    setSavedRecordState(null);
   }, [sessionId, userId]);
+
+  // Ràng buộc quyền sở hữu phiên đồng bộ tại thời điểm render:
+  // Loại bỏ triệt để nguy cơ hiển thị flash kết quả riêng tư của User A trong frame commit đầu tiên của User B
+  const visibleRecord = React.useMemo(() => {
+    if (!savedRecordState) return null;
+    if (
+      !userId ||
+      !sessionId ||
+      savedRecordState.ownerUserId !== userId ||
+      savedRecordState.ownerSessionId !== sessionId
+    ) {
+      return null;
+    }
+    return savedRecordState.record;
+  }, [savedRecordState, userId, sessionId]);
 
   const form = useForm<LogBodyMetricFormValues>({
     resolver: zodResolver(logBodyMetricSchema),
@@ -54,6 +75,20 @@ export function BodyMetricForm({ onSuccessLogged }: BodyMetricFormProps) {
     },
   });
 
+  const formSessionRef = React.useRef(sessionId);
+  if (formSessionRef.current !== sessionId) {
+    formSessionRef.current = sessionId;
+    form.reset({
+      loggedAt: toLocalInputDateTimeString(new Date()),
+      weightKg: 70.0,
+      bodyFatPercent: null,
+      waistCircumferenceCm: null,
+      systolicBloodPressure: null,
+      diastolicBloodPressure: null,
+      restingHeartRate: null,
+    });
+  }
+
   const onSubmit = async (values: LogBodyMetricFormValues) => {
     const sessionSnapshot = getProgressSessionContext();
     try {
@@ -64,7 +99,11 @@ export function BodyMetricForm({ onSuccessLogged }: BodyMetricFormProps) {
       ) {
         return;
       }
-      setLastSavedRecord(record);
+      setSavedRecordState({
+        record,
+        ownerUserId: sessionSnapshot.userId,
+        ownerSessionId: sessionSnapshot.sessionId,
+      });
       if (onSuccessLogged) {
         onSuccessLogged(record);
       }
@@ -321,7 +360,7 @@ export function BodyMetricForm({ onSuccessLogged }: BodyMetricFormProps) {
       </Card>
 
       {/* Banner kết quả phản hồi BMI chính thức từ backend sau khi lưu */}
-      {lastSavedRecord && (
+      {visibleRecord && (
         <Card className="border-emerald-500/40 bg-emerald-500/5 shadow-xs">
           <CardContent className="py-4">
             <div className="flex items-start gap-3">
@@ -334,23 +373,23 @@ export function BodyMetricForm({ onSuccessLogged }: BodyMetricFormProps) {
                   <span className="text-xs text-muted-foreground">
                     Cân nặng:{' '}
                     <strong className="text-foreground tabular-nums">
-                      {lastSavedRecord.weightKg} kg
+                      {visibleRecord.weightKg} kg
                     </strong>
                   </span>
                   <span>•</span>
                   <span className="text-xs text-muted-foreground">
                     Chỉ số BMI:{' '}
                     <strong className="text-foreground tabular-nums">
-                      {lastSavedRecord.bmi.toFixed(1)}
+                      {visibleRecord.bmi.toFixed(1)}
                     </strong>
                   </span>
                   <Badge
                     variant="outline"
                     className={`text-[11px] font-semibold ${getBmiBadgeStyle(
-                      lastSavedRecord.bmiCategory
+                      visibleRecord.bmiCategory
                     )}`}
                   >
-                    {lastSavedRecord.bmiCategoryLabel}
+                    {visibleRecord.bmiCategoryLabel}
                   </Badge>
                 </div>
               </div>

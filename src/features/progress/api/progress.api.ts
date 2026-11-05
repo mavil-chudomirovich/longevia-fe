@@ -66,7 +66,10 @@ export const progressApi = {
    * Bắt đầu một phiên nhịn ăn mới
    * POST /api/progress/fasting/start
    */
-  startFasting: async (values: StartFastingFormValues): Promise<FastingSessionResult> => {
+  startFasting: async (
+    values: StartFastingFormValues,
+    signal?: AbortSignal
+  ): Promise<FastingSessionResult> => {
     const payload: StartFastingRequestDto = {
       protocol: values.protocol,
       startedAt: toUtcInstantIsoString(values.startedAt),
@@ -76,7 +79,7 @@ export const progressApi = {
     const res = await api.post<FastingSessionResponseDto>(
       API_ENDPOINTS.PROGRESS.FASTING_START,
       payload,
-      { showErrorToast: false }
+      { silent: true, showErrorToast: false, signal }
     );
     return progressMapper.toFastingSessionResult(res.data);
   },
@@ -85,14 +88,19 @@ export const progressApi = {
    * Kết thúc phiên nhịn ăn hiện tại
    * POST /api/progress/fasting/end
    */
-  endFasting: async (values: EndFastingFormValues): Promise<EndFastingResult> => {
+  endFasting: async (
+    values: EndFastingFormValues,
+    signal?: AbortSignal
+  ): Promise<EndFastingResult> => {
     const payload: EndFastingRequestDto = {
       sessionId: values.sessionId,
       endedAt: toUtcInstantIsoString(values.endedAt),
     };
 
     const res = await api.post<EndFastingResponseDto>(API_ENDPOINTS.PROGRESS.FASTING_END, payload, {
+      silent: true,
       showErrorToast: false,
+      signal,
     });
     return progressMapper.toEndFastingResult(res.data);
   },
@@ -112,13 +120,15 @@ export const progressApi = {
    * Ghi nhận lượng nước uống
    * POST /api/progress/water/log
    */
-  logWater: async (values: LogWaterFormValues): Promise<WaterSummary> => {
+  logWater: async (values: LogWaterFormValues, signal?: AbortSignal): Promise<WaterSummary> => {
     const payload: LogWaterRequestDto = {
       amountMl: values.amountMl,
     };
 
     const res = await api.post<WaterSummaryResponseDto>(API_ENDPOINTS.PROGRESS.WATER_LOG, payload, {
+      silent: true,
       showErrorToast: false,
+      signal,
     });
     return progressMapper.toWaterSummary(res.data);
   },
@@ -127,7 +137,7 @@ export const progressApi = {
    * Ghi nhận giấc ngủ
    * POST /api/progress/sleep/log
    */
-  logSleep: async (values: LogSleepFormValues): Promise<SleepRecord> => {
+  logSleep: async (values: LogSleepFormValues, signal?: AbortSignal): Promise<SleepRecord> => {
     const payload: LogSleepRequestDto = {
       sleptAt: toUtcInstantIsoString(values.sleptAt),
       wokeAt: toUtcInstantIsoString(values.wokeAt),
@@ -135,7 +145,9 @@ export const progressApi = {
     };
 
     const res = await api.post<SleepResponseDto>(API_ENDPOINTS.PROGRESS.SLEEP_LOG, payload, {
+      silent: true,
       showErrorToast: false,
+      signal,
     });
     return progressMapper.toSleepRecord(res.data);
   },
@@ -144,7 +156,10 @@ export const progressApi = {
    * Ghi nhận chỉ số cơ thể & snapshot BMI
    * POST /api/progress/metrics
    */
-  logBodyMetric: async (values: LogBodyMetricFormValues): Promise<BodyMetricRecord> => {
+  logBodyMetric: async (
+    values: LogBodyMetricFormValues,
+    signal?: AbortSignal
+  ): Promise<BodyMetricRecord> => {
     const payload: LogBodyMetricRequestDto = {
       loggedAt: toUtcInstantIsoString(values.loggedAt),
       weightKg: values.weightKg,
@@ -156,7 +171,9 @@ export const progressApi = {
     };
 
     const res = await api.post<BodyMetricResponseDto>(API_ENDPOINTS.PROGRESS.METRICS, payload, {
+      silent: true,
       showErrorToast: false,
+      signal,
     });
     return progressMapper.toBodyMetricRecord(res.data);
   },

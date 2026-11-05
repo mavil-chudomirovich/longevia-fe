@@ -30,15 +30,36 @@ const QUALITY_OPTIONS: Array<{
   { value: 'Excellent', label: 'Rất tốt', desc: 'Tỉnh táo, sảng khoái tối đa' },
 ];
 
+interface SavedSleepState {
+  record: SleepRecord;
+  ownerUserId: string;
+  ownerSessionId: string;
+}
+
 export function SleepLogForm() {
   const { sessionId, userId } = useProgressSession();
   const logMutation = useLogSleepMutation();
-  const [lastLoggedSleep, setLastLoggedSleep] = React.useState<SleepRecord | null>(null);
+  const [savedSleepState, setSavedSleepState] = React.useState<SavedSleepState | null>(null);
 
   // Xóa kết quả riêng tư khi chuyển đổi tài khoản hoặc đăng xuất
   React.useEffect(() => {
-    setLastLoggedSleep(null);
+    setSavedSleepState(null);
   }, [sessionId, userId]);
+
+  // Ràng buộc quyền sở hữu phiên đồng bộ tại thời điểm render:
+  // Ngăn chặn rò rỉ dữ liệu giấc ngủ của User A trong frame commit đầu tiên của User B
+  const visibleSleepRecord = React.useMemo(() => {
+    if (!savedSleepState) return null;
+    if (
+      !userId ||
+      !sessionId ||
+      savedSleepState.ownerUserId !== userId ||
+      savedSleepState.ownerSessionId !== sessionId
+    ) {
+      return null;
+    }
+    return savedSleepState.record;
+  }, [savedSleepState, userId, sessionId]);
 
   // Mặc định: Giấc ngủ từ 23:00 tối qua đến 07:00 sáng nay
   const getDefaultTimes = () => {
@@ -60,6 +81,15 @@ export function SleepLogForm() {
       sleepQuality: 'Good',
     },
   });
+
+  const formSessionRef = React.useRef(sessionId);
+  if (formSessionRef.current !== sessionId) {
+    formSessionRef.current = sessionId;
+    form.reset({
+      ...getDefaultTimes(),
+      sleepQuality: 'Good',
+    });
+  }
 
   const sleptAtWatch = form.watch('sleptAt');
   const wokeAtWatch = form.watch('wokeAt');
@@ -90,7 +120,11 @@ export function SleepLogForm() {
       ) {
         return;
       }
-      setLastLoggedSleep(record);
+      setSavedSleepState({
+        record,
+        ownerUserId: sessionSnapshot.userId,
+        ownerSessionId: sessionSnapshot.sessionId,
+      });
       // Giữ nguyên form nhưng reset sang giá trị mặc định mới
       form.reset({
         ...getDefaultTimes(),
@@ -231,7 +265,7 @@ export function SleepLogForm() {
       </Card>
 
       {/* Xác nhận kết quả vừa lưu (Tuân thủ hợp đồng: không hiển thị fake lịch sử) */}
-      {lastLoggedSleep && (
+      {visibleSleepRecord && (
         <Card className="border-emerald-500/40 bg-emerald-500/5 shadow-xs">
           <CardContent className="py-4">
             <div className="flex items-start gap-3">
@@ -242,9 +276,14 @@ export function SleepLogForm() {
                 </span>
                 <p className="text-xs text-muted-foreground">
                   Thời lượng:{' '}
-                  <strong className="text-foreground">{lastLoggedSleep.formattedDuration}</strong> •
-                  Chất lượng:{' '}
-                  <strong className="text-foreground">{lastLoggedSleep.sleepQualityLabel}</strong>.
+                  <strong className="text-foreground">
+                    {visibleSleepRecord.formattedDuration}
+                  </strong>{' '}
+                  • Chất lượng:{' '}
+                  <strong className="text-foreground">
+                    {visibleSleepRecord.sleepQualityLabel}
+                  </strong>
+                  .
                 </p>
                 <div className="flex items-center gap-1 text-[11px] text-muted-foreground/90 pt-1">
                   <Info className="size-3 shrink-0" />

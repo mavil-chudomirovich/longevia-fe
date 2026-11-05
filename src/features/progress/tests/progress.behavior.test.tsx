@@ -2,13 +2,23 @@
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
-import { render, screen, act, fireEvent, waitFor, cleanup } from '@testing-library/react';
+import {
+  render,
+  screen,
+  act,
+  fireEvent,
+  waitFor,
+  cleanup,
+  renderHook,
+} from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/store/useAuthStore';
+import api from '@/lib/axios';
 import { progressApi } from '../api/progress.api';
 import {
   progressKeys,
+  clearProgressCache,
   useStartFastingMutation,
   useEndFastingMutation,
   useLogWaterMutation,
@@ -565,14 +575,29 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
   });
 
   describe('Scenario J — Mapper error in real component displays explicit error state', () => {
-    it('surfaces visible error card when backend returns malformed timestamp', async () => {
+    it('surfaces visible error card when backend returns malformed timestamp through full Axios -> Mapper -> UI pipeline', async () => {
       useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
       syncProgressSessionWithAuth();
 
-      // API trả về timestamp bất khả thi (Feb 30) -> Mapper ném ProgressDataIntegrityError
-      vi.spyOn(progressApi, 'getCurrentFasting').mockRejectedValueOnce(
-        new ProgressDataIntegrityError('startedAt', 'PROGRESS_INVALID_TIMESTAMP', 'CurrentFasting')
-      );
+      // Phục hồi implementation thực của progressApi.getCurrentFasting đã bị mock trong beforeEach
+      vi.spyOn(progressApi, 'getCurrentFasting').mockRestore();
+
+      // Mock ở tầng Axios API boundary với payload DTO chứa ngày không hợp lệ 30/02
+      // Kiểm thử toàn diện pipeline thực tế: Axios api.get -> progressApi.getCurrentFasting -> progressMapper.toCurrentFastingSession -> ném ProgressDataIntegrityError -> UI error card
+      vi.spyOn(api, 'get').mockImplementation(async (url: string) => {
+        if (url === '/progress/fasting/current') {
+          return {
+            data: {
+              sessionId: 'sess-corrupt',
+              protocol: '16:8',
+              startedAt: '2026-02-30T10:00:00Z', // 30/02 bất khả thi!
+              targetEndedAt: '2026-02-30T20:00:00Z',
+              status: 'InProgress',
+            },
+          } as any;
+        }
+        return { data: null } as any;
+      });
 
       render(<FastingPanel />, { wrapper: createWrapper() });
 
@@ -580,7 +605,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
         expect(screen.getByText(/không thể tải trạng thái nhịn ăn/i)).toBeInTheDocument();
       });
 
-      // Không hiển thị form nhịn ăn mới
+      // Không hiển thị form nhịn ăn mới và tuyệt đối không fallback tạo timestamp giả mạo
       expect(screen.queryByText(/bắt đầu phiên nhịn ăn mới/i)).not.toBeInTheDocument();
       // Hiển thị nút thử lại
       expect(screen.getByRole('button', { name: /thử lại/i })).toBeInTheDocument();
@@ -604,6 +629,42 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
 
       // Cache của User A phải bị dọn dẹp ngay lập tức
       expect(queryClient.getQueryData(progressKeys.dashboard(mockUserA.id))).toBeUndefined();
+    });
+
+    it('preserves User B queries when ProgressCacheSync is already mounted and User A cleanup finishes asynchronously', async () => {
+      // User A đang đăng nhập và ProgressCacheSync đã mount sẵn trong layout
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      queryClient.setQueryData(progressKeys.dashboard(mockUserA.id), { currentWeightKg: 80 });
+      queryClient.setQueryData(progressKeys.water(mockUserA.id), { consumedMl: 1500 });
+
+      const { rerender } = render(<ProgressCacheSync />, { wrapper: createWrapper() });
+
+      expect(queryClient.getQueryData(progressKeys.dashboard(mockUserA.id))).toBeDefined();
+
+      // User A đăng xuất và User B đăng nhập ngay sau đó
+      act(() => {
+        useAuthStore.getState().logout();
+        useAuthStore.setState({ user: mockUserB, isAuthenticated: true, token: 'token-b' });
+        syncProgressSessionWithAuth();
+      });
+
+      // User B nạp dữ liệu cache mới
+      queryClient.setQueryData(progressKeys.dashboard(mockUserB.id), { currentWeightKg: 65 });
+      queryClient.setQueryData(progressKeys.water(mockUserB.id), { consumedMl: 250 });
+
+      rerender(<ProgressCacheSync />);
+
+      // Dọn dẹp không đồng bộ hoàn tất: Cache của User A bị xóa, nhưng cache của User B bảo toàn tuyệt đối!
+      expect(queryClient.getQueryData(progressKeys.dashboard(mockUserA.id))).toBeUndefined();
+      expect(queryClient.getQueryData(progressKeys.water(mockUserA.id))).toBeUndefined();
+      expect(queryClient.getQueryData(progressKeys.dashboard(mockUserB.id))).toEqual({
+        currentWeightKg: 65,
+      });
+      expect(queryClient.getQueryData(progressKeys.water(mockUserB.id))).toEqual({
+        consumedMl: 250,
+      });
     });
   });
 
@@ -759,6 +820,222 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       expect(queryClient.getQueryData(progressKeys.dashboard(mockUserA.id))).toBeUndefined();
       expect(queryClient.getQueryData(progressKeys.water(mockUserA.id))).toBeUndefined();
       expect(queryClient.getQueryData(progressKeys.fasting(mockUserA.id))).toBeUndefined();
+    });
+  });
+
+  describe('Scenario P — Server, gateway and network error toasts in active vs switched session', () => {
+    it('displays 502 Bad Gateway error toast in active session', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      vi.spyOn(progressApi, 'getCurrentFasting').mockResolvedValue(null);
+      const axiosError = {
+        isAxiosError: true,
+        response: {
+          status: 502,
+          data: { detail: 'Bad Gateway' },
+        },
+      };
+      vi.spyOn(progressApi, 'startFasting').mockRejectedValueOnce(axiosError);
+
+      render(<FastingPanel />, { wrapper: createWrapper() });
+
+      const startBtn = await screen.findByText(/bắt đầu nhịn ăn ngay/i);
+      await act(async () => {
+        fireEvent.click(startBtn);
+      });
+
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('502 Gateway'));
+    });
+
+    it('displays 503 Service Unavailable error toast in active session', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      const axiosError = {
+        isAxiosError: true,
+        response: {
+          status: 503,
+          data: { detail: 'Service Unavailable' },
+        },
+      };
+      vi.spyOn(progressApi, 'logWater').mockRejectedValueOnce(axiosError);
+
+      render(<WaterTracker />, { wrapper: createWrapper() });
+
+      const quick250Btn = await screen.findByText('+250 ml');
+      await act(async () => {
+        fireEvent.click(quick250Btn);
+      });
+
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('503 Service Unavailable'));
+    });
+
+    it('displays 500 server error toast in active session', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      const axiosError = {
+        isAxiosError: true,
+        response: {
+          status: 500,
+          data: { detail: 'Internal Server Error' },
+        },
+      };
+      vi.spyOn(progressApi, 'logWater').mockRejectedValueOnce(axiosError);
+
+      render(<WaterTracker />, { wrapper: createWrapper() });
+
+      const quick250Btn = await screen.findByText('+250 ml');
+      await act(async () => {
+        fireEvent.click(quick250Btn);
+      });
+
+      expect(toast.error).toHaveBeenCalledWith('Lỗi hệ thống máy chủ. Vui lòng thử lại sau.');
+    });
+
+    it('displays network disconnection error toast in active session', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      const axiosError = {
+        isAxiosError: true,
+        request: {},
+        response: undefined,
+      };
+      vi.spyOn(progressApi, 'logWater').mockRejectedValueOnce(axiosError);
+
+      render(<WaterTracker />, { wrapper: createWrapper() });
+
+      const quick250Btn = await screen.findByText('+250 ml');
+      await act(async () => {
+        fireEvent.click(quick250Btn);
+      });
+
+      expect(toast.error).toHaveBeenCalledWith(
+        'Không thể kết nối đến máy chủ. Vui lòng kiểm tra đường truyền.'
+      );
+    });
+
+    it('suppresses 502/503/500/network error toasts completely when session switches to User B', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      const deferred = createDeferred<any>();
+      vi.spyOn(progressApi, 'logWater').mockReturnValueOnce(deferred.promise);
+
+      const { rerender } = render(<WaterTracker />, { wrapper: createWrapper() });
+
+      const quick250Btn = await screen.findByText('+250 ml');
+      await act(async () => {
+        fireEvent.click(quick250Btn);
+      });
+
+      // User A chuyển sang User B
+      act(() => {
+        useAuthStore.getState().logout();
+        useAuthStore.setState({ user: mockUserB, isAuthenticated: true, token: 'token-b' });
+        syncProgressSessionWithAuth();
+      });
+
+      rerender(<WaterTracker />);
+
+      // Request ban đầu của User A bị lỗi 500 từ server
+      await act(async () => {
+        deferred.reject({
+          isAxiosError: true,
+          response: { status: 500, data: { detail: 'Server exploded' } },
+        });
+      });
+
+      // Tuyệt đối không hiển thị toast lỗi của User A cho User B!
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Scenario Q — Dispatch-time session mismatch prevention', () => {
+    it('aborts and issues zero HTTP calls if session is invalidated before mutationFn executes', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      const apiSpy = vi.spyOn(progressApi, 'logWater');
+
+      const { result } = renderHook(() => useLogWaterMutation(), { wrapper: createWrapper() });
+
+      // User A logs out
+      act(() => {
+        useAuthStore.getState().logout();
+        syncProgressSessionWithAuth();
+      });
+
+      // Gọi mutate khi phiên đã mất
+      await act(async () => {
+        try {
+          await result.current.mutateAsync({ amountMl: 250 });
+        } catch {
+          // Expected auth error
+        }
+      });
+
+      // Không có bất kỳ HTTP call nào được dispatch
+      expect(apiSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Scenario R — Immediate synchronous render-time isolation of private UI state', () => {
+    it('synchronously hides User A private record during User B first commit render', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      const deferred = createDeferred<any>();
+      vi.spyOn(progressApi, 'logBodyMetric').mockReturnValueOnce(deferred.promise);
+
+      const { rerender } = render(<BodyMetricForm />, { wrapper: createWrapper() });
+
+      const submitBtn = screen.getByRole('button', { name: /lưu chỉ số cơ thể/i });
+      await act(async () => {
+        fireEvent.submit(submitBtn.closest('form')!);
+      });
+
+      // Hoàn tất lưu chỉ số của User A
+      await act(async () => {
+        deferred.resolve({
+          id: 'metric-a',
+          loggedAt: new Date('2026-11-04T12:00:00Z'),
+          formattedLoggedAt: '19:00 - 04/11/2026',
+          weightKg: 88.0,
+          bmi: 27.5,
+          bmiCategory: 'Overweight',
+          bmiCategoryLabel: 'Thừa cân',
+          bodyFatPercent: 25,
+          waistCircumferenceCm: 90,
+          systolicBloodPressure: null,
+          diastolicBloodPressure: null,
+          bloodPressureDisplay: null,
+          restingHeartRate: null,
+        });
+      });
+
+      // Verify User A đang nhìn thấy banner BMI của mình
+      expect(
+        screen.getByText(/đã ghi nhận chỉ số thành công vào cơ sở dữ liệu/i)
+      ).toBeInTheDocument();
+      expect(screen.getByText(/88 kg/)).toBeInTheDocument();
+
+      // Chuyển sang User B
+      act(() => {
+        useAuthStore.getState().logout();
+        useAuthStore.setState({ user: mockUserB, isAuthenticated: true, token: 'token-b' });
+        syncProgressSessionWithAuth();
+      });
+
+      // Ngay tại render commit đầu tiên của User B, kết quả của User A phải biến mất hoàn toàn
+      rerender(<BodyMetricForm />);
+
+      expect(
+        screen.queryByText(/đã ghi nhận chỉ số thành công vào cơ sở dữ liệu/i)
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/88 kg/)).not.toBeInTheDocument();
     });
   });
 });

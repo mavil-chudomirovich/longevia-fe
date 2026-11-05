@@ -55,17 +55,36 @@ export function FastingPanel() {
   const endMutation = useEndFastingMutation();
 
   const [confirmEndOpen, setConfirmEndOpen] = React.useState(false);
-  const [completedResultModal, setCompletedResultModal] = React.useState<{
-    actualHours: number;
-    targetHours: number;
-    isGoalReached: boolean;
+  const [modalState, setModalState] = React.useState<{
+    data: {
+      actualHours: number;
+      targetHours: number;
+      isGoalReached: boolean;
+    };
+    ownerUserId: string;
+    ownerSessionId: string;
   } | null>(null);
 
   // Tự động xóa sạch modal kết quả và đóng dialog khi người dùng đăng xuất hoặc đổi tài khoản
   React.useEffect(() => {
-    setCompletedResultModal(null);
+    setModalState(null);
     setConfirmEndOpen(false);
   }, [sessionId, userId]);
+
+  // Ràng buộc quyền sở hữu phiên đồng bộ tại thời điểm render:
+  // Ngăn chặn mở modal kết quả nhịn ăn của User A cho User B trong frame commit đầu tiên
+  const visibleModal = React.useMemo(() => {
+    if (!modalState) return null;
+    if (
+      !userId ||
+      !sessionId ||
+      modalState.ownerUserId !== userId ||
+      modalState.ownerSessionId !== sessionId
+    ) {
+      return null;
+    }
+    return modalState.data;
+  }, [modalState, userId, sessionId]);
 
   // Form bắt đầu nhịn ăn
   const form = useForm<StartFastingFormValues>({
@@ -164,10 +183,14 @@ export function FastingPanel() {
         return;
       }
       setConfirmEndOpen(false);
-      setCompletedResultModal({
-        actualHours: result.actualHours,
-        targetHours: result.targetHours,
-        isGoalReached: result.isGoalReached,
+      setModalState({
+        data: {
+          actualHours: result.actualHours,
+          targetHours: result.targetHours,
+          isGoalReached: result.isGoalReached,
+        },
+        ownerUserId: sessionSnapshot.userId,
+        ownerSessionId: sessionSnapshot.sessionId,
       });
     } catch {
       // Đã toast tại mutation handler
@@ -485,33 +508,30 @@ export function FastingPanel() {
       </Dialog>
 
       {/* Modal chúc mừng / tổng kết kết quả phiên vừa kết thúc */}
-      <Dialog
-        open={!!completedResultModal}
-        onOpenChange={(open) => !open && setCompletedResultModal(null)}
-      >
+      <Dialog open={!!visibleModal} onOpenChange={(open) => !open && setModalState(null)}>
         <DialogContent className="sm:max-w-md text-center">
           <div className="mx-auto my-2 p-3 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 w-fit">
             <CheckCircle2 className="size-8" />
           </div>
           <DialogHeader>
             <DialogTitle className="text-center text-xl">
-              {completedResultModal?.isGoalReached
+              {visibleModal?.isGoalReached
                 ? 'Xuất sắc! Bạn đã hoàn thành mục tiêu!'
                 : 'Phiên nhịn ăn đã được ghi nhận'}
             </DialogTitle>
             <DialogDescription className="text-center text-pretty">
-              {completedResultModal?.isGoalReached
+              {visibleModal?.isGoalReached
                 ? `Bạn đã kiên trì nhịn ăn trong ${formatDurationHours(
-                    completedResultModal?.actualHours ?? 0
-                  )}, vượt qua mốc ${completedResultModal?.targetHours} giờ đề ra.`
+                    visibleModal?.actualHours ?? 0
+                  )}, vượt qua mốc ${visibleModal?.targetHours} giờ đề ra.`
                 : `Bạn đã nhịn ăn được ${formatDurationHours(
-                    completedResultModal?.actualHours ?? 0
+                    visibleModal?.actualHours ?? 0
                   )}. Mọi nỗ lực đều giúp tế bào phục hồi tốt hơn.`}
             </DialogDescription>
           </DialogHeader>
 
           <DialogFooter className="sm:justify-center">
-            <Button onClick={() => setCompletedResultModal(null)} className="gap-1.5">
+            <Button onClick={() => setModalState(null)} className="gap-1.5">
               <RotateCcw className="size-4" /> Tiếp tục theo dõi
             </Button>
           </DialogFooter>

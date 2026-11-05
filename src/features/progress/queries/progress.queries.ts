@@ -1,6 +1,13 @@
-import { QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import * as React from 'react';
+import {
+  MutateOptions,
+  QueryClient,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { AxiosError } from 'axios';
+import axios, { AxiosError } from 'axios';
 import { useAuthStore } from '@/store/useAuthStore';
 import { progressApi } from '../api/progress.api';
 import {
@@ -23,7 +30,11 @@ import {
 } from '../schemas/progress.schema';
 import { ErrorResponse } from '@/types/api';
 import { getUtcTodayDateString } from '../utils/progress-date';
-import { getProgressSessionContext, isProgressSessionActive } from '../utils/progress-session';
+import {
+  getProgressSessionContext,
+  isProgressSessionActive,
+  registerSessionAbortController,
+} from '../utils/progress-session';
 import {
   ProgressAuthError,
   ProgressDataIntegrityError,
@@ -144,37 +155,216 @@ export function useMetricsHistoryQuery(filters?: GetMetricsHistoryFilters, custo
 // 2. MUTATIONS (Session-Safe & Invocation-Bound)
 // ==========================================
 
-export function useStartFastingMutation() {
+export type ProgressMutationError =
+  AxiosError<ErrorResponse> | ProgressAuthError | ProgressDataIntegrityError | Error;
+
+interface SessionMutationInput<TVariables> {
+  values: TVariables;
+  initiatingSession: { userId: string; sessionId: string };
+  abortController: AbortController;
+}
+
+function handleProgressMutationError(
+  error: unknown,
+  context: ProgressMutationContext | undefined,
+  defaultMessage: string,
+  customStatusHandlers?: (status?: number, detail?: string) => string | null
+): void {
+  // Lỗi do request bị abort khi chuyển tài khoản hoặc hủy phiên -> không hiển thị toast
+  if (
+    axios.isCancel(error) ||
+    (error instanceof Error && error.name === 'AbortError') ||
+    (error as any)?.code === 'ERR_CANCELED'
+  ) {
+    return;
+  }
+
+  // Nếu phiên đã thay đổi hoặc đã logout -> triệt tiêu toàn bộ toast thông báo của phiên cũ
+  if (!context || !isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)) {
+    return;
+  }
+
+  if (error instanceof ProgressAuthError) {
+    toast.error(error.message);
+    return;
+  }
+
+  if (error instanceof ProgressDataIntegrityError) {
+    toast.error(error.message);
+    return;
+  }
+
+  const axiosError = error as AxiosError<ErrorResponse>;
+  const status = axiosError.response?.status;
+  const errorData = axiosError.response?.data;
+  const detail = errorData?.detail || '';
+
+  if (customStatusHandlers) {
+    const customMsg = customStatusHandlers(status, detail);
+    if (customMsg) {
+      toast.error(customMsg);
+      return;
+    }
+  }
+
+  if (status && status >= 500) {
+    if (status === 502) {
+      toast.error('Lỗi kết nối với dịch vụ máy chủ (502 Gateway). Vui lòng thử lại sau.');
+    } else if (status === 503) {
+      toast.error(
+        'Dịch vụ tạm thời không khả dụng (503 Service Unavailable). Vui lòng thử lại sau ít phút.'
+      );
+    } else {
+      toast.error('Lỗi hệ thống máy chủ. Vui lòng thử lại sau.');
+    }
+  } else if (status === 403) {
+    toast.error(errorData?.message || detail || 'Bạn không có quyền thực hiện thao tác này.');
+  } else if (status === 429) {
+    toast.error('Bạn đang gửi quá nhiều yêu cầu. Vui lòng thử lại sau.');
+  } else if (axiosError.request && !axiosError.response) {
+    toast.error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra đường truyền.');
+  } else {
+    toast.error(detail || errorData?.title || errorData?.message || defaultMessage);
+  }
+}
+
+function useSessionBoundMutation<TData, TVariables>(config: {
+  mutationFn: (values: TVariables, signal: AbortSignal) => Promise<TData>;
+  onSuccess?: (data: TData, variables: TVariables, context: ProgressMutationContext) => void;
+  onError?: (
+    error: ProgressMutationError,
+    variables: TVariables,
+    context: ProgressMutationContext | undefined
+  ) => void;
+}) {
   const queryClient = useQueryClient();
 
-  return useMutation<
-    FastingSessionResult,
-    AxiosError<ErrorResponse> | ProgressAuthError | ProgressDataIntegrityError | Error,
-    StartFastingFormValues,
+  const mutation = useMutation<
+    TData,
+    ProgressMutationError,
+    SessionMutationInput<TVariables>,
     ProgressMutationContext
   >({
-    mutationFn: async (values) => {
-      const session = getProgressSessionContext();
-      if (!session) {
+    mutationFn: async ({ values, initiatingSession, abortController }) => {
+      // Tái kiểm tra phiên NGAY TRƯỚC KHI gửi yêu cầu HTTP ra mạng
+      if (!isProgressSessionActive(initiatingSession.userId, initiatingSession.sessionId)) {
+        abortController.abort();
         throw new ProgressAuthError();
       }
-      return progressApi.startFasting(values);
+      return config.mutationFn(values, abortController.signal);
     },
-    onMutate: async () => {
-      const session = getProgressSessionContext();
-      if (!session) {
+    onMutate: async ({ initiatingSession }) => {
+      if (!isProgressSessionActive(initiatingSession.userId, initiatingSession.sessionId)) {
         throw new ProgressAuthError();
       }
       return {
-        initiatingUserId: session.userId,
-        initiatingSessionId: session.sessionId,
+        initiatingUserId: initiatingSession.userId,
+        initiatingSessionId: initiatingSession.sessionId,
       };
     },
+    onSuccess: (data, input, context) => {
+      config.onSuccess?.(data, input.values, context);
+    },
+    onError: (error, input, context) => {
+      config.onError?.(error, input.values, context);
+    },
+  });
+
+  const mutate = React.useCallback(
+    (
+      values: TVariables,
+      options?: MutateOptions<TData, ProgressMutationError, TVariables, ProgressMutationContext>
+    ) => {
+      const session = getProgressSessionContext();
+      if (!session) {
+        const authError = new ProgressAuthError();
+        toast.error(authError.message);
+        if (options?.onError) {
+          options.onError(authError, values, undefined, {
+            client: queryClient,
+            meta: undefined,
+          });
+        }
+        return;
+      }
+      const controller = new AbortController();
+      const unregister = registerSessionAbortController(session.sessionId, controller);
+      mutation.mutate(
+        { values, initiatingSession: session, abortController: controller },
+        {
+          onSuccess: (data, _vars, ctx, fnCtx) => {
+            unregister();
+            options?.onSuccess?.(data, values, ctx, fnCtx);
+          },
+          onError: (err, _vars, ctx, fnCtx) => {
+            unregister();
+            options?.onError?.(err, values, ctx, fnCtx);
+          },
+          onSettled: (data, err, _vars, ctx, fnCtx) => {
+            unregister();
+            options?.onSettled?.(data, err, values, ctx, fnCtx);
+          },
+        }
+      );
+    },
+    [mutation, queryClient]
+  );
+
+  const mutateAsync = React.useCallback(
+    async (
+      values: TVariables,
+      options?: MutateOptions<TData, ProgressMutationError, TVariables, ProgressMutationContext>
+    ): Promise<TData> => {
+      const session = getProgressSessionContext();
+      if (!session) {
+        const authError = new ProgressAuthError();
+        toast.error(authError.message);
+        throw authError;
+      }
+      const controller = new AbortController();
+      const unregister = registerSessionAbortController(session.sessionId, controller);
+      try {
+        return await mutation.mutateAsync(
+          { values, initiatingSession: session, abortController: controller },
+          {
+            onSuccess: (data, _vars, ctx, fnCtx) => {
+              unregister();
+              options?.onSuccess?.(data, values, ctx, fnCtx);
+            },
+            onError: (err, _vars, ctx, fnCtx) => {
+              unregister();
+              options?.onError?.(err, values, ctx, fnCtx);
+            },
+            onSettled: (data, err, _vars, ctx, fnCtx) => {
+              unregister();
+              options?.onSettled?.(data, err, values, ctx, fnCtx);
+            },
+          }
+        );
+      } finally {
+        unregister();
+      }
+    },
+    [mutation]
+  );
+
+  return React.useMemo(
+    () => ({
+      ...mutation,
+      mutate,
+      mutateAsync,
+    }),
+    [mutation, mutate, mutateAsync]
+  );
+}
+
+export function useStartFastingMutation() {
+  const queryClient = useQueryClient();
+
+  return useSessionBoundMutation<FastingSessionResult, StartFastingFormValues>({
+    mutationFn: (values, signal) => progressApi.startFasting(values, signal),
     onSuccess: (_result, _variables, context) => {
-      if (
-        !context ||
-        !isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)
-      ) {
+      if (!isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)) {
         return;
       }
       toast.success('Bắt đầu phiên nhịn ăn thành công!');
@@ -186,30 +376,17 @@ export function useStartFastingMutation() {
       });
     },
     onError: (error, _variables, context) => {
-      if (error instanceof ProgressAuthError) {
-        toast.error(error.message);
-        return;
-      }
-      if (
-        !context ||
-        !isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)
-      ) {
-        return;
-      }
-      if (error instanceof ProgressDataIntegrityError) {
-        toast.error(error.message);
-        return;
-      }
-      const axiosError = error as AxiosError<ErrorResponse>;
-      if (axiosError.response?.status === 409) {
-        toast.error('Bạn đang có một phiên nhịn ăn chưa kết thúc.');
-      } else {
-        const msg =
-          axiosError.response?.data?.detail ||
-          axiosError.response?.data?.title ||
-          'Không thể bắt đầu phiên nhịn ăn. Vui lòng thử lại.';
-        toast.error(msg);
-      }
+      handleProgressMutationError(
+        error,
+        context,
+        'Không thể bắt đầu phiên nhịn ăn. Vui lòng thử lại.',
+        (status) => {
+          if (status === 409) {
+            return 'Bạn đang có một phiên nhịn ăn chưa kết thúc.';
+          }
+          return null;
+        }
+      );
     },
   });
 }
@@ -217,34 +394,10 @@ export function useStartFastingMutation() {
 export function useEndFastingMutation() {
   const queryClient = useQueryClient();
 
-  return useMutation<
-    EndFastingResult,
-    AxiosError<ErrorResponse> | ProgressAuthError | ProgressDataIntegrityError | Error,
-    EndFastingFormValues,
-    ProgressMutationContext
-  >({
-    mutationFn: async (values) => {
-      const session = getProgressSessionContext();
-      if (!session) {
-        throw new ProgressAuthError();
-      }
-      return progressApi.endFasting(values);
-    },
-    onMutate: async () => {
-      const session = getProgressSessionContext();
-      if (!session) {
-        throw new ProgressAuthError();
-      }
-      return {
-        initiatingUserId: session.userId,
-        initiatingSessionId: session.sessionId,
-      };
-    },
+  return useSessionBoundMutation<EndFastingResult, EndFastingFormValues>({
+    mutationFn: (values, signal) => progressApi.endFasting(values, signal),
     onSuccess: (result, _variables, context) => {
-      if (
-        !context ||
-        !isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)
-      ) {
+      if (!isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)) {
         return;
       }
       if (result.isGoalReached) {
@@ -262,26 +415,17 @@ export function useEndFastingMutation() {
       });
     },
     onError: (error, _variables, context) => {
-      if (error instanceof ProgressAuthError) {
-        toast.error(error.message);
-        return;
-      }
-      if (
-        !context ||
-        !isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)
-      ) {
-        return;
-      }
-      if (error instanceof ProgressDataIntegrityError) {
-        toast.error(error.message);
-        return;
-      }
-      const axiosError = error as AxiosError<ErrorResponse>;
-      const msg =
-        axiosError.response?.data?.detail ||
-        axiosError.response?.data?.title ||
-        'Không thể kết thúc phiên nhịn ăn. Vui lòng thử lại.';
-      toast.error(msg);
+      handleProgressMutationError(
+        error,
+        context,
+        'Không thể kết thúc phiên nhịn ăn. Vui lòng thử lại.',
+        (status) => {
+          if (status === 404) {
+            return 'Không tìm thấy phiên nhịn ăn để kết thúc.';
+          }
+          return null;
+        }
+      );
     },
   });
 }
@@ -289,34 +433,10 @@ export function useEndFastingMutation() {
 export function useLogWaterMutation() {
   const queryClient = useQueryClient();
 
-  return useMutation<
-    WaterSummary,
-    AxiosError<ErrorResponse> | ProgressAuthError | ProgressDataIntegrityError | Error,
-    LogWaterFormValues,
-    ProgressMutationContext
-  >({
-    mutationFn: async (values) => {
-      const session = getProgressSessionContext();
-      if (!session) {
-        throw new ProgressAuthError();
-      }
-      return progressApi.logWater(values);
-    },
-    onMutate: async () => {
-      const session = getProgressSessionContext();
-      if (!session) {
-        throw new ProgressAuthError();
-      }
-      return {
-        initiatingUserId: session.userId,
-        initiatingSessionId: session.sessionId,
-      };
-    },
+  return useSessionBoundMutation<WaterSummary, LogWaterFormValues>({
+    mutationFn: (values, signal) => progressApi.logWater(values, signal),
     onSuccess: (_data, variables, context) => {
-      if (
-        !context ||
-        !isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)
-      ) {
+      if (!isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)) {
         return;
       }
       toast.success(`Đã ghi nhận thêm ${variables.amountMl} ml nước uống.`);
@@ -328,26 +448,11 @@ export function useLogWaterMutation() {
       });
     },
     onError: (error, _variables, context) => {
-      if (error instanceof ProgressAuthError) {
-        toast.error(error.message);
-        return;
-      }
-      if (
-        !context ||
-        !isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)
-      ) {
-        return;
-      }
-      if (error instanceof ProgressDataIntegrityError) {
-        toast.error(error.message);
-        return;
-      }
-      const axiosError = error as AxiosError<ErrorResponse>;
-      const msg =
-        axiosError.response?.data?.detail ||
-        axiosError.response?.data?.title ||
-        'Không thể ghi nhận nước uống. Vui lòng thử lại.';
-      toast.error(msg);
+      handleProgressMutationError(
+        error,
+        context,
+        'Không thể ghi nhận nước uống. Vui lòng thử lại.'
+      );
     },
   });
 }
@@ -355,34 +460,10 @@ export function useLogWaterMutation() {
 export function useLogSleepMutation() {
   const queryClient = useQueryClient();
 
-  return useMutation<
-    SleepRecord,
-    AxiosError<ErrorResponse> | ProgressAuthError | ProgressDataIntegrityError | Error,
-    LogSleepFormValues,
-    ProgressMutationContext
-  >({
-    mutationFn: async (values) => {
-      const session = getProgressSessionContext();
-      if (!session) {
-        throw new ProgressAuthError();
-      }
-      return progressApi.logSleep(values);
-    },
-    onMutate: async () => {
-      const session = getProgressSessionContext();
-      if (!session) {
-        throw new ProgressAuthError();
-      }
-      return {
-        initiatingUserId: session.userId,
-        initiatingSessionId: session.sessionId,
-      };
-    },
+  return useSessionBoundMutation<SleepRecord, LogSleepFormValues>({
+    mutationFn: (values, signal) => progressApi.logSleep(values, signal),
     onSuccess: (record, _variables, context) => {
-      if (
-        !context ||
-        !isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)
-      ) {
+      if (!isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)) {
         return;
       }
       toast.success(`Đã ghi nhận giấc ngủ (${record.formattedDuration}) thành công!`);
@@ -391,30 +472,17 @@ export function useLogSleepMutation() {
       });
     },
     onError: (error, _variables, context) => {
-      if (error instanceof ProgressAuthError) {
-        toast.error(error.message);
-        return;
-      }
-      if (
-        !context ||
-        !isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)
-      ) {
-        return;
-      }
-      if (error instanceof ProgressDataIntegrityError) {
-        toast.error(error.message);
-        return;
-      }
-      const axiosError = error as AxiosError<ErrorResponse>;
-      if (axiosError.response?.status === 409) {
-        toast.error('Khoảng thời gian này đã trùng với một giấc ngủ đã được ghi nhận trước đó.');
-      } else {
-        const msg =
-          axiosError.response?.data?.detail ||
-          axiosError.response?.data?.title ||
-          'Không thể ghi nhận giấc ngủ. Vui lòng kiểm tra lại thời gian.';
-        toast.error(msg);
-      }
+      handleProgressMutationError(
+        error,
+        context,
+        'Không thể ghi nhận giấc ngủ. Vui lòng kiểm tra lại thời gian.',
+        (status) => {
+          if (status === 409) {
+            return 'Khoảng thời gian này đã trùng với một giấc ngủ đã được ghi nhận trước đó.';
+          }
+          return null;
+        }
+      );
     },
   });
 }
@@ -422,34 +490,10 @@ export function useLogSleepMutation() {
 export function useLogBodyMetricMutation() {
   const queryClient = useQueryClient();
 
-  return useMutation<
-    BodyMetricRecord,
-    AxiosError<ErrorResponse> | ProgressAuthError | ProgressDataIntegrityError | Error,
-    LogBodyMetricFormValues,
-    ProgressMutationContext
-  >({
-    mutationFn: async (values) => {
-      const session = getProgressSessionContext();
-      if (!session) {
-        throw new ProgressAuthError();
-      }
-      return progressApi.logBodyMetric(values);
-    },
-    onMutate: async () => {
-      const session = getProgressSessionContext();
-      if (!session) {
-        throw new ProgressAuthError();
-      }
-      return {
-        initiatingUserId: session.userId,
-        initiatingSessionId: session.sessionId,
-      };
-    },
+  return useSessionBoundMutation<BodyMetricRecord, LogBodyMetricFormValues>({
+    mutationFn: (values, signal) => progressApi.logBodyMetric(values, signal),
     onSuccess: (record, _variables, context) => {
-      if (
-        !context ||
-        !isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)
-      ) {
+      if (!isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)) {
         return;
       }
       toast.success(`Đã lưu chỉ số cơ thể! BMI: ${record.bmi} (${record.bmiCategoryLabel}).`);
@@ -461,40 +505,23 @@ export function useLogBodyMetricMutation() {
       });
     },
     onError: (error, _variables, context) => {
-      if (error instanceof ProgressAuthError) {
-        toast.error(error.message);
-        return;
-      }
-      if (
-        !context ||
-        !isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)
-      ) {
-        return;
-      }
-      if (error instanceof ProgressDataIntegrityError) {
-        toast.error(error.message);
-        return;
-      }
-      const axiosError = error as AxiosError<ErrorResponse>;
-      const status = axiosError.response?.status;
-      const errorData = axiosError.response?.data;
-      const detail = errorData?.detail || '';
-
-      if (status === 422 || detail.includes('height_unavailable')) {
-        toast.error(
-          'Hồ sơ của bạn chưa có thông tin chiều cao. Vui lòng cập nhật chiều cao trong trang Hồ sơ cá nhân để tính BMI.'
-        );
-      } else if (status === 503 || detail.includes('identity_unavailable')) {
-        toast.error(
-          'Dịch vụ thông tin hồ sơ tạm thời không khả dụng. Vui lòng thử lại sau ít phút.'
-        );
-      } else if (status === 502 || detail.includes('identity_integration_failure')) {
-        toast.error(
-          'Lỗi kết nối với dịch vụ hồ sơ. Vui lòng liên hệ quản trị viên nếu tình trạng tiếp diễn.'
-        );
-      } else {
-        toast.error(detail || errorData?.title || 'Không thể lưu chỉ số cơ thể. Vui lòng thử lại.');
-      }
+      handleProgressMutationError(
+        error,
+        context,
+        'Không thể lưu chỉ số cơ thể. Vui lòng thử lại.',
+        (status, detail) => {
+          if (status === 422 || (detail && detail.includes('height_unavailable'))) {
+            return 'Hồ sơ của bạn chưa có thông tin chiều cao. Vui lòng cập nhật chiều cao trong trang Hồ sơ cá nhân để tính BMI.';
+          }
+          if (status === 503 || (detail && detail.includes('identity_unavailable'))) {
+            return 'Dịch vụ thông tin hồ sơ tạm thời không khả dụng. Vui lòng thử lại sau ít phút.';
+          }
+          if (status === 502 || (detail && detail.includes('identity_integration_failure'))) {
+            return 'Lỗi kết nối với dịch vụ hồ sơ. Vui lòng liên hệ quản trị viên nếu tình trạng tiếp diễn.';
+          }
+          return null;
+        }
+      );
     },
   });
 }

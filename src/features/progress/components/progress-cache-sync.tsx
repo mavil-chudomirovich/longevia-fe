@@ -45,11 +45,8 @@ export function ProgressCacheSync() {
 
       if (previousUserId && previousUserId !== newUserId) {
         // Người dùng đã đăng xuất hoặc chuyển đổi tài khoản:
-        // Hủy toàn bộ query đang pending và xóa cache dữ liệu của user cũ
+        // Hủy toàn bộ query đang pending và xóa cache dữ liệu của user cũ một cách an toàn
         void clearProgressCache(queryClient, previousUserId);
-        if (!newUserId) {
-          void clearProgressCache(queryClient);
-        }
       }
 
       lastUserIdRef.current = newUserId;

@@ -7,6 +7,67 @@ let activeUserId: string | null = null;
 let lastAuthToken: string | null = null;
 let isSubscribed = false;
 
+const sessionAbortControllers = new Map<string, Set<AbortController>>();
+
+/**
+ * Đăng ký AbortController cho một phiên mutation cụ thể.
+ * Tự động hủy yêu cầu mạng khi phiên kết thúc hoặc chuyển đổi người dùng.
+ */
+export function registerSessionAbortController(
+  sessionId: string,
+  controller: AbortController
+): () => void {
+  let controllers = sessionAbortControllers.get(sessionId);
+  if (!controllers) {
+    controllers = new Set<AbortController>();
+    sessionAbortControllers.set(sessionId, controllers);
+  }
+  controllers.add(controller);
+
+  return () => {
+    const set = sessionAbortControllers.get(sessionId);
+    if (set) {
+      set.delete(controller);
+      if (set.size === 0) {
+        sessionAbortControllers.delete(sessionId);
+      }
+    }
+  };
+}
+
+/**
+ * Hủy toàn bộ các yêu cầu HTTP đang chạy của một phiên cụ thể.
+ */
+export function abortSessionControllers(sessionId: string): void {
+  const controllers = sessionAbortControllers.get(sessionId);
+  if (controllers) {
+    for (const controller of controllers) {
+      try {
+        controller.abort();
+      } catch {
+        // bỏ qua lỗi abort nếu đã kết thúc
+      }
+    }
+    sessionAbortControllers.delete(sessionId);
+  }
+}
+
+/**
+ * Hủy toàn bộ các controller đang hoạt động của mọi phiên.
+ */
+export function abortAllSessionControllers(): void {
+  for (const [, controllers] of sessionAbortControllers.entries()) {
+    for (const controller of controllers) {
+      try {
+        controller.abort();
+      } catch {
+        // bỏ qua
+      }
+    }
+  }
+  sessionAbortControllers.clear();
+}
+
 function generateSessionId(userId: string): string {
   return `sess_${userId}_${++sessionEpoch}_${Date.now()}`;
 }
@@ -17,6 +78,9 @@ export function syncProgressSessionWithAuth(): void {
     Boolean(state.isAuthenticated) && Boolean(state.user?.id) && Boolean(state.token);
 
   if (!isAuthValid) {
+    if (activeSessionId) {
+      abortSessionControllers(activeSessionId);
+    }
     activeSessionId = '';
     activeUserId = null;
     lastAuthToken = null;
@@ -28,6 +92,9 @@ export function syncProgressSessionWithAuth(): void {
 
   // Nếu user thay đổi, hoặc session trước đó đã hết hạn/chưa có:
   if (activeUserId !== newUserId || !activeSessionId || lastAuthToken === null) {
+    if (activeSessionId) {
+      abortSessionControllers(activeSessionId);
+    }
     activeUserId = newUserId;
     activeSessionId = generateSessionId(newUserId);
     lastAuthToken = newToken;
@@ -108,6 +175,7 @@ export function useProgressSession() {
  * Helper dành riêng cho môi trường kiểm thử để reset trạng thái session giữa các test case.
  */
 export function __resetProgressSessionForTests(): void {
+  abortAllSessionControllers();
   activeSessionId = '';
   activeUserId = null;
   lastAuthToken = null;
