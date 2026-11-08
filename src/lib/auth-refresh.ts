@@ -1,10 +1,11 @@
 'use client';
 
 import axios from 'axios';
-import { setAccessToken, clearAccessToken } from './auth-token';
+import { getAccessToken, setAccessToken, clearAccessToken } from './auth-token';
 import { useAuthStore } from '@/store/useAuthStore';
 import { authMapper } from '@/features/auth/mappers/auth.mapper';
-import type { RefreshResponseDto } from '@/features/auth/types/auth.dto';
+import type { AuthTokenDto } from '@/features/auth/types/auth.dto';
+import { API_ENDPOINTS } from '@/common/constants/api-endpoints';
 
 /**
  * Singleton refresh cho toàn bộ tab.
@@ -51,14 +52,8 @@ function releaseLocalLock(): void {
 }
 
 async function doFetchRefresh(): Promise<string> {
-  // Đi qua Next proxy để forward HttpOnly cookie + nhận Set-Cookie rotation
-  const res = await axios.post<RefreshResponseDto>('/api/auth/refresh-token', {}, { baseURL: '' });
-  const raw = res.data as RefreshResponseDto & { accessToken?: string };
-  const envelope: RefreshResponseDto =
-    raw && typeof raw === 'object' && 'accessToken' in raw && !('data' in raw)
-      ? { data: raw as RefreshResponseDto['data'] }
-      : raw;
-  const token = authMapper.toRefreshedTokenModel(envelope).accessToken;
+  const res = await axios.post<AuthTokenDto>(API_ENDPOINTS.BFF.REFRESH, {}, { baseURL: '' });
+  const token = authMapper.toSessionModel(res.data).accessToken;
   if (token) {
     setAccessToken(token);
     useAuthStore.getState().setToken(token);
@@ -146,7 +141,15 @@ export function clearRefreshState(): void {
  */
 export async function forceLogout(): Promise<void> {
   try {
-    await axios.post('/api/auth/logout', { allDevices: false }, { baseURL: '', timeout: 8000 });
+    await axios.post(
+      API_ENDPOINTS.BFF.LOGOUT,
+      {},
+      {
+        baseURL: '',
+        timeout: 8000,
+        headers: getAccessToken() ? { Authorization: `Bearer ${getAccessToken()}` } : undefined,
+      }
+    );
   } catch {
     /* Logout proxy idempotent — BE down vẫn tiếp tục logout phía client */
   }

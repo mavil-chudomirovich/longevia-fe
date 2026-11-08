@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Image from 'next/image';
 import { motion, useReducedMotion } from 'motion/react';
-import { Sparkles, MapPin, Heart, Leaf, Utensils } from 'lucide-react';
+import { Activity, Sparkles, UserRound, Leaf, Utensils } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface AuthEditorialHeroProps {
@@ -45,7 +45,7 @@ export function AuthEditorialHero({ className }: AuthEditorialHeroProps) {
           className="inline-flex items-center gap-2 rounded-full border border-emerald-200/60 bg-emerald-50/80 px-3.5 py-1 text-[11px] font-semibold uppercase tracking-widest text-[#075B45] shadow-xs backdrop-blur-xs dark:border-emerald-800/50 dark:bg-emerald-950/50 dark:text-emerald-300"
         >
           <Leaf className="h-3.5 w-3.5 text-[#287D32] dark:text-emerald-400" />
-          <span>YOUR PLANT-BASED COMPANION</span>
+          <span>DINH DƯỠNG · SỨC KHỎE · TRƯỜNG THỌ</span>
         </motion.div>
 
         {/* Main Heading */}
@@ -55,9 +55,9 @@ export function AuthEditorialHero({ className }: AuthEditorialHeroProps) {
           transition={{ duration: 0.45, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
           className="text-4xl font-extrabold tracking-tight text-[#1D2B22] dark:text-[#E8F1E8] sm:text-5xl xl:text-[54px] leading-[1.12]"
         >
-          Eat well.
+          Sống khỏe.
           <br />
-          <span className="text-[#287D32] dark:text-emerald-400">Connect deeply.</span>
+          <span className="text-[#287D32] dark:text-emerald-400">Bền lâu hơn.</span>
         </motion.h1>
 
         {/* Supporting text */}
@@ -67,7 +67,7 @@ export function AuthEditorialHero({ className }: AuthEditorialHeroProps) {
           transition={{ duration: 0.45, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
           className="max-w-md text-base leading-relaxed text-[#718078] dark:text-neutral-400 sm:text-lg"
         >
-          Khám phá công thức, địa điểm và những lựa chọn phù hợp với hành trình ăn chay của bạn.
+          Theo dõi dinh dưỡng và tiến trình sức khỏe, nhận gợi ý phù hợp với hồ sơ của bạn.
         </motion.p>
       </div>
 
@@ -102,7 +102,7 @@ export function AuthEditorialHero({ className }: AuthEditorialHeroProps) {
           >
             <Image
               src="/hero/optimized/completed-dish.webp"
-              alt="Món ăn thuần chay cân bằng dinh dưỡng - VeggieConnect"
+              alt="Món ăn cân bằng dinh dưỡng - Longevia"
               fill
               priority
               sizes="(max-width: 1024px) 256px, 300px"
@@ -110,7 +110,7 @@ export function AuthEditorialHero({ className }: AuthEditorialHeroProps) {
             />
           </motion.div>
 
-          {/* FLOATING CARD 1: VEGGIE AI Recommendation (Top Right) */}
+          {/* FLOATING CARD 1: AI meal suggestion (Top Right) */}
           <motion.div
             initial={shouldReduceMotion ? false : { opacity: 0, y: 15, x: 10 }}
             animate={
@@ -129,19 +129,19 @@ export function AuthEditorialHero({ className }: AuthEditorialHeroProps) {
           >
             <div className="flex items-center gap-1.5 text-[10px] font-bold tracking-wider text-[#287D32] dark:text-emerald-400 uppercase">
               <Sparkles className="h-3 w-3" />
-              <span>VEGGIE AI</span>
+              <span>GỢI Ý AI</span>
             </div>
             <div className="mt-1 text-[11px] font-medium text-muted-foreground">Gợi ý hôm nay</div>
             <div className="text-xs font-bold text-[#1D2B22] dark:text-foreground">
-              Tofu Buddha Bowl
+              Bữa ăn cân bằng
             </div>
             <div className="mt-1.5 flex items-center gap-1 text-[10px] font-medium text-[#075B45] dark:text-emerald-300">
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#287D32] dark:bg-emerald-400" />
-              <span>Giàu đạm · Cân đối</span>
+              <span>Theo mục tiêu của bạn</span>
             </div>
           </motion.div>
 
-          {/* FLOATING CARD 2: NEAR YOU Places (Bottom Left) */}
+          {/* FLOATING CARD 2: Health progress (Bottom Left) */}
           <motion.div
             initial={shouldReduceMotion ? false : { opacity: 0, y: 15, x: -10 }}
             animate={
@@ -159,19 +159,19 @@ export function AuthEditorialHero({ className }: AuthEditorialHeroProps) {
             className="absolute -bottom-3 -left-2 sm:-left-4 z-10 flex items-center gap-3 rounded-2xl border border-white/60 bg-white/95 px-3.5 py-2.5 shadow-[0_12px_32px_rgba(29,43,34,0.08)] backdrop-blur-md dark:border-border/60 dark:bg-card/95 dark:shadow-[0_12px_32px_rgba(0,0,0,0.4)]"
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100/80 text-[#287D32] dark:bg-emerald-950/70 dark:text-emerald-300">
-              <MapPin className="h-4 w-4" />
+              <Activity className="h-4 w-4" />
             </div>
             <div>
               <div className="text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
-                GẦN BẠN
+                TIẾN ĐỘ
               </div>
               <div className="text-xs font-bold text-[#1D2B22] dark:text-foreground">
-                12 quán chay lành tính
+                Chỉ số sức khỏe
               </div>
             </div>
           </motion.div>
 
-          {/* FLOATING CARD 3: COMMUNITY Connection (Bottom Right / Offset) */}
+          {/* FLOATING CARD 3: Personal health profile (Bottom Right / Offset) */}
           <motion.div
             initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.9 }}
             animate={
@@ -189,14 +189,14 @@ export function AuthEditorialHero({ className }: AuthEditorialHeroProps) {
             className="absolute bottom-6 -right-2 sm:-right-6 z-10 flex items-center gap-2 rounded-2xl border border-white/60 bg-white/95 px-3 py-2 shadow-[0_10px_28px_rgba(29,43,34,0.07)] backdrop-blur-md dark:border-border/60 dark:bg-card/95 dark:shadow-[0_10px_28px_rgba(0,0,0,0.4)]"
           >
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400">
-              <Heart className="h-3.5 w-3.5 fill-current" />
+              <UserRound className="h-3.5 w-3.5" />
             </div>
             <div>
               <div className="text-[9px] font-bold tracking-wider text-muted-foreground uppercase">
-                CỘNG ĐỒNG
+                HỒ SƠ SỨC KHỎE
               </div>
               <div className="text-[11px] font-semibold text-[#1D2B22] dark:text-foreground">
-                Chia sẻ · Kết nối · An lành
+                Cá nhân hóa theo bạn
               </div>
             </div>
           </motion.div>
@@ -212,11 +212,11 @@ export function AuthEditorialHero({ className }: AuthEditorialHeroProps) {
       >
         <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-3 py-1 font-medium dark:bg-muted/30">
           <Utensils className="h-3 w-3 text-[#287D32] dark:text-emerald-400" />
-          500+ Công thức thuần thực vật
+          Nhật ký dinh dưỡng
         </span>
         <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-3 py-1 font-medium dark:bg-muted/30">
           <Sparkles className="h-3 w-3 text-[#287D32] dark:text-emerald-400" />
-          Đồng hành AI thông minh
+          Tiến trình sức khỏe
         </span>
       </motion.div>
     </div>

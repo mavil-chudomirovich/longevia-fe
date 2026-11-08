@@ -3,19 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  Menu,
-  X,
-  User as UserIcon,
-  LogOut,
-  Settings,
-  Sparkles,
-  HeartPulse,
-  Apple,
-  CalendarDays,
-  LineChart,
-  BookOpen,
-} from 'lucide-react';
+import { Menu, X, User as UserIcon, LogOut, Sparkles, Apple, LineChart, House } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BrandLogo } from '@/components/layout/brand-logo';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
@@ -33,11 +21,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
-  { label: 'Chế độ ăn', href: '/diet', icon: Apple },
-  { label: 'Kế hoạch bữa ăn', href: '/meal-plans', icon: CalendarDays },
+  { label: 'Trang chủ', href: '/', icon: House },
+  { label: 'Dinh dưỡng', href: '/diet', icon: Apple },
+  { label: 'Gợi ý AI', href: '/diet/suggestions', icon: Sparkles },
   { label: 'Tiến trình', href: '/progress', icon: LineChart },
-  { label: 'Kiến thức trường thọ', href: '/knowledge', icon: BookOpen },
-  { label: 'Trợ lý AI', href: '/assistant', icon: Sparkles, badge: 'AI' },
 ];
 
 export function SiteHeader() {
@@ -60,7 +47,8 @@ export function SiteHeader() {
           {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-1 lg:gap-2">
             {NAV_ITEMS.map((item) => {
-              const isActive = pathname.startsWith(item.href);
+              const isActive =
+                item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
               return (
                 <Link
                   key={item.href}
@@ -74,11 +62,6 @@ export function SiteHeader() {
                 >
                   <item.icon className="w-4 h-4" />
                   <span>{item.label}</span>
-                  {item.badge && (
-                    <span className="ml-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                      {item.badge}
-                    </span>
-                  )}
                 </Link>
               );
             })}
@@ -97,9 +80,9 @@ export function SiteHeader() {
                   className="relative h-9 w-9 rounded-full ring-1 ring-border"
                 >
                   <Avatar className="h-9 w-9">
-                    <AvatarImage src={user.avatarUrl || ''} alt={user.displayName || 'User'} />
+                    <AvatarImage alt={user.fullName} />
                     <AvatarFallback className="bg-primary/10 text-primary font-semibold text-xs">
-                      {user.initials || 'U'}
+                      {user.fullName.slice(0, 1).toUpperCase() || 'U'}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -108,7 +91,7 @@ export function SiteHeader() {
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-semibold leading-none">
-                      {user.displayName || user.email}
+                      {user.fullName || user.email}
                     </p>
                     <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                   </div>
@@ -118,12 +101,6 @@ export function SiteHeader() {
                   <Link href="/profile" className="flex items-center cursor-pointer">
                     <UserIcon className="mr-2 h-4 w-4" />
                     <span>Hồ sơ cá nhân</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/settings" className="flex items-center cursor-pointer">
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Cài đặt</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -142,7 +119,7 @@ export function SiteHeader() {
                 <Link href="/login">Đăng nhập</Link>
               </Button>
               <Button size="sm" className="bg-primary text-white hover:bg-primary/90" asChild>
-                <Link href="/register">Bắt đầu ngay</Link>
+                <Link href="/login?tab=register">Bắt đầu ngay</Link>
               </Button>
             </div>
           )}
@@ -179,11 +156,6 @@ export function SiteHeader() {
                 <item.icon className="w-4 h-4" />
                 <span>{item.label}</span>
               </div>
-              {item.badge && (
-                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-600">
-                  {item.badge}
-                </span>
-              )}
             </Link>
           ))}
           {!isAuthenticated && (
@@ -194,7 +166,7 @@ export function SiteHeader() {
                 </Link>
               </Button>
               <Button asChild className="w-full bg-primary text-white">
-                <Link href="/register" onClick={() => setMobileMenuOpen(false)}>
+                <Link href="/login?tab=register" onClick={() => setMobileMenuOpen(false)}>
                   Đăng ký tài khoản
                 </Link>
               </Button>

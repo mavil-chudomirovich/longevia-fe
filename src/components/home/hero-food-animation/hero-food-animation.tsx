@@ -40,7 +40,7 @@ export interface HeroFoodAnimationProps {
 }
 
 /**
- * Visual Hero Animation Component cho Landing Page VeggieConnect.
+ * Visual Hero Animation Component cho Landing Page Longevia.
  * Thay thế hình ảnh tĩnh bằng hoạt cảnh 2D ẩm thực thuần chay với Remotion Player.
  */
 /**

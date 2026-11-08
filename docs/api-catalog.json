@@ -1,0 +1,558 @@
+{
+  "$generated": "scripts/sync-swagger.mjs — không sửa tay",
+  "source": "docs\\swagger.json",
+  "generatedAt": "2026-11-08T11:12:30.642Z",
+  "stats": {
+    "operations": 32,
+    "groups": 13,
+    "schemas": 41
+  },
+  "operations": [
+    {
+      "method": "POST",
+      "path": "/identity/auth/register",
+      "group": "Authentication",
+      "summary": "Đăng ký tài khoản người dùng mới",
+      "operationId": "RegisterUser",
+      "params": [],
+      "request": {
+        "schema": {
+          "$ref": "identity_RegisterUserRequest"
+        },
+        "required": true
+      },
+      "responses": {
+        "201": "identity_UserResponse"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/identity/auth/verify",
+      "group": "Authentication",
+      "summary": "Xác minh địa chỉ email và kích hoạt tài khoản",
+      "operationId": "VerifyUser",
+      "params": [
+        {
+          "in": "query",
+          "name": "Token",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "request": null,
+      "responses": {
+        "204": "No Content"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/identity/auth/login",
+      "group": "Authentication",
+      "summary": "Đăng nhập lấy cặp Access/Refresh Token",
+      "operationId": "Login",
+      "params": [],
+      "request": {
+        "schema": {
+          "$ref": "identity_LoginRequest"
+        },
+        "required": true
+      },
+      "responses": {
+        "200": "identity_AuthTokenResponse"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/identity/auth/refresh",
+      "group": "Authentication",
+      "summary": "Đổi Access Token mới qua Refresh Token",
+      "operationId": "RefreshToken",
+      "params": [],
+      "request": {
+        "schema": {
+          "$ref": "identity_RefreshTokenRequest"
+        },
+        "required": true
+      },
+      "responses": {
+        "200": "identity_AuthTokenResponse"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/identity/auth/logout",
+      "group": "Authentication",
+      "summary": "Thu hồi Refresh Token",
+      "operationId": "Logout",
+      "params": [],
+      "request": {
+        "schema": {
+          "$ref": "identity_LogoutRequest"
+        },
+        "required": true
+      },
+      "responses": {
+        "204": "No Content"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/identity/auth/change-password",
+      "group": "Authentication",
+      "summary": "Đổi mật khẩu của tài khoản hiện tại",
+      "operationId": "ChangePassword",
+      "params": [],
+      "request": {
+        "schema": {
+          "$ref": "identity_ChangePasswordRequest"
+        },
+        "required": true
+      },
+      "responses": {
+        "204": "No Content"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/identity/auth/forgot-password",
+      "group": "Authentication",
+      "summary": "Yêu cầu gửi email đặt lại mật khẩu",
+      "operationId": "ForgotPassword",
+      "params": [],
+      "request": {
+        "schema": {
+          "$ref": "identity_ForgotPasswordRequest"
+        },
+        "required": true
+      },
+      "responses": {
+        "202": "Accepted"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/identity/auth/reset-password",
+      "group": "Authentication",
+      "summary": "Đặt lại mật khẩu bằng token email",
+      "operationId": "ResetPassword",
+      "params": [],
+      "request": {
+        "schema": {
+          "$ref": "identity_ResetPasswordRequest"
+        },
+        "required": true
+      },
+      "responses": {
+        "204": "No Content"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/identity/health",
+      "group": "Identity.Api",
+      "summary": "",
+      "operationId": "",
+      "params": [],
+      "request": null,
+      "responses": {
+        "200": "OK"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/identity/users/me",
+      "group": "Users",
+      "summary": "Lấy thông tin tài khoản hiện tại kèm hồ sơ",
+      "operationId": "GetCurrentUser",
+      "params": [],
+      "request": null,
+      "responses": {
+        "200": "identity_UserResponse"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/identity/users/me/profile",
+      "group": "Users",
+      "summary": "Cập nhật hồ sơ thể chất cơ bản & dị ứng",
+      "operationId": "UpdateProfile",
+      "params": [],
+      "request": {
+        "schema": {
+          "$ref": "identity_UpdateProfileRequest"
+        },
+        "required": true
+      },
+      "responses": {
+        "200": "identity_ProfileResponse"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/diet/health",
+      "group": "Diet.Api",
+      "summary": "",
+      "operationId": "",
+      "params": [],
+      "request": null,
+      "responses": {
+        "200": "OK"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/diet/alive",
+      "group": "Diet.Api",
+      "summary": "",
+      "operationId": "",
+      "params": [],
+      "request": null,
+      "responses": {
+        "200": "diet_String<>f__AnonymousType0"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/diet/foods",
+      "group": "Foods",
+      "summary": "Tìm món chung và món tùy chỉnh của bạn",
+      "operationId": "SearchFoods",
+      "params": [
+        {
+          "in": "query",
+          "name": "search",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "in": "query",
+          "name": "category",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "in": "query",
+          "name": "pageNumber",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "in": "query",
+          "name": "pageSize",
+          "required": false,
+          "type": "integer"
+        }
+      ],
+      "request": null,
+      "responses": {
+        "200": "diet_FoodPageResponse"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/diet/foods",
+      "group": "Foods",
+      "summary": "Tạo món tùy chỉnh cá nhân",
+      "operationId": "CreateFood",
+      "params": [],
+      "request": {
+        "schema": {
+          "$ref": "diet_CreateFoodRequest"
+        },
+        "required": true
+      },
+      "responses": {
+        "201": "diet_FoodResponse"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/diet/meals",
+      "group": "Meals",
+      "summary": "Ghi nhật ký và snapshot dinh dưỡng",
+      "operationId": "LogMeal",
+      "params": [],
+      "request": {
+        "schema": {
+          "$ref": "diet_LogMealRequest"
+        },
+        "required": true
+      },
+      "responses": {
+        "201": "diet_MealResponse"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/diet/meals/ai-recommendations",
+      "group": "Meals",
+      "summary": "Gợi ý bữa ăn từ profile và phần dinh dưỡng còn lại hôm nay",
+      "operationId": "GetMealRecommendations",
+      "params": [
+        {
+          "in": "query",
+          "name": "mealType",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "in": "query",
+          "name": "goal",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "request": null,
+      "responses": {
+        "200": "diet_MealRecommendationsResponse"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/diet/meals/daily-summary",
+      "group": "Meals",
+      "summary": "Tổng hợp dinh dưỡng theo ngày, mặc định UTC",
+      "operationId": "GetDailyDietSummary",
+      "params": [
+        {
+          "in": "query",
+          "name": "date",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "request": null,
+      "responses": {
+        "200": "diet_DailySummaryResponse"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/diet/targets/me",
+      "group": "Targets",
+      "summary": "Lấy mục tiêu dinh dưỡng hiện tại",
+      "operationId": "GetDietTarget",
+      "params": [],
+      "request": null,
+      "responses": {
+        "200": "diet_TargetResponse"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/diet/targets/me",
+      "group": "Targets",
+      "summary": "Lưu mục tiêu calo và macro nhập tay",
+      "operationId": "UpdateDietTarget",
+      "params": [],
+      "request": {
+        "schema": {
+          "$ref": "diet_UpdateTargetRequest"
+        },
+        "required": true
+      },
+      "responses": {
+        "200": "diet_TargetResponse"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/diet/targets/me/calculate",
+      "group": "Targets",
+      "summary": "Tính BMR/TDEE từ hồ sơ và lưu snapshot cùng mục tiêu",
+      "operationId": "CalculateDietTarget",
+      "params": [],
+      "request": {
+        "schema": {
+          "$ref": "diet_UpdateTargetRequest"
+        },
+        "required": true
+      },
+      "responses": {
+        "200": "diet_TargetResponse"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/progress/dashboard/summary",
+      "group": "Dashboard",
+      "summary": "Tổng hợp số liệu dashboard, streak, và delta cân nặng",
+      "operationId": "GetDashboardSummary",
+      "params": [],
+      "request": null,
+      "responses": {
+        "200": "progress_DashboardSummaryResponse"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/progress/fasting/start",
+      "group": "Fasting",
+      "summary": "Bắt đầu một phiên nhịn ăn mới",
+      "operationId": "StartFasting",
+      "params": [],
+      "request": {
+        "schema": {
+          "$ref": "progress_StartFastingRequest"
+        },
+        "required": true
+      },
+      "responses": {
+        "201": "progress_FastingSessionResponse"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/progress/fasting/end",
+      "group": "Fasting",
+      "summary": "Kết thúc phiên nhịn ăn hiện tại",
+      "operationId": "EndFasting",
+      "params": [],
+      "request": {
+        "schema": {
+          "$ref": "progress_EndFastingRequest"
+        },
+        "required": true
+      },
+      "responses": {
+        "200": "progress_EndFastingResponse"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/progress/fasting/current",
+      "group": "Fasting",
+      "summary": "Lấy thông tin phiên nhịn ăn đang hoạt động",
+      "operationId": "GetCurrentFasting",
+      "params": [],
+      "request": null,
+      "responses": {
+        "200": "OK"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/progress/metrics",
+      "group": "Metrics",
+      "summary": "Ghi nhận chỉ số cơ thể và tính snapshot BMI",
+      "operationId": "LogBodyMetric",
+      "params": [],
+      "request": {
+        "schema": {
+          "$ref": "progress_LogBodyMetricRequest"
+        },
+        "required": true
+      },
+      "responses": {
+        "201": "progress_BodyMetricResponse"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/progress/metrics/history",
+      "group": "Metrics",
+      "summary": "Tra cứu lịch sử chỉ số cơ thể có phân trang",
+      "operationId": "GetMetricsHistory",
+      "params": [
+        {
+          "in": "query",
+          "name": "fromDate",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "in": "query",
+          "name": "toDate",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "in": "query",
+          "name": "pageNumber",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "in": "query",
+          "name": "pageSize",
+          "required": false,
+          "type": "integer"
+        }
+      ],
+      "request": null,
+      "responses": {
+        "200": "progress_MetricsHistoryResponse"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/progress/alive",
+      "group": "Progress.Api",
+      "summary": "",
+      "operationId": "",
+      "params": [],
+      "request": null,
+      "responses": {
+        "200": "progress_String<>f__AnonymousType0"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/progress/health",
+      "group": "Progress.Api",
+      "summary": "",
+      "operationId": "",
+      "params": [],
+      "request": null,
+      "responses": {
+        "200": "OK"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/progress/sleep/log",
+      "group": "Sleep",
+      "summary": "Ghi nhận thông tin giấc ngủ",
+      "operationId": "LogSleep",
+      "params": [],
+      "request": {
+        "schema": {
+          "$ref": "progress_LogSleepRequest"
+        },
+        "required": true
+      },
+      "responses": {
+        "201": "progress_SleepResponse"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/progress/water/log",
+      "group": "Water",
+      "summary": "Ghi nhận lượng nước uống vào",
+      "operationId": "LogWater",
+      "params": [],
+      "request": {
+        "schema": {
+          "$ref": "progress_LogWaterRequest"
+        },
+        "required": true
+      },
+      "responses": {
+        "200": "progress_WaterSummaryResponse"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/progress/water/today",
+      "group": "Water",
+      "summary": "Lấy tổng lượng nước uống hôm nay",
+      "operationId": "GetWaterToday",
+      "params": [],
+      "request": null,
+      "responses": {
+        "200": "progress_WaterSummaryResponse"
+      }
+    }
+  ]
+}

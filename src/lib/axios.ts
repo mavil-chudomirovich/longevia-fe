@@ -1,10 +1,12 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { toast } from 'sonner';
-import { ErrorResponse } from '@/types/api';
+import type { ProblemDetails } from '@/types/api';
 import { getAccessToken, setAccessToken } from './auth-token';
 import { useAuthStore } from '@/store/useAuthStore';
 import { API_BASE_URL } from './env';
 import { sharedRefresh, forceLogout } from './auth-refresh';
+import { PROTECTED_PREFIXES } from '@/common/constants/routes';
+import { API_ENDPOINTS } from '@/common/constants/api-endpoints';
 
 declare module 'axios' {
   export interface AxiosRequestConfig {
@@ -48,8 +50,6 @@ api.interceptors.request.use(
 );
 
 /** Route cần đăng nhập theo `middleware.ts` — redirect về login kèm `from` khi mất phiên. */
-const PROTECTED_PREFIXES = ['/dashboard', '/profile', '/admin', '/progress'];
-
 /**
  * Đưa về `/login?from=<path>` khi mất phiên mà đang ở route bảo vệ.
  * Trang public giữ nguyên (không redirect gây khó chịu); AuthGuard/middleware
@@ -73,6 +73,11 @@ const failedQueue: Array<{
   reject: (reason: unknown) => void;
 }> = [];
 let queueProcessing = false;
+const noRefreshRoutes = [
+  API_ENDPOINTS.BFF.LOGIN,
+  API_ENDPOINTS.BFF.LOGOUT,
+  API_ENDPOINTS.BFF.REFRESH,
+].map((path) => path.replace(/^\/api/, ''));
 
 const processQueue = (error: unknown, token: string | null = null) => {
   queueProcessing = false;
@@ -86,7 +91,7 @@ api.interceptors.response.use(
   (response) => {
     return response;
   },
-  async (error: AxiosError<ErrorResponse>) => {
+  async (error: AxiosError<ProblemDetails>) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
     const silent = originalRequest?.silent === true;
     const showErrorToast = originalRequest?.showErrorToast === true;
@@ -97,14 +102,7 @@ api.interceptors.response.use(
       const errorData = error.response.data;
 
       // Kiểm tra lỗi xác thực 401 (hỗ trợ cả envelope mới lồng `error`)
-      const nestedMessage = errorData?.error?.message;
-      const isAuthError =
-        status === 401 ||
-        (status === 500 &&
-          (nestedMessage === 'Vui lòng đăng nhập' ||
-            errorData?.message === 'Vui lòng đăng nhập' ||
-            errorData?.detail === 'Vui lòng đăng nhập' ||
-            errorData?.Detail === 'Vui lòng đăng nhập'));
+      const isAuthError = status === 401;
 
       // Chỉ thử refresh khi từng có phiên (token memory/store hoặc user đã persist).
       // Guest chưa đăng nhập gặp 401 thì reject ngay: không gọi refresh vô ích, không toast sai.
@@ -115,15 +113,8 @@ api.interceptors.response.use(
         isAuthError &&
         originalRequest &&
         !originalRequest._retry &&
-        !originalRequest.url?.includes('/auth/login')
+        !noRefreshRoutes.some((path) => originalRequest.url?.includes(path))
       ) {
-        if (
-          originalRequest.url?.includes('/auth/logout') ||
-          originalRequest.url?.includes('/auth/refresh-token')
-        ) {
-          return Promise.reject(error);
-        }
-
         if (!hadSession) {
           return Promise.reject(error);
         }
@@ -155,13 +146,7 @@ api.interceptors.response.use(
           // Sự kiện mất phiên là toàn cục: luôn toast 1 lần kể cả khi request
           // kích hoạt có `silent` (silent chỉ áp dụng cho lỗi nghiệp vụ của request đó).
           if (!hasShownSessionExpiredToast) {
-            const refreshCode =
-              err instanceof AxiosError ? err.response?.data?.error?.code : undefined;
-            toast.error(
-              refreshCode === 'REFRESH_TOKEN_REUSED'
-                ? 'Phiên đăng nhập đã bị thu hồi trên thiết bị khác. Vui lòng đăng nhập lại.'
-                : 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
-            );
+            toast.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
             hasShownSessionExpiredToast = true;
           }
           redirectToLoginIfProtected();
@@ -179,20 +164,13 @@ api.interceptors.response.use(
           toast.error('Lỗi hệ thống máy chủ. Vui lòng thử lại sau.');
         } else if (status === 403) {
           toast.error(
-            nestedMessage ||
-              errorData?.message ||
-              errorData?.detail ||
-              'Bạn không có quyền thực hiện thao tác này.'
+            errorData?.detail || errorData?.title || 'Bạn không có quyền thực hiện thao tác này.'
           );
         } else if (status === 429) {
           toast.error('Bạn đang gửi quá nhiều yêu cầu. Vui lòng thử lại sau.');
         } else if (showErrorToast) {
           toast.error(
-            nestedMessage ||
-              errorData?.message ||
-              errorData?.detail ||
-              errorData?.title ||
-              'Thao tác thất bại. Vui lòng thử lại.'
+            errorData?.detail || errorData?.title || 'Thao tác thất bại. Vui lòng thử lại.'
           );
         }
       }

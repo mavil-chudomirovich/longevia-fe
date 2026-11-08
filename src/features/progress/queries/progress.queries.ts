@@ -28,7 +28,7 @@ import {
   LogWaterFormValues,
   StartFastingFormValues,
 } from '../schemas/progress.schema';
-import { ErrorResponse } from '@/types/api';
+import type { ProblemDetails } from '@/types/api';
 import { getUtcTodayDateString } from '../utils/progress-date';
 import {
   getProgressSessionContext,
@@ -158,7 +158,7 @@ export function useMetricsHistoryQuery(filters?: GetMetricsHistoryFilters, custo
 // ==========================================
 
 export type ProgressMutationError =
-  | AxiosError<ErrorResponse>
+  | AxiosError<ProblemDetails>
   | ProgressAuthError
   | ProgressSessionObsoleteError
   | ProgressDataIntegrityError
@@ -174,7 +174,7 @@ function handleProgressMutationError(
   error: unknown,
   context: ProgressMutationContext | undefined,
   defaultMessage: string,
-  customStatusHandlers?: (status?: number, detail?: string) => string | null
+  customStatusHandlers?: (status?: number, code?: string) => string | null
 ): void {
   // Lỗi do request bị abort khi chuyển tài khoản hoặc hủy phiên -> không hiển thị toast
   if (
@@ -204,13 +204,14 @@ function handleProgressMutationError(
     return;
   }
 
-  const axiosError = error as AxiosError<ErrorResponse>;
+  const axiosError = error as AxiosError<ProblemDetails>;
   const status = axiosError.response?.status;
   const errorData = axiosError.response?.data;
+  const code = errorData?.code;
   const detail = errorData?.detail || '';
 
   if (customStatusHandlers) {
-    const customMsg = customStatusHandlers(status, detail);
+    const customMsg = customStatusHandlers(status, code);
     if (customMsg) {
       toast.error(customMsg);
       return;
@@ -228,13 +229,13 @@ function handleProgressMutationError(
       toast.error('Lỗi hệ thống máy chủ. Vui lòng thử lại sau.');
     }
   } else if (status === 403) {
-    toast.error(errorData?.message || detail || 'Bạn không có quyền thực hiện thao tác này.');
+    toast.error(detail || 'Bạn không có quyền thực hiện thao tác này.');
   } else if (status === 429) {
     toast.error('Bạn đang gửi quá nhiều yêu cầu. Vui lòng thử lại sau.');
   } else if (axiosError.request && !axiosError.response) {
     toast.error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra đường truyền.');
   } else {
-    toast.error(detail || errorData?.title || errorData?.message || defaultMessage);
+    toast.error(detail || errorData?.title || defaultMessage);
   }
 }
 
@@ -486,8 +487,8 @@ export function useStartFastingMutation() {
         error,
         context,
         'Không thể bắt đầu phiên nhịn ăn. Vui lòng thử lại.',
-        (status) => {
-          if (status === 409) {
+        (_status, code) => {
+          if (code === 'progress.fasting_active_conflict') {
             return 'Bạn đang có một phiên nhịn ăn chưa kết thúc.';
           }
           return null;
@@ -525,8 +526,8 @@ export function useEndFastingMutation() {
         error,
         context,
         'Không thể kết thúc phiên nhịn ăn. Vui lòng thử lại.',
-        (status) => {
-          if (status === 404) {
+        (_status, code) => {
+          if (code === 'progress.fasting_not_found' || code === 'progress.fasting_no_active') {
             return 'Không tìm thấy phiên nhịn ăn để kết thúc.';
           }
           return null;
@@ -582,8 +583,8 @@ export function useLogSleepMutation() {
         error,
         context,
         'Không thể ghi nhận giấc ngủ. Vui lòng kiểm tra lại thời gian.',
-        (status) => {
-          if (status === 409) {
+        (_status, code) => {
+          if (code === 'progress.sleep_overlap') {
             return 'Khoảng thời gian này đã trùng với một giấc ngủ đã được ghi nhận trước đó.';
           }
           return null;
@@ -615,14 +616,14 @@ export function useLogBodyMetricMutation() {
         error,
         context,
         'Không thể lưu chỉ số cơ thể. Vui lòng thử lại.',
-        (status, detail) => {
-          if (status === 422 || (detail && detail.includes('height_unavailable'))) {
+        (_status, code) => {
+          if (code === 'progress.height_unavailable') {
             return 'Hồ sơ của bạn chưa có thông tin chiều cao. Vui lòng cập nhật chiều cao trong trang Hồ sơ cá nhân để tính BMI.';
           }
-          if (status === 503 || (detail && detail.includes('identity_unavailable'))) {
+          if (code === 'progress.identity_unavailable') {
             return 'Dịch vụ thông tin hồ sơ tạm thời không khả dụng. Vui lòng thử lại sau ít phút.';
           }
-          if (status === 502 || (detail && detail.includes('identity_integration_failure'))) {
+          if (code === 'progress.identity_integration_failure') {
             return 'Lỗi kết nối với dịch vụ hồ sơ. Vui lòng liên hệ quản trị viên nếu tình trạng tiếp diễn.';
           }
           return null;

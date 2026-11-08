@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { authApi, LoginPayload } from '../api/auth.api';
+import { toast } from 'sonner';
+import { authApi, type LoginPayload } from '../api/auth.api';
 import type { RegisterFormValues } from '../schemas/auth.schema';
 import { useAuthStore } from '@/store/useAuthStore';
-import { toast } from 'sonner';
+import { clearAccessToken, setAccessToken } from '@/lib/auth-token';
 
 export const AUTH_QUERY_KEYS = {
   all: ['auth'] as const,
@@ -10,46 +11,50 @@ export const AUTH_QUERY_KEYS = {
 };
 
 export const useCurrentUserQuery = () => {
-  const token = useAuthStore((s) => s.token);
-  const setUser = useAuthStore((s) => s.setUser);
-
+  const token = useAuthStore((state) => state.token);
+  const setUser = useAuthStore((state) => state.setUser);
   return useQuery({
     queryKey: AUTH_QUERY_KEYS.me(),
     queryFn: async () => {
       const user = await authApi.getMe();
-      // Bỏ qua user rỗng để không ghi đè session hợp lệ bằng dữ liệu rỗng.
       if (user.id) setUser(user);
       return user;
     },
-    enabled: !!token,
+    enabled: Boolean(token),
   });
 };
 
 export const useRegisterMutation = () => {
-  const queryClient = useQueryClient();
-  const setSession = useAuthStore((s) => s.setSession);
-
-  return useMutation({
+  const mutation = useMutation({
     mutationFn: (values: RegisterFormValues) => authApi.register(values),
-    onSuccess: (session) => {
-      if (!session.accessToken) return;
-      setSession(session.accessToken, session.user);
-      queryClient.setQueryData(AUTH_QUERY_KEYS.me(), session.user);
-      toast.success('Đăng ký thành công! Chào mừng bạn đến với ChayXanh.');
-    },
   });
+  return {
+    ...mutation,
+    mutateAsync: async (values: RegisterFormValues) => {
+      const user = await mutation.mutateAsync(values);
+      toast.success('Tài khoản đã tạo. Hãy kiểm tra email để xác minh địa chỉ của bạn.');
+      return user;
+    },
+  };
 };
 
 export const useLoginMutation = () => {
   const queryClient = useQueryClient();
-  const setSession = useAuthStore((s) => s.setSession);
-
+  const setSession = useAuthStore((state) => state.setSession);
   return useMutation({
-    mutationFn: (payload: LoginPayload) => authApi.login(payload),
-    onSuccess: (session) => {
-      if (!session.accessToken) return;
-      setSession(session.accessToken, session.user);
-      queryClient.setQueryData(AUTH_QUERY_KEYS.me(), session.user);
+    mutationFn: async (payload: LoginPayload) => {
+      const session = await authApi.login(payload);
+      setAccessToken(session.accessToken);
+      try {
+        return { session, user: await authApi.getMe() };
+      } catch (error) {
+        clearAccessToken();
+        throw error;
+      }
+    },
+    onSuccess: ({ session, user }) => {
+      setSession(session.accessToken, user);
+      queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user);
       toast.success('Đăng nhập thành công!');
     },
   });
@@ -57,10 +62,9 @@ export const useLoginMutation = () => {
 
 export const useLogoutMutation = () => {
   const queryClient = useQueryClient();
-  const logout = useAuthStore((s) => s.logout);
-
+  const logout = useAuthStore((state) => state.logout);
   return useMutation({
-    mutationFn: (opts?: { allDevices?: boolean }) => authApi.logout(opts),
+    mutationFn: () => authApi.logout(),
     onSettled: () => {
       logout();
       queryClient.clear();

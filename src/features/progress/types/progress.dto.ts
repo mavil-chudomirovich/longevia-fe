@@ -1,3 +1,5 @@
+import type { PagedResult } from '@/types/api';
+
 /**
  * Progress DTO Types — Raw backend API contracts from Longevia Progress Service (.NET 10).
  * Source of truth:
@@ -108,13 +110,7 @@ export interface BodyMetricResponseDto {
   restingHeartRate?: number | null;
 }
 
-export interface MetricsHistoryResponseDto {
-  items: BodyMetricResponseDto[];
-  pageNumber: number;
-  pageSize: number;
-  totalCount: number;
-  totalPages: number;
-}
+export type MetricsHistoryResponseDto = PagedResult<BodyMetricResponseDto>;
 
 export interface GetMetricsHistoryParamsDto {
   fromDate?: string; // YYYY-MM-DD

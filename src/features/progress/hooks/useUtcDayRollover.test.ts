@@ -4,22 +4,19 @@ import { setupUtcDayRollover, DocumentVisibilityTarget } from './useUtcDayRollov
 import { useAuthStore } from '@/store/useAuthStore';
 import { progressKeys } from '../queries/progress.queries';
 import * as dateUtils from '../utils/progress-date';
-import { UserRole, MemberStatus } from '@/common/enums';
-import { User } from '@/features/auth/types/auth.model';
+import { UserStatus, type UserModel } from '@/features/auth/types/auth.model';
 
 describe('useUtcDayRollover / setupUtcDayRollover (Corrective C)', () => {
   let queryClient: QueryClient;
 
-  const mockUser: User = {
+  const mockUser: UserModel = {
     id: 'user-utc-test-123',
     email: 'test@longevia.com',
-    displayName: 'Test User',
-    avatarUrl: '',
-    role: UserRole.MEMBER,
-    status: MemberStatus.ACTIVE,
+    fullName: 'Test User',
+    status: UserStatus.ACTIVE,
     createdAt: new Date(),
-    contributorApplication: null,
-    initials: 'TU',
+    profile: null,
+    hasProfile: false,
   };
 
   let mockDoc: DocumentVisibilityTarget & {

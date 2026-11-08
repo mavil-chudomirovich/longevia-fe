@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { FormProvider, useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   AlertCircle,
@@ -19,13 +19,14 @@ import { Label } from '@/components/ui/label';
 import { useRegisterMutation } from '../queries/auth.queries';
 import { registerSchema, type RegisterFormValues } from '../schemas/auth.schema';
 import { getApiErrorCode, getApiErrorFields } from '@/lib/api-error';
-import { ContributorRequestFields } from './contributor-request-fields';
 
 function PasswordStrength({ value }: { value: string }) {
   const rules = [
     { label: 'Từ 8 ký tự', ok: value.length >= 8 },
-    { label: '1 chữ HOA', ok: /[A-Z]/.test(value) },
+    { label: '1 chữ hoa', ok: /[A-Z]/.test(value) },
+    { label: '1 chữ thường', ok: /[a-z]/.test(value) },
     { label: '1 số (0-9)', ok: /[0-9]/.test(value) },
+    { label: '1 ký tự đặc biệt', ok: /[^A-Za-z0-9]/.test(value) },
   ];
   const score = rules.filter((r) => r.ok).length;
   const label = !value
@@ -63,7 +64,7 @@ function PasswordStrength({ value }: { value: string }) {
 }
 
 /**
- * Form đăng ký tài khoản Member. Gọi API thật và tự đăng nhập sau khi thành công.
+ * Form đăng ký tài khoản. Người dùng xác minh email trước khi đăng nhập.
  * Lỗi nghiệp vụ đọc theo `error.code` (không branch theo text).
  */
 export function RegisterForm({ onSuccess }: { onSuccess?: () => void }) {
@@ -73,11 +74,10 @@ export function RegisterForm({ onSuccess }: { onSuccess?: () => void }) {
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
-      displayName: '',
+      fullName: '',
       email: '',
       password: '',
       confirmPassword: '',
-      wantsContributor: false,
     },
   });
 
@@ -90,11 +90,11 @@ export function RegisterForm({ onSuccess }: { onSuccess?: () => void }) {
       onSuccess?.();
     } catch (error) {
       const code = getApiErrorCode(error);
-      if (code === 'EMAIL_ALREADY_EXISTS') {
+      if (code === 'identity.email_taken') {
         form.setError('email', { message: 'Email này đã được sử dụng. Vui lòng dùng email khác.' });
         return;
       }
-      if (code === 'VALIDATION_ERROR') {
+      if (code === 'identity.validation_failed') {
         const fields = getApiErrorFields(error);
         let mapped = false;
         if (fields) {
@@ -116,121 +116,117 @@ export function RegisterForm({ onSuccess }: { onSuccess?: () => void }) {
   };
 
   return (
-    <FormProvider {...form}>
-      <form onSubmit={(e) => void form.handleSubmit(onSubmit)(e)} className="space-y-4" noValidate>
-        {formError && (
-          <div
-            role="alert"
-            className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
-          >
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{formError}</span>
-          </div>
-        )}
-
-        <div className="space-y-1.5">
-          <Label
-            htmlFor="register-displayName"
-            className="text-xs font-semibold uppercase tracking-wider text-[#718078] dark:text-neutral-300"
-          >
-            Họ và tên
-          </Label>
-          <div className="relative">
-            <UserIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="register-displayName"
-              autoComplete="name"
-              placeholder="Ví dụ: Lê Minh Tâm"
-              className="h-12 rounded-xl pl-10 text-sm border-border/80 focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
-              {...form.register('displayName')}
-            />
-          </div>
-          {form.formState.errors.displayName && (
-            <p className="text-xs text-destructive">{form.formState.errors.displayName.message}</p>
-          )}
+    <form onSubmit={(e) => void form.handleSubmit(onSubmit)(e)} className="space-y-4" noValidate>
+      {formError && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{formError}</span>
         </div>
+      )}
 
-        <div className="space-y-1.5">
-          <Label
-            htmlFor="register-email"
-            className="text-xs font-semibold uppercase tracking-wider text-[#718078] dark:text-neutral-300"
-          >
-            Địa chỉ Email
-          </Label>
-          <div className="relative">
-            <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="register-email"
-              type="email"
-              autoComplete="email"
-              placeholder="ban@gmail.com"
-              className="h-12 rounded-xl pl-10 text-sm border-border/80 focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
-              {...form.register('email')}
-            />
-          </div>
-          {form.formState.errors.email && (
-            <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>
-          )}
-        </div>
-
-        <div className="space-y-1.5">
-          <Label
-            htmlFor="register-password"
-            className="text-xs font-semibold uppercase tracking-wider text-[#718078] dark:text-neutral-300"
-          >
-            Mật khẩu mới
-          </Label>
-          <div className="relative">
-            <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="register-password"
-              type="password"
-              autoComplete="new-password"
-              placeholder="Tối thiểu 8 ký tự..."
-              className="h-12 rounded-xl pl-10 text-sm border-border/80 focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
-              {...form.register('password')}
-            />
-          </div>
-          {form.formState.errors.password ? (
-            <p className="text-xs text-destructive">{form.formState.errors.password.message}</p>
-          ) : (
-            <PasswordStrength value={passwordValue ?? ''} />
-          )}
-        </div>
-
-        <div className="space-y-1.5">
-          <Label
-            htmlFor="register-confirmPassword"
-            className="text-xs font-semibold uppercase tracking-wider text-[#718078] dark:text-neutral-300"
-          >
-            Nhập lại mật khẩu
-          </Label>
+      <div className="space-y-1.5">
+        <Label
+          htmlFor="register-fullName"
+          className="text-xs font-semibold uppercase tracking-wider text-[#718078] dark:text-neutral-300"
+        >
+          Họ và tên
+        </Label>
+        <div className="relative">
+          <UserIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            id="register-confirmPassword"
+            id="register-fullName"
+            autoComplete="name"
+            placeholder="Ví dụ: Lê Minh Tâm"
+            className="h-12 rounded-xl pl-10 text-sm border-border/80 focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
+            {...form.register('fullName')}
+          />
+        </div>
+        {form.formState.errors.fullName && (
+          <p className="text-xs text-destructive">{form.formState.errors.fullName.message}</p>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        <Label
+          htmlFor="register-email"
+          className="text-xs font-semibold uppercase tracking-wider text-[#718078] dark:text-neutral-300"
+        >
+          Địa chỉ Email
+        </Label>
+        <div className="relative">
+          <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            id="register-email"
+            type="email"
+            autoComplete="email"
+            placeholder="ban@gmail.com"
+            className="h-12 rounded-xl pl-10 text-sm border-border/80 focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
+            {...form.register('email')}
+          />
+        </div>
+        {form.formState.errors.email && (
+          <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        <Label
+          htmlFor="register-password"
+          className="text-xs font-semibold uppercase tracking-wider text-[#718078] dark:text-neutral-300"
+        >
+          Mật khẩu mới
+        </Label>
+        <div className="relative">
+          <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            id="register-password"
             type="password"
             autoComplete="new-password"
-            placeholder="Nhập lại mật khẩu..."
-            className="h-12 rounded-xl px-4 text-sm border-border/80 focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
-            {...form.register('confirmPassword')}
+            placeholder="Tối thiểu 8 ký tự..."
+            className="h-12 rounded-xl pl-10 text-sm border-border/80 focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
+            {...form.register('password')}
           />
-          {form.formState.errors.confirmPassword && (
-            <p className="text-xs text-destructive">
-              {form.formState.errors.confirmPassword.message}
-            </p>
-          )}
         </div>
+        {form.formState.errors.password ? (
+          <p className="text-xs text-destructive">{form.formState.errors.password.message}</p>
+        ) : (
+          <PasswordStrength value={passwordValue ?? ''} />
+        )}
+      </div>
 
-        <ContributorRequestFields />
-
-        <Button
-          type="submit"
-          className="h-12 w-full gap-2 rounded-xl font-semibold bg-primary hover:bg-primary/95 active:scale-[0.99] transition-all shadow-xs"
-          disabled={registerMutation.isPending}
+      <div className="space-y-1.5">
+        <Label
+          htmlFor="register-confirmPassword"
+          className="text-xs font-semibold uppercase tracking-wider text-[#718078] dark:text-neutral-300"
         >
-          {registerMutation.isPending ? 'Đang tạo tài khoản...' : 'Tạo tài khoản VeggieConnect'}
-          <ArrowRight className="h-4 w-4" />
-        </Button>
-      </form>
-    </FormProvider>
+          Nhập lại mật khẩu
+        </Label>
+        <Input
+          id="register-confirmPassword"
+          type="password"
+          autoComplete="new-password"
+          placeholder="Nhập lại mật khẩu..."
+          className="h-12 rounded-xl px-4 text-sm border-border/80 focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
+          {...form.register('confirmPassword')}
+        />
+        {form.formState.errors.confirmPassword && (
+          <p className="text-xs text-destructive">
+            {form.formState.errors.confirmPassword.message}
+          </p>
+        )}
+      </div>
+
+      <Button
+        type="submit"
+        className="h-12 w-full gap-2 rounded-xl font-semibold bg-primary hover:bg-primary/95 active:scale-[0.99] transition-all shadow-xs"
+        disabled={registerMutation.isPending}
+      >
+        {registerMutation.isPending ? 'Đang tạo tài khoản...' : 'Tạo tài khoản Longevia'}
+        <ArrowRight className="h-4 w-4" />
+      </Button>
+    </form>
   );
 }

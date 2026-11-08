@@ -468,7 +468,7 @@ export const AuthShowcaseComposition: React.FC = () => {
         }}
       />
 
-      {/* Phân cảnh 1: Giới thiệu thương hiệu & Tinh thần ChayXanh */}
+      {/* Phân cảnh 1: Giới thiệu thương hiệu Longevia */}
       <Sequence from={0} durationInFrames={100}>
         <IntroScene />
       </Sequence>
