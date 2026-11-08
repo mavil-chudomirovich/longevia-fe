@@ -45,16 +45,11 @@ export function SafeImage({
   unoptimized,
   style,
 }: SafeImageProps) {
-  const initialSrc = src && src.trim() !== '' ? src : fallbackSrc;
-  const [currentSrc, setCurrentSrc] = React.useState<string>(initialSrc);
-
-  // Reset khi `src` đổi (chuyển card, refetch...). Tránh kẹt ở fallback cũ.
-  React.useEffect(() => {
-    setCurrentSrc(src && src.trim() !== '' ? src : fallbackSrc);
-  }, [src, fallbackSrc]);
+  const [failedSrc, setFailedSrc] = React.useState<string | null>(null);
+  const currentSrc = failedSrc === src ? fallbackSrc : src && src.trim() !== '' ? src : fallbackSrc;
 
   const handleError = () => {
-    if (currentSrc !== fallbackSrc) setCurrentSrc(fallbackSrc);
+    if (currentSrc !== fallbackSrc) setFailedSrc(src ?? '');
   };
 
   const isYouTube = currentSrc.includes('i.ytimg.com') || currentSrc.includes('img.youtube.com');

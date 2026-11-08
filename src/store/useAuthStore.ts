@@ -1,14 +1,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { User } from '@/features/auth/types/auth.model';
+import type { UserModel } from '@/features/auth/types/auth.model';
 import { setAccessToken, clearAccessToken } from '@/lib/auth-token';
 
 interface AuthState {
   token: string | null;
-  user: User | null;
+  user: UserModel | null;
   isAuthenticated: boolean;
-  setSession: (token: string, user: User | null) => void;
-  setUser: (user: User | null) => void;
+  setSession: (token: string, user: UserModel | null) => void;
+  setUser: (user: UserModel | null) => void;
   setToken: (token: string | null) => void;
   logout: () => void;
 }

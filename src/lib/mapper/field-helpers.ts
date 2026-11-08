@@ -1,13 +1,13 @@
 /**
  * Helper lấy giá trị lồng nhau qua chuỗi đường dẫn dot-notation (ví dụ: 'category.name')
  */
-function getNestedValue(obj: any, path: string): any {
+function getNestedValue(obj: unknown, path: string): unknown {
   if (!obj || typeof obj !== 'object') return undefined;
   const parts = path.split('.');
-  let current = obj;
+  let current: unknown = obj;
   for (const part of parts) {
-    if (current === null || current === undefined) return undefined;
-    current = current[part];
+    if (!current || typeof current !== 'object') return undefined;
+    current = (current as Record<string, unknown>)[part];
   }
   return current;
 }
@@ -21,9 +21,9 @@ function getNestedValue(obj: any, path: string): any {
  * @param candidateKeys Danh sách tên trường ứng viên (hỗ trợ cả dot-notation 'nested.field')
  * @param fallback Giá trị mặc định an toàn trả về nếu không tìm thấy
  */
-export function pickField<T, D = any>(
+export function pickField<T, D = unknown>(
   source: D | null | undefined,
-  candidateKeys: string[],
+  candidateKeys: readonly string[],
   fallback: T
 ): T {
   if (!source || typeof source !== 'object') {

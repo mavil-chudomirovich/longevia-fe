@@ -16,7 +16,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
       {/* Header */}
       <header className="z-10 mx-auto flex h-16 sm:h-20 w-full max-w-7xl items-center justify-between px-4 sm:px-8">
-        <BrandLogo variant="horizontal" size="md" withSubtitle="Viet Vegan Companion" priority />
+        <BrandLogo variant="horizontal" size="md" withSubtitle="Dinh dưỡng trường thọ" priority />
         <div className="flex items-center gap-3">
           <Link
             href="/"
@@ -51,7 +51,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <footer className="border-t border-border/30 py-4 text-center text-xs text-muted-foreground">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 sm:px-8">
           <span>
-            © {new Date().getFullYear()} VeggieConnect. Dinh dưỡng thuần chay khoa học & lành tính.
+            © {new Date().getFullYear()} Longevia. Dinh dưỡng trường thọ dựa trên khoa học.
           </span>
           <div className="flex items-center gap-4">
             <Link href="/" className="transition-colors hover:text-primary">

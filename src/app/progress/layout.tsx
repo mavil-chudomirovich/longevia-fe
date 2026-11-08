@@ -4,10 +4,13 @@ import * as React from 'react';
 import { AuthGuard } from '@/components/shared/auth-guard';
 import { ProgressSubNav } from '@/features/progress/components/progress-subnav';
 import { ProgressCacheSync } from '@/features/progress/components/progress-cache-sync';
+import { SiteHeader } from '@/components/layout/site-header';
+import { SiteFooter } from '@/components/layout/site-footer';
 
 export default function ProgressLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard>
+      <SiteHeader />
       <div className="min-h-[calc(100dvh-4rem)] bg-background flex flex-col">
         {/* Đồng bộ vòng đời cache & chuyển ngày UTC cho module Tiến trình */}
         <ProgressCacheSync />
@@ -20,6 +23,7 @@ export default function ProgressLayout({ children }: { children: React.ReactNode
           {children}
         </main>
       </div>
+      <SiteFooter />
     </AuthGuard>
   );
 }

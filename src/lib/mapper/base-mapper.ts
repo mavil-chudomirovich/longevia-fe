@@ -1,4 +1,4 @@
-import { PaginationResult } from '@/types/api';
+import { PagedResult } from '@/types/api';
 import { safeArray } from './field-helpers';
 
 /**
@@ -7,9 +7,7 @@ import { safeArray } from './field-helpers';
 export interface IMapper<TDto, TModel> {
   toModel(dto: TDto | null | undefined): TModel;
   toModelList(dtos: (TDto | null | undefined)[] | null | undefined): TModel[];
-  toPaginationModel(
-    paginationDto: PaginationResult<TDto> | null | undefined
-  ): PaginationResult<TModel>;
+  toPaginationModel(paginationDto: PagedResult<TDto> | null | undefined): PagedResult<TModel>;
 }
 
 /**
@@ -43,33 +41,27 @@ export abstract class BaseMapper<TDto, TModel> implements IMapper<TDto, TModel> 
   }
 
   /**
-   * Chuyển cấu trúc phân trang PaginationResult<TDto> sang PaginationResult<TModel>
+   * Chuyển cấu trúc phân trang PagedResult<TDto> sang PagedResult<TModel>
    */
-  toPaginationModel(
-    paginationDto: PaginationResult<TDto> | null | undefined
-  ): PaginationResult<TModel> {
+  toPaginationModel(paginationDto: PagedResult<TDto> | null | undefined): PagedResult<TModel> {
     if (!paginationDto) {
       return {
         items: [],
-        metadata: {
-          page: 1,
-          limit: 10,
-          totalItems: 0,
-          totalPages: 0,
-        },
+        pageNumber: 1,
+        pageSize: 20,
+        totalCount: 0,
+        totalPages: 0,
       };
     }
 
     return {
       items: this.toModelList(paginationDto.items),
-      metadata: {
-        page: paginationDto.metadata?.page ?? 1,
-        limit: paginationDto.metadata?.limit ?? 10,
-        totalItems: paginationDto.metadata?.totalItems ?? 0,
-        totalPages: paginationDto.metadata?.totalPages ?? 0,
-        hasNextPage: paginationDto.metadata?.hasNextPage,
-        hasPrevPage: paginationDto.metadata?.hasPrevPage,
-      },
+      pageNumber: paginationDto.pageNumber,
+      pageSize: paginationDto.pageSize,
+      totalCount: paginationDto.totalCount,
+      totalPages: paginationDto.totalPages,
+      hasPreviousPage: paginationDto.hasPreviousPage,
+      hasNextPage: paginationDto.hasNextPage,
     };
   }
 }

@@ -2,8 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
 import { progressKeys, clearProgressCache, useDashboardSummaryQuery } from './progress.queries';
 import { useAuthStore } from '@/store/useAuthStore';
-import { UserRole, MemberStatus } from '@/common/enums';
-import { User } from '@/features/auth/types/auth.model';
+import { UserStatus, type UserModel } from '@/features/auth/types/auth.model';
 import {
   getProgressSessionContext,
   isProgressSessionActive,
@@ -37,28 +36,24 @@ describe('Progress Queries - User-Isolated Cache & Lifecycle (Corrective A & B)'
     writable: true,
   });
 
-  const mockUserA: User = {
+  const mockUserA: UserModel = {
     id: 'user-aaa-111',
     email: 'user-a@longevia.com',
-    displayName: 'User A',
-    avatarUrl: '',
-    role: UserRole.MEMBER,
-    status: MemberStatus.ACTIVE,
+    fullName: 'User A',
+    status: UserStatus.ACTIVE,
     createdAt: new Date(),
-    contributorApplication: null,
-    initials: 'UA',
+    profile: null,
+    hasProfile: false,
   };
 
-  const mockUserB: User = {
+  const mockUserB: UserModel = {
     id: 'user-bbb-222',
     email: 'user-b@longevia.com',
-    displayName: 'User B',
-    avatarUrl: '',
-    role: UserRole.MEMBER,
-    status: MemberStatus.ACTIVE,
+    fullName: 'User B',
+    status: UserStatus.ACTIVE,
     createdAt: new Date(),
-    contributorApplication: null,
-    initials: 'UB',
+    profile: null,
+    hasProfile: false,
   };
 
   beforeEach(() => {

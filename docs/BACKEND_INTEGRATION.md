@@ -1,82 +1,65 @@
-# BACKEND INTEGRATION — Longevia Microservices
+# Tích hợp Frontend – Backend Longevia
 
-> Bản đồ tích hợp giữa `longevia-fe` và hệ thống backend microservices ASP.NET Core (.NET 10).
+## Gateway và quy ước chung
 
----
+Trình duyệt gọi cùng origin qua Next.js. Rewrite `/api/:path*` chuyển tiếp tới Nginx Gateway (mặc định `http://localhost:8080`); gateway định tuyến `/api/identity/**`, `/api/diet/**` và `/api/progress/**`, rồi bỏ prefix service trước khi gọi backend. Recommendation là gRPC-only, không có route client-facing.
 
-## 1. Kiến trúc Cổng kết nối (API Gateway)
+API trả JSON phẳng, không có `{ data }` envelope. Lỗi dùng Problem Details với `code` ở cấp gốc và `errors: [{ field, message }]` nếu có. Identity validation trả `422 identity.validation_failed`; Diet/Progress validation trả `400 validation.failed`. FE rẽ nhánh theo `code`, không phân tích câu `detail`. Enum là chuỗi. Ngày nghiệp vụ mặc định dùng UTC.
 
-Frontend giao tiếp với toàn bộ backend qua **Nginx API Gateway** tại cổng `8080` (hoặc cấu hình trong `.env.local` qua `NEXT_PUBLIC_API_URL`):
+## Identity và phiên đăng nhập
 
-```
-Client (longevia-fe:3000)
-       │ HTTP / HTTPS
-       ▼
-Nginx Gateway (:8080)
-       ├── /api/identity/**  ──> Identity Service (:8080)
-       ├── /api/diet/**      ──> Diet Service (:8080)
-       ├── /api/progress/**  ──> Progress Service (:8080)
-       └── /swagger/         ──> Swagger UI (tổng hợp 3 service)
-```
+API service routes dưới `/api/identity`:
 
-> **Lưu ý đặc biệt về Recommendation Service**:
-> Recommendation Service là dịch vụ **nội bộ hoàn toàn (gRPC-only)**, sở hữu cơ sở dữ liệu `recommendation_db` (RAG Knowledge Base trích xuất từ sách "Chế độ ăn trường thọ"). Nginx **không** mở route ra ngoài cho service này. Frontend nhận gợi ý AI thông qua `Diet Service` hoặc `Progress Service`.
+| Method | Path | Hành vi FE |
+| --- | --- | --- |
+| POST | `/auth/register` | Gửi `email`, `password`, `fullName`; nhận `201 UserResponse`, không đăng nhập tự động |
+| GET | `/auth/verify?token=...` | Xác thực email; thành công `204` |
+| POST | `/auth/login` | BFF gọi Identity; nhận cặp token, chỉ trả access token cho client |
+| POST | `/auth/refresh` | BFF đọc refresh token từ HttpOnly cookie, xoay token và cập nhật cookie |
+| POST | `/auth/logout` | BFF gửi Bearer + refresh token, luôn xóa cookie cục bộ |
+| POST | `/auth/change-password` | Gửi `currentPassword`, `newPassword`; thành công `204` và backend thu hồi refresh sessions |
+| POST | `/auth/forgot-password` | Gửi email; luôn nhận `202`, không tiết lộ email có tài khoản hay không |
+| POST | `/auth/reset-password` | Gửi mã 64-hex và `newPassword`; thành công `204` |
+| GET | `/users/me` | Đọc `id`, `email`, `fullName`, `status`, `createdAt`, `profile` |
+| PUT | `/users/me/profile` | Gửi hồ sơ sức khỏe; thành công trả `ProfileResponse` |
 
----
+Next BFF routes: `/api/auth/login`, `/api/auth/register`, `/api/auth/refresh-token`, `/api/auth/logout`. Cookie `lv_rt` là HttpOnly, giới hạn path `/api/auth`, sống 7 ngày; `lv_at` là HttpOnly ở path `/` theo thời hạn access token. `lv_session_hint` là cookie HttpOnly không chứa token để middleware biết client nên thử silent refresh; API vẫn yêu cầu Bearer JWT. Access token cho API chỉ nằm trong memory của client. JWT access token hết hạn sau 15 phút; `lv_rt` cho phép silent refresh. Identity không phát role claim.
 
-## 2. Danh sách dịch vụ và trạng thái Endpoint
+Mật khẩu phải có ít nhất 8 ký tự, chữ hoa, chữ thường, chữ số và ký tự đặc biệt. Các mã lỗi FE xử lý riêng: `identity.invalid_credentials`, `identity.user_suspended`, `identity.email_taken`, `identity.invalid_verification_token`, `identity.invalid_password_reset_token`, `identity.invalid_current_password`, `identity.validation_failed`.
 
-### 2.1. Identity Service (`/api/identity/*`)
+## Diet
 
-| Endpoint                | Method | Trạng thái    | Mô tả                                                   |
-| ----------------------- | ------ | ------------- | ------------------------------------------------------- |
-| `/auth/register`        | `POST` | `READY`       | Đăng ký tài khoản người dùng mới                        |
-| `/auth/login`           | `POST` | `READY`       | Đăng nhập, trả về Access Token + HttpOnly Refresh Token |
-| `/auth/refresh`         | `POST` | `READY`       | Silent refresh token theo cơ chế rotation               |
-| `/auth/logout`          | `POST` | `READY`       | Thu hồi refresh token và xóa cookie phiên               |
-| `/users/me`             | `GET`  | `READY`       | Thông tin người dùng hiện tại và vai trò                |
-| `/users/me/preferences` | `PUT`  | `IN_PROGRESS` | Cập nhật mục tiêu và sở thích ăn uống cá nhân           |
+Mọi route dưới đây đi qua `/api/diet` và cần Bearer JWT.
 
-### 2.2. Diet Service (`/api/diet/*`)
+| Method | Path | Trạng thái FE | Ghi chú |
+| --- | --- | --- | --- |
+| GET / POST | `/foods` | READY | Danh sách có tìm kiếm, lọc, phân trang; tạo món cá nhân |
+| GET / PUT | `/targets/me` | READY | `diet.target_not_found` mở trạng thái chưa thiết lập; target thủ công kiểm tra 4P+4C+9F lệch calo tối đa ±5% |
+| POST | `/targets/me/calculate` | READY | Backend tính từ hồ sơ và cân nặng; `bmr`/`tdee` null được giữ là null |
+| POST | `/meals` | READY | Ghi ngày UTC, meal type và tối đa 100 món; không tự retry mutation |
+| GET | `/meals/daily-summary?date=YYYY-MM-DD` | READY | Summary theo ngày; calo còn lại có thể âm |
+| GET | `/meals/ai-recommendations?mealType=...&goal=...` | READY | Luôn hiện `disclaimer`/`safetyNote`; citation `verified=false` được ghi rõ; chỉ ghi log khi người dùng bấm |
 
-| Endpoint               | Method | Trạng thái    | Mô tả                                                   |
-| ---------------------- | ------ | ------------- | ------------------------------------------------------- |
-| `/diet-rules`          | `GET`  | `IN_PROGRESS` | Nguyên tắc dinh dưỡng và danh mục thực phẩm khuyến nghị |
-| `/meal-plans`          | `GET`  | `IN_PROGRESS` | Danh sách kế hoạch bữa ăn đã lưu                        |
-| `/meal-plans/generate` | `POST` | `PLANNED`     | Tạo kế hoạch ăn uống tự động dựa trên RAG AI            |
-| `/recipes`             | `GET`  | `PLANNED`     | Danh mục công thức món ăn trường thọ                    |
+Các mã lỗi được trình bày bằng UI: `diet.weight_not_found` → `/progress/metrics`; `diet.profile_not_found`/`diet.profile_incomplete` → `/profile`; `diet.no_safe_candidate` giải thích dữ liệu dị ứng và dẫn `/diet/foods`; `diet.ai_timeout`/`diet.ai_unavailable` cho phép thử lại; `diet.food_not_found` báo món không còn tồn tại. `400 validation.failed` gắn lỗi vào trường tương ứng. Seed hiện có ít món; AI có thể trả danh sách rỗng nếu không tìm được ứng viên an toàn.
 
-### 2.3. Progress Service (`/api/progress/*`) — Sở hữu: Bảo (Dev 3)
+## Progress
 
-Tất cả business endpoints đều yêu cầu JWT Bearer Token thuật toán ES256 được cấp bởi Identity Service. Gateway Nginx tự động strip tiền tố `/api/progress/` trước khi forward tới Progress Service root.
+Các route dưới `/api/progress` cần Bearer JWT. FE đã nối đủ 9 business endpoints:
 
-| Endpoint Gateway                  | Method | Trạng thái | Mô tả                                             | Chi tiết tích hợp & Lưu ý                                                                                                                                                                                                                                |
-| --------------------------------- | ------ | ---------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/api/progress/dashboard/summary` | `GET`  | `READY`    | Tổng hợp chỉ số dashboard, streak, delta cân nặng | Trả về cân nặng hiện tại, cân nặng ban đầu, delta so với tuần trước, BMI, streak hiện tại/kỷ lục, số phiên fasting hoàn thành trong tuần, giờ ngủ TB 7 ngày.                                                                                             |
-| `/api/progress/fasting/current`   | `GET`  | `READY`    | Lấy phiên nhịn ăn đang hoạt động                  | Trả về `CurrentFastingResponse` nếu có phiên đang diễn ra hoặc `null` nếu không có phiên hoạt động.                                                                                                                                                      |
-| `/api/progress/fasting/start`     | `POST` | `READY`    | Bắt đầu một phiên nhịn ăn mới                     | Body: `protocol` (16:8, 18:6, 20:4, Custom), `startedAt` (ISO UTC instant), `targetHours` (1..24). Báo 409 nếu đã có phiên active.                                                                                                                       |
-| `/api/progress/fasting/end`       | `POST` | `READY`    | Kết thúc phiên nhịn ăn hiện tại                   | Body: `sessionId` (UUID), `endedAt` (ISO UTC instant). Tính toán `actualHours` và cờ `isGoalReached`.                                                                                                                                                    |
-| `/api/progress/water/today`       | `GET`  | `READY`    | Tổng lượng nước uống trong ngày                   | Tính theo chu kỳ UTC (chuyển ngày lúc 00:00 UTC). Mục tiêu MVP cố định: 2500 ml.                                                                                                                                                                         |
-| `/api/progress/water/log`         | `POST` | `READY`    | Ghi nhận lượng nước uống                          | Body: `amountMl` (1..5000 ml). Tự động cộng dồn vào tổng lượng nước hôm nay.                                                                                                                                                                             |
-| `/api/progress/sleep/log`         | `POST` | `READY`    | Ghi nhận thông tin giấc ngủ                       | Body: `sleptAt`, `wokeAt` (ISO UTC instant, <=24h), `sleepQuality` (Poor, Fair, Good, Excellent). Báo 409 nếu trùng lặp khoảng thời gian.                                                                                                                |
-| `/api/progress/metrics`           | `POST` | `READY`    | Ghi nhận chỉ số cơ thể & snapshot BMI             | Body: `loggedAt`, `weightKg` (25..300), optional: `bodyFatPercent`, `waistCircumferenceCm`, cặp huyết áp (`systolicBloodPressure`, `diastolicBloodPressure`), `restingHeartRate`. Yêu cầu chiều cao từ Identity; trả về 422 nếu hồ sơ chưa có chiều cao. |
-| `/api/progress/metrics/history`   | `GET`  | `READY`    | Tra cứu lịch sử chỉ số phân trang                 | Query params: `fromDate?`, `toDate?` (YYYY-MM-DD), `pageNumber?`, `pageSize?`. Trả về `items`, `pageNumber`, `pageSize`, `totalCount`, `totalPages`.                                                                                                     |
+| Method | Path | Trạng thái FE |
+| --- | --- | --- |
+| GET | `/dashboard/summary` | READY |
+| GET | `/fasting/current` | READY; body `null` nghĩa là chưa có phiên |
+| POST | `/fasting/start` | READY |
+| POST | `/fasting/end` | READY |
+| GET | `/water/today` | READY |
+| POST | `/water/log` | READY |
+| POST | `/sleep/log` | READY |
+| POST | `/metrics` | READY |
+| GET | `/metrics/history` | READY; phân trang không trả `hasPreviousPage`/`hasNextPage` |
 
-> **Chính sách lịch kinh doanh UTC (Q01 / ADR005)**:
->
-> - Các giá trị ngày do hệ thống tự sinh (`water/today`, ngày kết thúc giấc ngủ, ngày ghi nhận chỉ số, streak, tuần bắt đầu Thứ Hai 00:00 UTC) tuân thủ hoàn toàn theo lịch UTC.
-> - Tại Việt Nam (UTC+7), thời điểm 00:30 ngày 05/11 vẫn thuộc ngày 04/11 UTC; mốc 07:00 ngày 05/11 mới bước sang ngày 05/11 UTC.
-> - Ngày lịch sử (`fromDate`, `toDate`, DateOnly) do người dùng chọn chủ động được bảo lưu nguyên vẹn, không bị lệch múi giờ.
+Lỗi được phân nhánh theo mã: `progress.fasting_active_conflict`, `progress.fasting_not_found`, `progress.fasting_no_active`, `progress.sleep_overlap`, `progress.height_unavailable`, `progress.identity_unavailable`, `progress.identity_integration_failure`. Metrics cần chiều cao hồ sơ từ Identity. Ngày hôm nay, water, và khoảng tuần dùng lịch UTC; ngày lịch sử người dùng chọn được giữ nguyên.
 
----
+## Đồng bộ OpenAPI
 
-## 3. Quy trình đồng bộ OpenAPI / Swagger
-
-Khi backend cập nhật endpoint mới, chạy lệnh:
-
-```powershell
-# Chạy đồng bộ từ file swagger hoặc URL Gateway
-npm run sync:swagger
-```
-
-Script sẽ cập nhật catalog tại `docs/API-CATALOG.md` và `docs/api/<service>.md` giúp các AI Agent tra cứu nhanh mà không cần đọc trực tiếp toàn bộ spec lớn.
+Khi có JSON OpenAPI của service, chạy `npm run sync:swagger <đường-dẫn-hoặc-URL-json>` trong repo FE để cập nhật `docs/api-catalog.json`, `docs/API-CATALOG.md` và `docs/api/`. Swagger UI của gateway không phải JSON OpenAPI; dùng URL/file JSON do service hoặc deployment cung cấp.

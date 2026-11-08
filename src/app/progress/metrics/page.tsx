@@ -10,7 +10,12 @@ import { MetricsHistory } from '@/features/progress/components/metrics-history';
 import { useMetricsHistoryQuery } from '@/features/progress/queries/progress.queries';
 
 export default function MetricsPage() {
-  const { data: historyData, isLoading } = useMetricsHistoryQuery({
+  const {
+    data: historyData,
+    isLoading,
+    isError,
+    refetch,
+  } = useMetricsHistoryQuery({
     pageNumber: 1,
     pageSize: 20,
   });
@@ -44,7 +49,12 @@ export default function MetricsPage() {
 
         {/* Biểu đồ xu hướng (7 cột) */}
         <div className="lg:col-span-7 space-y-6">
-          <WeightTrendChart metrics={historyData?.items ?? []} isLoading={isLoading} />
+          <WeightTrendChart
+            metrics={historyData?.items ?? []}
+            isLoading={isLoading}
+            isError={isError}
+            onRetry={() => void refetch()}
+          />
         </div>
       </div>
 

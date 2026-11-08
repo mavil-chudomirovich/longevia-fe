@@ -7,7 +7,7 @@ interface EnergyConnectionsProps {
 
 /**
  * Hiệu ứng đường kết nối hữu cơ (Organic Connection Lines) & các hạt năng lượng thực vật.
- * Thể hiện tinh thần "VeggieConnect" - kết nối nguồn sống tự nhiên giữa các nguyên liệu.
+ * Thể hiện tinh thần Longevia - kết nối nguồn sống tự nhiên giữa các nguyên liệu.
  */
 export const EnergyConnections: React.FC<EnergyConnectionsProps> = ({ opacity }) => {
   if (opacity <= 0.01) return null;

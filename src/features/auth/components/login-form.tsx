@@ -13,17 +13,11 @@ import { getApiErrorCode, getApiErrorFields } from '@/lib/api-error';
 
 /**
  * Form đăng nhập email/mật khẩu. Lỗi nghiệp vụ đọc theo `error.code`:
- * - `INVALID_CREDENTIALS` → inline "Email hoặc mật khẩu không đúng."
- * - `ACCOUNT_LOCKED` / `ACCOUNT_BANNED` → thông báo lỗi đăng nhập thất bại chung
+ * - `identity.invalid_credentials` → inline message (including unverified email).
+ * - `identity.user_suspended` → account is suspended.
  *   (không CAPTCHA, không đếm ngược — Clarifications spec 2026-09-15).
  */
-export function LoginForm({
-  onSuccess,
-  onForgotPassword,
-}: {
-  onSuccess?: () => void;
-  onForgotPassword?: () => void;
-}) {
+export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
   const loginMutation = useLoginMutation();
   const [showPassword, setShowPassword] = React.useState(false);
   const [formError, setFormError] = React.useState<string | null>(null);
@@ -40,15 +34,15 @@ export function LoginForm({
       onSuccess?.();
     } catch (error) {
       const code = getApiErrorCode(error);
-      if (code === 'INVALID_CREDENTIALS') {
-        setFormError('Email hoặc mật khẩu không đúng. Vui lòng thử lại.');
+      if (code === 'identity.invalid_credentials') {
+        setFormError('Email hoặc mật khẩu không đúng, hoặc tài khoản chưa xác thực email.');
         return;
       }
-      if (code === 'ACCOUNT_LOCKED' || code === 'ACCOUNT_BANNED') {
-        setFormError('Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin và thử lại.');
+      if (code === 'identity.user_suspended') {
+        setFormError('Tài khoản của bạn đang bị tạm ngưng.');
         return;
       }
-      if (code === 'VALIDATION_ERROR') {
+      if (code === 'identity.validation_failed') {
         const fields = getApiErrorFields(error);
         let mapped = false;
         if (fields) {
@@ -86,7 +80,7 @@ export function LoginForm({
           htmlFor="login-email"
           className="text-xs font-semibold uppercase tracking-wider text-[#718078] dark:text-neutral-300"
         >
-          Email hoặc Tên đăng nhập
+          Email
         </Label>
         <div className="relative">
           <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -94,7 +88,7 @@ export function LoginForm({
             id="login-email"
             type="email"
             autoComplete="email"
-            placeholder="vidu@veggieconnect.vn"
+            placeholder="vidu@longevia.vn"
             className="h-12 rounded-xl pl-10 text-sm border-border/80 focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
             {...form.register('email')}
           />
@@ -112,13 +106,6 @@ export function LoginForm({
           >
             Mật khẩu
           </Label>
-          <button
-            type="button"
-            onClick={() => onForgotPassword?.()}
-            className="text-xs font-medium text-primary hover:underline"
-          >
-            Quên mật khẩu?
-          </button>
         </div>
         <div className="relative">
           <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

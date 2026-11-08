@@ -1,165 +1,64 @@
-import { BaseMapper, pickField, safeBoolean, safeDate, safeEnum, safeString } from '@/lib/mapper';
 import {
-  AuthSessionResponseDto,
-  ContributorApplicationDto,
-  LogoutResponseDto,
-  ProfileResponseDto,
-  RefreshResponseDto,
-  RegisterRequestDto,
-  UserDto,
-} from '../types/auth.dto';
-import {
-  AuthSession,
-  ContributorApplication,
-  LogoutResult,
-  RefreshedToken,
-  User,
-} from '../types/auth.model';
+  BaseMapper,
+  pickField,
+  safeArray,
+  safeDate,
+  safeEnum,
+  safeNumber,
+  safeString,
+} from '@/lib/mapper';
+import type { AuthTokenDto, ProfileDto, RegisterRequestDto, UserDto } from '../types/auth.dto';
+import type { AuthSession, ProfileModel, UserModel } from '../types/auth.model';
+import { UserStatus } from '../types/auth.model';
 import type { RegisterFormValues } from '../schemas/auth.schema';
-import {
-  ContributorApplicationStatus,
-  ContributorApprovalBasis,
-  LogoutScope,
-  MemberStatus,
-  UserRole,
-} from '@/common/enums';
 
-const APPROVAL_BASIS_LABELS: Record<ContributorApprovalBasis, string> = {
-  [ContributorApprovalBasis.ORGANIZATION_AFFILIATION]: 'Tổ chức đối tác / Viện ẩm thực',
-  [ContributorApprovalBasis.PLATFORM_TRACK_RECORD]: 'Thành viên uy tín trên nền tảng',
-  [ContributorApprovalBasis.ADMIN_INVITED]: 'Được Quản trị viên mời',
-};
-
-/**
- * AuthMapper chuyển DTO backend (OpenAPI `AuthSessionResponse` / `ProfileResponse`)
- * sang Domain Model sạch cho UI. Mọi field đều qua `pickField` + `safe*`.
- */
-export class AuthMapper extends BaseMapper<UserDto, User> {
-  toModel(dto: UserDto | null | undefined): User {
-    const displayName = safeString(pickField(dto, ['displayName', 'display_name'], 'Người dùng'));
-
+export class AuthMapper extends BaseMapper<UserDto, UserModel> {
+  toModel(dto: UserDto | null | undefined): UserModel {
+    const profileDto = pickField<ProfileDto | null>(dto, ['profile'], null);
     return {
       id: safeString(pickField(dto, ['id'], '')),
       email: safeString(pickField(dto, ['email'], '')),
-      displayName,
-      avatarUrl: safeString(pickField(dto, ['avatarUrl', 'avatar_url'], '')),
-      role: safeEnum(pickField(dto, ['role'], 'MEMBER'), UserRole, UserRole.MEMBER),
-      status: safeEnum(pickField(dto, ['status'], 'ACTIVE'), MemberStatus, MemberStatus.ACTIVE),
-      createdAt: safeDate(pickField(dto, ['createdAt', 'created_at'], null)),
-      contributorApplication: this.toContributorApplication(
-        pickField<ContributorApplicationDto | null>(
-          dto,
-          ['contributorApplication', 'contributor_application'],
-          null
-        )
-      ),
-      initials: toInitials(displayName),
-    };
-  }
-
-  /** Đơn nguyện vọng — chỉ để hiển thị, không bao giờ dùng để cấp quyền (FR-008). */
-  toContributorApplication(
-    dto: ContributorApplicationDto | null | undefined
-  ): ContributorApplication | null {
-    if (!dto || typeof dto !== 'object') return null;
-    const rawStatus = safeString(pickField(dto, ['status'], 'PENDING'));
-    const rawBasis = pickField(dto, ['claimedApprovalBasis', 'claimed_approval_basis'], null);
-    const claimedApprovalBasis = safeEnum(
-      rawBasis,
-      ContributorApprovalBasis,
-      null as unknown as ContributorApprovalBasis
-    );
-
-    return {
+      fullName: safeString(pickField(dto, ['fullName'], 'Người dùng')),
       status: safeEnum(
-        rawStatus,
-        ContributorApplicationStatus,
-        ContributorApplicationStatus.PENDING
+        pickField(dto, ['status'], UserStatus.PENDING_VERIFICATION),
+        UserStatus,
+        UserStatus.PENDING_VERIFICATION
       ),
-      rawStatus,
-      claimedApprovalBasis: claimedApprovalBasis ?? null,
-      claimedApprovalBasisLabel:
-        claimedApprovalBasis && claimedApprovalBasis in APPROVAL_BASIS_LABELS
-          ? APPROVAL_BASIS_LABELS[claimedApprovalBasis as ContributorApprovalBasis]
-          : '',
+      createdAt: safeDate(pickField(dto, ['createdAt'], null)),
+      profile: this.toProfileModel(profileDto),
+      hasProfile: Boolean(profileDto),
     };
   }
 
-  /** `POST /auth/register` và `POST /auth/login` → `AuthSession`. */
-  toSessionModel(dto: AuthSessionResponseDto | null | undefined): AuthSession {
-    const data = pickField(dto, ['data'], null) as AuthSessionResponseDto['data'];
-    const rawUser = pickField<UserDto | null | undefined>(data, ['user'], null);
+  toProfileModel(dto: ProfileDto | null | undefined): ProfileModel | null {
+    if (!dto) return null;
     return {
-      accessToken: safeString(pickField(data, ['accessToken', 'access_token'], '')),
-      accessTokenExpiresAt: safeDate(
-        pickField(data, ['accessTokenExpiresAt', 'access_token_expires_at'], null)
-      ),
-      user: this.toModel(rawUser),
+      id: safeString(pickField(dto, ['id'], '')),
+      birthDate: safeString(pickField(dto, ['birthDate'], '')),
+      biologicalSex: safeString(pickField(dto, ['biologicalSex'], '')),
+      heightCm: safeNumber(pickField(dto, ['heightCm'], 0)),
+      activityLevel: safeString(pickField(dto, ['activityLevel'], '')),
+      dietaryPreference: safeString(pickField(dto, ['dietaryPreference'], '')),
+      allergies: safeArray<string>(pickField(dto, ['allergies'], [])),
+      updatedAt: safeDate(pickField(dto, ['updatedAt'], null)),
     };
   }
 
-  /** `POST /auth/refresh` → `RefreshedToken`. */
-  toRefreshedTokenModel(dto: RefreshResponseDto | null | undefined): RefreshedToken {
-    const data = pickField(dto, ['data'], null) as RefreshResponseDto['data'];
+  toSessionModel(dto: AuthTokenDto | null | undefined): AuthSession {
+    const expiresIn = safeNumber(pickField(dto, ['expiresIn'], 900), 900);
     return {
-      accessToken: safeString(pickField(data, ['accessToken', 'access_token'], '')),
-      accessTokenExpiresAt: safeDate(
-        pickField(data, ['accessTokenExpiresAt', 'access_token_expires_at'], null)
-      ),
+      accessToken: safeString(pickField(dto, ['accessToken'], '')),
+      expiresAt: new Date(Date.now() + expiresIn * 1000),
     };
   }
 
-  /** `POST /auth/logout` → `LogoutResult`. */
-  toLogoutResultModel(dto: LogoutResponseDto | null | undefined): LogoutResult {
-    const data = pickField(dto, ['data'], null) as LogoutResponseDto['data'];
-    const loggedOut = safeBoolean(pickField(data, ['loggedOut'], true));
-    const scope = safeEnum(
-      pickField(data, ['scope'], LogoutScope.CURRENT),
-      LogoutScope,
-      LogoutScope.CURRENT
-    );
-    return { loggedOut, scope };
-  }
-
-  /** `GET /users/me` → `User`. Phần health/diet của `data` thuộc feature khác, bỏ qua. */
-  toProfileModel(dto: ProfileResponseDto | null | undefined): User {
-    const data = pickField(dto, ['data'], null) as UserDto | null;
-    return this.toModel(data);
-  }
-
-  /**
-   * Map `RegisterFormValues` sang payload backend yêu cầu.
-   * Chỉ gửi `contributorRequest` khi user bật nguyện vọng.
-   */
   toRegisterDto(values: RegisterFormValues): RegisterRequestDto {
-    const payload: RegisterRequestDto = {
-      email: safeString(values.email),
-      password: safeString(values.password, ''),
-      displayName: safeString(values.displayName),
+    return {
+      email: values.email.trim(),
+      password: values.password,
+      fullName: values.fullName.trim(),
     };
-    if (values.wantsContributor) {
-      payload.contributorRequest = {
-        claimedApprovalBasis: values.claimedApprovalBasis ?? 'PLATFORM_TRACK_RECORD',
-        ...(values.claimedApprovalBasis === 'ORGANIZATION_AFFILIATION'
-          ? { organizationClaim: safeString(values.organizationClaim).trim() }
-          : {}),
-        experience: safeString(values.experience),
-        referenceLinks:
-          values.referenceLinks
-            ?.split('\n')
-            .map((l) => l.trim())
-            .filter((l) => l.length > 0) ?? [],
-      };
-    }
-    return payload;
   }
-}
-
-function toInitials(displayName: string): string {
-  const parts = displayName.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 export const authMapper = new AuthMapper();

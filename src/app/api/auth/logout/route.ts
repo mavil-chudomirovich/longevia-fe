@@ -1,41 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { API_ENDPOINTS } from '@/common/constants/api-endpoints';
 import { BACKEND_URL } from '@/lib/env';
+import { clearSessionCookies } from '@/lib/auth-cookies';
 
-/**
- * POST /api/auth/logout
- * Proxy logout + xóa cookie phía Next để middleware hết cho qua.
- */
-export async function POST(req: NextRequest) {
-  const cookieHeader = req.headers.get('cookie') ?? '';
-
-  // Nhận scope từ client: `{ allDevices?: boolean }` (LogoutRequest của BE).
-  let allDevices = false;
-  try {
-    const body = (await req.json()) as { allDevices?: unknown };
-    allDevices = body?.allDevices === true;
-  } catch {
-    /* không body hoặc body sai định dạng -> mặc định CURRENT */
-  }
-
-  try {
-    await fetch(`${BACKEND_URL}/auth/logout`, {
+export async function POST(request: NextRequest) {
+  const refreshToken = request.cookies.get('lv_rt')?.value;
+  const authorization = request.headers.get('authorization');
+  if (refreshToken && authorization) {
+    await fetch(`${BACKEND_URL}${API_ENDPOINTS.IDENTITY.AUTH.LOGOUT}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        cookie: cookieHeader,
-      },
-      body: JSON.stringify({ allDevices }),
+      headers: { 'Content-Type': 'application/json', Authorization: authorization },
+      body: JSON.stringify({ refreshToken }),
     }).catch(() => null);
-  } catch {
-    /* BE down vẫn cho logout phía client */
   }
-
-  // Idempotent: luôn 200 + xóa cookie phía Next để middleware hết cho qua,
-  // kể cả khi BE không phản hồi.
-  const res = NextResponse.json({ message: 'Đã đăng xuất' });
-  res.cookies.delete('accessToken');
-  res.cookies.delete('access_token');
-  res.cookies.delete('refreshToken');
-  res.cookies.delete('refresh_token');
-  return res;
+  const response = NextResponse.json({ loggedOut: true });
+  clearSessionCookies(response);
+  return response;
 }

@@ -44,8 +44,7 @@ import {
   syncProgressSessionWithAuth,
   getActiveSessionAbortControllerCount,
 } from '../utils/progress-session';
-import { UserRole, MemberStatus } from '@/common/enums';
-import { User } from '@/features/auth/types/auth.model';
+import { UserStatus, type UserModel } from '@/features/auth/types/auth.model';
 import {
   ProgressAuthError,
   ProgressSessionObsoleteError,
@@ -92,28 +91,24 @@ globalThis.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserv
 describe('Progress Module - Real React Behavioral Regression Tests (Corrective C)', () => {
   let queryClient: QueryClient;
 
-  const mockUserA: User = {
+  const mockUserA: UserModel = {
     id: 'user-aaa-111',
     email: 'user-a@longevia.com',
-    displayName: 'User A',
-    avatarUrl: '',
-    role: UserRole.MEMBER,
-    status: MemberStatus.ACTIVE,
+    fullName: 'User A',
+    status: UserStatus.ACTIVE,
     createdAt: new Date(),
-    contributorApplication: null,
-    initials: 'UA',
+    profile: null,
+    hasProfile: false,
   };
 
-  const mockUserB: User = {
+  const mockUserB: UserModel = {
     id: 'user-bbb-222',
     email: 'user-b@longevia.com',
-    displayName: 'User B',
-    avatarUrl: '',
-    role: UserRole.MEMBER,
-    status: MemberStatus.ACTIVE,
+    fullName: 'User B',
+    status: UserStatus.ACTIVE,
     createdAt: new Date(),
-    contributorApplication: null,
-    initials: 'UB',
+    profile: null,
+    hasProfile: false,
   };
 
   const createWrapper = () => {
@@ -544,7 +539,11 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
         isAxiosError: true,
         response: {
           status: 409,
-          data: { title: 'Conflict', detail: 'Already fasting' },
+          data: {
+            title: 'Conflict',
+            detail: 'Already fasting',
+            code: 'progress.fasting_active_conflict',
+          },
         },
       };
       vi.spyOn(progressApi, 'startFasting').mockRejectedValueOnce(axiosError);
@@ -567,7 +566,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
         isAxiosError: true,
         response: {
           status: 422,
-          data: { detail: 'progress.height_unavailable' },
+          data: { code: 'progress.height_unavailable', detail: 'Missing height' },
         },
       };
       vi.spyOn(progressApi, 'logBodyMetric').mockRejectedValueOnce(axiosError);
@@ -1649,7 +1648,10 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       api.defaults.adapter = async (config) => {
         throw createMockAxiosError(config, {
           status: 409,
-          data: { detail: 'Already fasting' },
+          data: {
+            code: 'progress.fasting_active_conflict',
+            detail: 'Already fasting',
+          },
         });
       };
 
@@ -1678,7 +1680,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       api.defaults.adapter = async (config) => {
         throw createMockAxiosError(config, {
           status: 422,
-          data: { detail: 'progress.height_unavailable' },
+          data: { code: 'progress.height_unavailable', detail: 'Missing height' },
         });
       };
 

@@ -3,32 +3,25 @@
 import React, { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
-import { UserRole } from '@/common/enums';
 import { LoadingState } from './loading-state';
-import { ErrorState } from './error-state';
 
 /**
- * Guard phía client cho route cần đăng nhập / phân quyền.
- * Dùng kèm middleware.ts (check token + role ADMIN ở Edge).
+ * Guard phía client cho route cần đăng nhập, đi kèm middleware.ts.
  *
  * Đợi Zustand persist hydrate xong mới quyết định redirect, tránh
  * redirect nhầm khi AuthProvider đang silent-refresh.
  *
- * @example
- * <AuthGuard roles={[UserRole.ADMIN]}><AdminPanel /></AuthGuard>
  */
 export function AuthGuard({
   children,
-  roles,
   loginPath = '/login',
 }: {
   children: React.ReactNode;
-  roles?: UserRole[];
   loginPath?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, isAuthenticated } = useAuthStore();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -46,10 +39,6 @@ export function AuthGuard({
 
   if (!hydrated || !isAuthenticated) {
     return <LoadingState message="Đang kiểm tra phiên đăng nhập..." />;
-  }
-
-  if (roles && roles.length > 0 && user && !roles.includes(user.role)) {
-    return <ErrorState title="Bạn không có quyền truy cập trang này." />;
   }
 
   return <>{children}</>;

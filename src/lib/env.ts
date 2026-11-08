@@ -5,7 +5,7 @@ import { z } from 'zod';
  * không đọc process.env rời rạc nữa.
  *
  * - NEXT_PUBLIC_*: dùng được cả client + server.
- * - BACKEND_API_URL: chỉ server (server-fetch, route handlers). Client = undefined.
+ * - BACKEND_API_URL: chỉ server (route handlers). Client = undefined.
  */
 const envSchema = z.object({
   NEXT_PUBLIC_API_URL: z
@@ -41,7 +41,7 @@ export const API_BASE_URL =
     ? '/api'
     : (env.BACKEND_API_URL ?? env.NEXT_PUBLIC_API_URL ?? '/api');
 
-/** Base URL server-only cho server-fetch và route handlers (ưu tiên BACKEND_API_URL). */
+/** Base URL server-only cho route handlers (ưu tiên BACKEND_API_URL). */
 export const BACKEND_URL = env.BACKEND_API_URL ?? env.NEXT_PUBLIC_API_URL;
 
 export const isDev = process.env.NODE_ENV === 'development';

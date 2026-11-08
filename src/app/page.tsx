@@ -112,7 +112,7 @@ export default function HomePage() {
                   className="w-full sm:w-auto h-12 px-6 gap-2"
                   asChild
                 >
-                  <Link href="/assistant">
+                  <Link href="/diet/suggestions">
                     <Sparkles className="w-4 h-4 text-primary" />
                     Trò chuyện cùng AI
                   </Link>
@@ -233,7 +233,7 @@ export default function HomePage() {
                 className="bg-white text-emerald-800 hover:bg-emerald-50 h-12 px-8 font-semibold shadow-sm"
                 asChild
               >
-                <Link href="/register">Tham gia ngay hoàn toàn miễn phí</Link>
+                <Link href="/login?tab=register">Tham gia ngay hoàn toàn miễn phí</Link>
               </Button>
             </div>
           </div>
