@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import axios from 'axios';
+import { getApiErrorCode } from '@/lib/api-error';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Scale, Activity, Heart, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
@@ -389,15 +389,17 @@ function BodyMetricFormInner({ onSuccessLogged }: BodyMetricFormProps) {
         </Card>
       )}
 
-      {/* Banner trợ giúp khi gặp lỗi thiếu chiều cao hồ sơ */}
+      {/* Banner trợ giúp khi thiếu hồ sơ hoặc thiếu chiều cao */}
       {logMutation.isError &&
-        axios.isAxiosError(logMutation.error) &&
-        logMutation.error?.response?.status === 422 && (
+        (getApiErrorCode(logMutation.error) === 'progress.height_unavailable' ||
+          getApiErrorCode(logMutation.error) === 'progress.profile_not_found') && (
           <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
             <AlertCircle className="size-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <div className="space-y-1">
               <span className="text-sm font-bold text-foreground">
-                Cần cập nhật chiều cao trong Hồ sơ người dùng
+                {getApiErrorCode(logMutation.error) === 'progress.profile_not_found'
+                  ? 'Bạn chưa thiết lập Hồ sơ sức khỏe'
+                  : 'Cần cập nhật chiều cao trong Hồ sơ người dùng'}
               </span>
               <p className="text-xs text-muted-foreground text-pretty">
                 Dịch vụ Progress cần thông tin chiều cao để tính toán BMI chuẩn xác. Vui lòng mở

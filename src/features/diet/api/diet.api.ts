@@ -69,9 +69,11 @@ export const dietApi = {
     params: { mealType: string; goal: string },
     signal?: AbortSignal
   ): Promise<RecommendationsModel> => {
+    // Trang Gợi ý AI tự hiển thị lỗi tại chỗ (kèm nút khắc phục) -> không toast tự động.
     const response = await api.get<RecommendationsDto>(API_ENDPOINTS.DIET.AI_RECOMMENDATIONS, {
       params,
       signal,
+      silent: true,
     });
     return dietMapper.toRecommendations(response.data);
   },

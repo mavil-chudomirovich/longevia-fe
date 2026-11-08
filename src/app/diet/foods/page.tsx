@@ -47,8 +47,12 @@ function CreateFoodForm() {
     setAllergen('');
   };
   const submit = form.handleSubmit(async (values) => {
-    await mutation.mutateAsync(values);
-    form.reset(defaults);
+    try {
+      await mutation.mutateAsync(values);
+      form.reset(defaults);
+    } catch {
+      // Lỗi đã được báo bằng thông báo thân thiện trong mutation; giữ nguyên dữ liệu đã nhập.
+    }
   });
   return (
     <form onSubmit={(event) => void submit(event)} className="space-y-4" noValidate>

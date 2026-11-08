@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_ENDPOINTS } from '@/common/constants/api-endpoints';
 import { BACKEND_URL } from '@/lib/env';
-import { clearSessionCookies, readTokenPair, setSessionCookies } from '@/lib/auth-cookies';
+import {
+  REFRESH_COOKIE,
+  clearSessionCookies,
+  readTokenPair,
+  setSessionCookies,
+} from '@/lib/auth-cookies';
 
 export async function POST(request: NextRequest) {
-  const refreshToken = request.cookies.get('lv_rt')?.value;
+  const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
   if (!refreshToken)
     return NextResponse.json(
       { status: 401, title: 'Phiên đăng nhập đã hết hạn.' },

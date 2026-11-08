@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useRegisterMutation } from '../queries/auth.queries';
 import { registerSchema, type RegisterFormValues } from '../schemas/auth.schema';
-import { getApiErrorCode, getApiErrorFields } from '@/lib/api-error';
+import { getApiErrorCode, getApiErrorFields, getApiErrorMessage } from '@/lib/api-error';
 
 function PasswordStrength({ value }: { value: string }) {
   const rules = [
@@ -91,7 +91,9 @@ export function RegisterForm({ onSuccess }: { onSuccess?: () => void }) {
     } catch (error) {
       const code = getApiErrorCode(error);
       if (code === 'identity.email_taken') {
-        form.setError('email', { message: 'Email này đã được sử dụng. Vui lòng dùng email khác.' });
+        form.setError('email', {
+          message: 'Email này đã được đăng ký. Bạn hãy đăng nhập hoặc dùng email khác nhé.',
+        });
         return;
       }
       if (code === 'identity.validation_failed') {
@@ -111,7 +113,9 @@ export function RegisterForm({ onSuccess }: { onSuccess?: () => void }) {
         }
         if (mapped) return;
       }
-      setFormError('Đăng ký thất bại. Vui lòng kiểm tra lại thông tin và thử lại.');
+      setFormError(
+        getApiErrorMessage(error, 'Chưa đăng ký được. Bạn kiểm tra lại thông tin rồi thử lại nhé.')
+      );
     }
   };
 

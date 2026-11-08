@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { getAccessToken, setAccessToken } from '@/lib/auth-token';
 import { sharedRefresh, forceLogout } from '@/lib/auth-refresh';
+import { hasSessionHint } from '@/lib/session-hint';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isHydrated, setIsHydrated] = useState(false);
@@ -14,15 +15,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const token = useAuthStore.getState().token ?? getAccessToken();
     if (!token) {
-      // Chỉ silent-refresh khi từng đăng nhập (còn user persist trong storage).
-      // KHÔNG kiểm tra `document.cookie`: cookie refresh là HttpOnly nên JS
-      // không bao giờ đọc được — check cũ khiến F5 nào cũng mất phiên.
+      // Silent-refresh khi có dấu hiệu từng đăng nhập: user persist trong storage
+      // HOẶC cookie gợi ý phiên `lv_session_hint` (JS đọc được, không chứa bí mật).
+      // Kiểm cả hint để localStorage bị xoá không làm kẹt phiên.
       const persistedUser = useAuthStore.getState().user;
-      if (!persistedUser) return;
+      if (!persistedUser && !hasSessionHint()) return;
 
       void sharedRefresh().catch(() => {
         // Refresh cookie hết hạn/bị thu hồi -> đăng xuất triệt để (xóa cả
-        // HttpOnly cookies) để không kẹt loop /login → / ở lần vào sau.
+        // HttpOnly cookies) để không kẹt loop ở lần vào sau.
         void forceLogout();
       });
     } else if (token && !getAccessToken()) {

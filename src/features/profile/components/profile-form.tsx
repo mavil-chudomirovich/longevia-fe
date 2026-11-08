@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { profileSchema, type ProfileFormValues } from '../schemas/profile.schema';
 import { useUpdateProfileMutation } from '../queries/profile.queries';
+import { getApiErrorFields, toastFriendlyError } from '@/lib/api-error';
 
 const emptyProfile: ProfileFormValues = {
   birthDate: '',
@@ -59,8 +60,20 @@ export function ProfileForm({
   };
 
   const onSubmit = form.handleSubmit(async (values) => {
-    await mutation.mutateAsync(values);
-    onSaved?.();
+    try {
+      await mutation.mutateAsync(values);
+      onSaved?.();
+    } catch (error) {
+      // Gắn lỗi vào đúng ô nếu BE trả lỗi theo trường, đồng thời báo bằng lời dễ hiểu.
+      const fields = getApiErrorFields(error);
+      if (fields) {
+        for (const [key, messages] of Object.entries(fields)) {
+          const field = (key.charAt(0).toLowerCase() + key.slice(1)) as keyof ProfileFormValues;
+          if (field in form.getValues()) form.setError(field, { message: messages[0] });
+        }
+      }
+      toastFriendlyError(error, 'Chưa lưu được hồ sơ. Bạn kiểm tra lại thông tin rồi thử lại nhé.');
+    }
   });
 
   return (

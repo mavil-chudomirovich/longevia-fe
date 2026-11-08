@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/store/useAuthStore';
-import { getApiErrorCode, getApiErrorMessage } from '@/lib/api-error';
+import { getApiErrorCode, toastFriendlyError } from '@/lib/api-error';
 import {
   getProgressSessionContext,
   isProgressSessionActive,
@@ -71,8 +71,11 @@ export function useRecommendationsQuery(mealType: string, goal: string, enabled:
 
 function useDietMutation<TValues, TResult>(
   mutationFn: (values: TValues, signal: AbortSignal) => Promise<TResult>,
-  onSuccess: (data: TResult, userId: string) => void
+  onSuccess: (data: TResult, userId: string) => void,
+  /** `false` khi trang tự hiển thị lỗi tại chỗ (tránh báo lỗi hai lần). */
+  options: { toastOnError?: boolean } = {}
 ) {
+  const { toastOnError = true } = options;
   return useMutation({
     mutationFn: async (values: TValues) => {
       const session = getProgressSessionContext();
@@ -98,7 +101,7 @@ function useDietMutation<TValues, TResult>(
       if (isProgressSessionActive(userId, sessionId)) onSuccess(data, userId);
     },
     onError: (error) => {
-      if (!(error instanceof ObsoleteDietSessionError)) toast.error(getApiErrorMessage(error));
+      if (toastOnError && !(error instanceof ObsoleteDietSessionError)) toastFriendlyError(error);
     },
     retry: false,
   });
@@ -114,11 +117,15 @@ export function useCreateFoodMutation() {
 
 export function useSaveTargetMutation() {
   const client = useQueryClient();
-  return useDietMutation<TargetFormValues, unknown>(dietApi.saveTarget, (_target, userId) => {
-    void client.invalidateQueries({ queryKey: dietKeys.target(userId) });
-    void client.invalidateQueries({ queryKey: [...dietKeys.user(userId), 'summary'] });
-    toast.success('Đã lưu mục tiêu dinh dưỡng.');
-  });
+  return useDietMutation<TargetFormValues, unknown>(
+    dietApi.saveTarget,
+    (_target, userId) => {
+      void client.invalidateQueries({ queryKey: dietKeys.target(userId) });
+      void client.invalidateQueries({ queryKey: [...dietKeys.user(userId), 'summary'] });
+      toast.success('Đã lưu mục tiêu dinh dưỡng.');
+    },
+    { toastOnError: false }
+  );
 }
 
 export function useCalculateTargetMutation() {
@@ -128,7 +135,8 @@ export function useCalculateTargetMutation() {
     (_target, userId) => {
       void client.invalidateQueries({ queryKey: dietKeys.target(userId) });
       toast.success('Đã tính và lưu mục tiêu từ hồ sơ của bạn.');
-    }
+    },
+    { toastOnError: false }
   );
 }
 

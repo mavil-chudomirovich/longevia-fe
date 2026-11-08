@@ -20,7 +20,7 @@ export default function ForgotPasswordPage() {
       await authApi.forgotPassword(email);
       setSent(true);
     } catch {
-      setError('Không thể gửi yêu cầu lúc này. Vui lòng thử lại.');
+      setError('Chưa gửi được yêu cầu lúc này. Bạn kiểm tra kết nối mạng rồi thử lại nhé.');
     } finally {
       setPending(false);
     }

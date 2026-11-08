@@ -37,7 +37,7 @@ function ProfileContent() {
           <CardDescription>
             {tab === 'profile'
               ? 'Thông tin này giúp cá nhân hóa các gợi ý dinh dưỡng.'
-              : 'Đổi mật khẩu sẽ thu hồi các phiên đăng nhập khác.'}
+              : 'Đổi mật khẩu sẽ đăng xuất mọi thiết bị, kể cả thiết bị này. Bạn cần đăng nhập lại bằng mật khẩu mới.'}
           </CardDescription>
         </CardHeader>
         <CardContent>

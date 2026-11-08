@@ -23,7 +23,7 @@ API service routes dưới `/api/identity`:
 | GET | `/users/me` | Đọc `id`, `email`, `fullName`, `status`, `createdAt`, `profile` |
 | PUT | `/users/me/profile` | Gửi hồ sơ sức khỏe; thành công trả `ProfileResponse` |
 
-Next BFF routes: `/api/auth/login`, `/api/auth/register`, `/api/auth/refresh-token`, `/api/auth/logout`. Cookie `lv_rt` là HttpOnly, giới hạn path `/api/auth`, sống 7 ngày; `lv_at` là HttpOnly ở path `/` theo thời hạn access token. `lv_session_hint` là cookie HttpOnly không chứa token để middleware biết client nên thử silent refresh; API vẫn yêu cầu Bearer JWT. Access token cho API chỉ nằm trong memory của client. JWT access token hết hạn sau 15 phút; `lv_rt` cho phép silent refresh. Identity không phát role claim.
+Next BFF routes: `/api/auth/login`, `/api/auth/register`, `/api/auth/refresh-token`, `/api/auth/logout`. Cookie `lv_rt` là HttpOnly, giới hạn path `/api/auth`, sống 7 ngày; `lv_at` là HttpOnly ở path `/` theo thời hạn access token. `lv_session_hint` là cookie không HttpOnly, không chứa token, để middleware và client biết nên thử silent refresh; API vẫn yêu cầu Bearer JWT. Access token cho API chỉ nằm trong memory của client. JWT access token hết hạn sau 15 phút; `lv_rt` cho phép silent refresh. Identity không phát role claim.
 
 Mật khẩu phải có ít nhất 8 ký tự, chữ hoa, chữ thường, chữ số và ký tự đặc biệt. Các mã lỗi FE xử lý riêng: `identity.invalid_credentials`, `identity.user_suspended`, `identity.email_taken`, `identity.invalid_verification_token`, `identity.invalid_password_reset_token`, `identity.invalid_current_password`, `identity.validation_failed`.
 
@@ -40,7 +40,7 @@ Mọi route dưới đây đi qua `/api/diet` và cần Bearer JWT.
 | GET | `/meals/daily-summary?date=YYYY-MM-DD` | READY | Summary theo ngày; calo còn lại có thể âm |
 | GET | `/meals/ai-recommendations?mealType=...&goal=...` | READY | Luôn hiện `disclaimer`/`safetyNote`; citation `verified=false` được ghi rõ; chỉ ghi log khi người dùng bấm |
 
-Các mã lỗi được trình bày bằng UI: `diet.weight_not_found` → `/progress/metrics`; `diet.profile_not_found`/`diet.profile_incomplete` → `/profile`; `diet.no_safe_candidate` giải thích dữ liệu dị ứng và dẫn `/diet/foods`; `diet.ai_timeout`/`diet.ai_unavailable` cho phép thử lại; `diet.food_not_found` báo món không còn tồn tại. `400 validation.failed` gắn lỗi vào trường tương ứng. Seed hiện có ít món; AI có thể trả danh sách rỗng nếu không tìm được ứng viên an toàn.
+Các mã lỗi được trình bày bằng UI: `diet.weight_not_found` → `/progress/metrics`; `diet.profile_not_found`/`diet.profile_incomplete` → `/profile`; `diet.no_safe_candidate` giải thích dữ liệu dị ứng và dẫn `/diet/foods`; `diet.ai_timeout`/`diet.ai_unavailable` cho phép thử lại; `diet.food_not_found` báo món không còn tồn tại. `400 validation.failed` gắn lỗi vào trường tương ứng. Seed hiện có 43 món dùng chung, tất cả đã khai báo dị ứng; AI vẫn có thể trả danh sách rỗng nếu mọi ứng viên đều trùng dị ứng trong hồ sơ.
 
 ## Progress
 

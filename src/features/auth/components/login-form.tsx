@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useLoginMutation } from '../queries/auth.queries';
 import { loginSchema, type LoginFormValues } from '../schemas/auth.schema';
-import { getApiErrorCode, getApiErrorFields } from '@/lib/api-error';
+import { getApiErrorCode, getApiErrorFields, getApiErrorMessage } from '@/lib/api-error';
 
 /**
  * Form đăng nhập email/mật khẩu. Lỗi nghiệp vụ đọc theo `error.code`:
@@ -34,12 +34,8 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
       onSuccess?.();
     } catch (error) {
       const code = getApiErrorCode(error);
-      if (code === 'identity.invalid_credentials') {
-        setFormError('Email hoặc mật khẩu không đúng, hoặc tài khoản chưa xác thực email.');
-        return;
-      }
-      if (code === 'identity.user_suspended') {
-        setFormError('Tài khoản của bạn đang bị tạm ngưng.');
+      if (code === 'identity.invalid_credentials' || code === 'identity.user_suspended') {
+        setFormError(getApiErrorMessage(error));
         return;
       }
       if (code === 'identity.validation_failed') {
@@ -59,7 +55,12 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
         }
         if (mapped) return;
       }
-      setFormError('Đăng nhập thất bại. Vui lòng thử lại.');
+      setFormError(
+        getApiErrorMessage(
+          error,
+          'Chưa đăng nhập được. Bạn kiểm tra lại thông tin rồi thử lại nhé.'
+        )
+      );
     }
   };
 

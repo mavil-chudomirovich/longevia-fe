@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { authApi } from '@/features/auth/api/auth.api';
 import { passwordSchema } from '@/features/auth/schemas/auth.schema';
-import { getApiErrorCode } from '@/lib/api-error';
+import { getApiErrorMessage } from '@/lib/api-error';
 
 function ResetContent() {
   const search = useSearchParams();
@@ -24,7 +24,9 @@ function ResetContent() {
     setError('');
     setMessage('');
     if (!/^[a-fA-F0-9]{64}$/.test(token)) {
-      setError('Mã đặt lại phải gồm 64 ký tự hex.');
+      setError(
+        'Mã xác nhận chưa đúng. Bạn hãy sao chép nguyên mã trong email (gồm 64 ký tự chữ và số).'
+      );
       return;
     }
     const passwordResult = passwordSchema.safeParse(password);
@@ -42,9 +44,10 @@ function ResetContent() {
       setMessage('Mật khẩu đã được đặt lại. Bạn có thể đăng nhập.');
     } catch (reason) {
       setError(
-        getApiErrorCode(reason) === 'identity.invalid_password_reset_token'
-          ? 'Mã không hợp lệ, đã hết hạn hoặc đã được sử dụng.'
-          : 'Không thể đặt lại mật khẩu. Kiểm tra yêu cầu mật khẩu rồi thử lại.'
+        getApiErrorMessage(
+          reason,
+          'Chưa đặt lại được mật khẩu. Bạn kiểm tra yêu cầu mật khẩu rồi thử lại nhé.'
+        )
       );
     } finally {
       setPending(false);
@@ -54,7 +57,7 @@ function ResetContent() {
     <section className="w-full max-w-lg rounded-3xl border bg-card p-8 shadow-lg">
       <h1 className="text-2xl font-bold">Đặt lại mật khẩu</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Dán mã 64 ký tự hex trong email và chọn mật khẩu mới.
+        Dán mã xác nhận Longevia vừa gửi vào email của bạn, rồi chọn mật khẩu mới.
       </p>
       <form onSubmit={(event) => void submit(event)} className="mt-6 space-y-4">
         <div className="space-y-2">

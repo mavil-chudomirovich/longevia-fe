@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { passwordSchema } from '@/features/auth/schemas/auth.schema';
-import { getApiErrorCode } from '@/lib/api-error';
+import { getApiErrorCode, toastFriendlyError } from '@/lib/api-error';
 import { useChangePasswordMutation } from '../queries/profile.queries';
 
 const schema = z
@@ -34,8 +34,13 @@ export function ChangePasswordForm() {
       await mutation.mutateAsync({ currentPassword, newPassword });
       form.reset();
     } catch (error) {
-      if (getApiErrorCode(error) === 'identity.invalid_current_password')
-        form.setError('currentPassword', { message: 'Mật khẩu hiện tại không đúng.' });
+      if (getApiErrorCode(error) === 'identity.invalid_current_password') {
+        form.setError('currentPassword', {
+          message: 'Mật khẩu hiện tại chưa đúng. Bạn kiểm tra lại giúp mình nhé.',
+        });
+        return;
+      }
+      toastFriendlyError(error, 'Chưa đổi được mật khẩu. Bạn vui lòng thử lại nhé.');
     }
   });
   return (
