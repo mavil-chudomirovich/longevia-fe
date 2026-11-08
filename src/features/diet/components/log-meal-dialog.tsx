@@ -15,7 +15,43 @@ import {
 import { useFoodsQuery, useLogMealMutation } from '../queries/diet.queries';
 import type { MealSuggestionModel } from '../types/diet.model';
 
-type SelectedFood = { foodId: string; quantity: string };
+/**
+ * `quantity` gửi lên BE tính theo `servingUnit` của món (vd. gam), KHÔNG phải số khẩu phần:
+ * BE quy đổi dinh dưỡng = giá trị trên 1 khẩu phần × quantity / servingSize.
+ * Mặc định điền đúng 1 khẩu phần (= servingSize).
+ */
+type SelectedFood = {
+  foodId: string;
+  name: string;
+  quantity: string;
+  servingSize: number;
+  servingUnit: string;
+  calories: number;
+};
+
+type FoodLike = {
+  name: string;
+  servingSize: number;
+  servingUnit: string;
+  calories: number;
+};
+
+function toSelected(foodId: string, food: FoodLike): SelectedFood {
+  return {
+    foodId,
+    name: food.name,
+    quantity: String(food.servingSize),
+    servingSize: food.servingSize,
+    servingUnit: food.servingUnit,
+    calories: food.calories,
+  };
+}
+
+function estimateCalories(item: SelectedFood): number | null {
+  const quantity = Number(item.quantity);
+  if (!Number.isFinite(quantity) || quantity <= 0 || item.servingSize <= 0) return null;
+  return Math.round((item.calories * quantity) / item.servingSize);
+}
 
 type LogMealDialogProps = {
   open: boolean;
@@ -32,18 +68,18 @@ function LogMealDialogContent({ open, onOpenChange, suggested }: LogMealDialogPr
   const [mealType, setMealType] = React.useState('Breakfast');
   const [date, setDate] = React.useState(() => new Date().toISOString().slice(0, 10));
   const [selected, setSelected] = React.useState<SelectedFood[]>(
-    suggested ? [{ foodId: suggested.foodId, quantity: '1' }] : []
+    suggested ? [toSelected(suggested.foodId, suggested)] : []
   );
   const [validationError, setValidationError] = React.useState('');
   const debouncedSearch = useDebounce(search, 300);
   const foods = useFoodsQuery({ search: debouncedSearch, pageNumber: 1, pageSize: 20 });
   const mutation = useLogMealMutation();
 
-  const add = (foodId: string) =>
+  const add = (foodId: string, food: FoodLike) =>
     setSelected((items) =>
       items.some((item) => item.foodId === foodId) || items.length >= 100
         ? items
-        : [...items, { foodId, quantity: '1' }]
+        : [...items, toSelected(foodId, food)]
     );
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -57,15 +93,22 @@ function LogMealDialogContent({ open, onOpenChange, suggested }: LogMealDialogPr
           (Number(item.quantity) * 1000) % 1 !== 0
       )
     ) {
-      setValidationError('Nhập số lượng lớn hơn 0, tối đa 1.000.000 và tối đa 3 chữ số thập phân.');
+      setValidationError(
+        'Nhập lượng ăn lớn hơn 0 (theo đơn vị của món), tối đa 1.000.000 và tối đa 3 chữ số thập phân.'
+      );
       return;
     }
     setValidationError('');
-    await mutation.mutateAsync({
-      date,
-      mealType,
-      items: selected.map((item) => ({ foodId: item.foodId, quantity: Number(item.quantity) })),
-    });
+    try {
+      await mutation.mutateAsync({
+        date,
+        mealType,
+        items: selected.map((item) => ({ foodId: item.foodId, quantity: Number(item.quantity) })),
+      });
+    } catch {
+      // Lỗi đã được báo trong mutation; giữ dialog mở để người dùng sửa và gửi lại.
+      return;
+    }
     onOpenChange(false);
     setSelected([]);
   };
@@ -76,13 +119,14 @@ function LogMealDialogContent({ open, onOpenChange, suggested }: LogMealDialogPr
         <DialogHeader>
           <DialogTitle>Ghi bữa ăn</DialogTitle>
           <DialogDescription>
-            Chọn món và lượng ăn. Dinh dưỡng được lưu thành snapshot tại thời điểm ghi.
+            Chọn món và lượng ăn theo đơn vị của món (vd. gam). Mặc định điền sẵn 1 khẩu phần. Giá
+            trị dinh dưỡng được ghi lại đúng như lúc bạn lưu.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={(event) => void save(event)} className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="meal-date">Ngày (UTC)</Label>
+              <Label htmlFor="meal-date">Ngày</Label>
               <Input
                 id="meal-date"
                 type="date"
@@ -143,7 +187,7 @@ function LogMealDialogContent({ open, onOpenChange, suggested }: LogMealDialogPr
                     disabled={
                       selected.length >= 100 || selected.some((item) => item.foodId === food.id)
                     }
-                    onClick={() => add(food.id)}
+                    onClick={() => add(food.id, food)}
                   >
                     Thêm
                   </Button>
@@ -162,18 +206,21 @@ function LogMealDialogContent({ open, onOpenChange, suggested }: LogMealDialogPr
           <div className="space-y-2">
             <h3 className="text-sm font-semibold">Món trong bữa ({selected.length}/100)</h3>
             {selected.map((item, index) => {
-              const food = foods.data?.items.find((candidate) => candidate.id === item.foodId);
+              const estimated = estimateCalories(item);
               return (
                 <div
                   key={item.foodId}
-                  className="grid grid-cols-[1fr_7rem_auto] items-center gap-2"
+                  className="grid grid-cols-[1fr_7rem_3rem_auto] items-center gap-2"
                 >
-                  <span className="truncate text-sm">
-                    {food?.name ??
-                      (suggested?.foodId === item.foodId ? suggested.name : item.foodId)}
+                  <span className="min-w-0 text-sm">
+                    <span className="block truncate">{item.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      1 khẩu phần = {item.servingSize} {item.servingUnit}
+                      {estimated !== null ? ` · ≈ ${estimated} kcal` : ''}
+                    </span>
                   </span>
                   <Input
-                    aria-label="Số khẩu phần"
+                    aria-label={`Lượng ăn (${item.servingUnit})`}
                     type="number"
                     required
                     min="0.001"
@@ -191,6 +238,7 @@ function LogMealDialogContent({ open, onOpenChange, suggested }: LogMealDialogPr
                       );
                     }}
                   />
+                  <span className="text-sm text-muted-foreground">{item.servingUnit}</span>
                   <Button
                     type="button"
                     variant="ghost"

@@ -1,9 +1,8 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
-import { SESSION_HINT_COOKIE } from '@/common/constants/routes';
+import { ACCESS_COOKIE, REFRESH_COOKIE, SESSION_HINT_COOKIE } from '@/common/constants/routes';
 
-export const ACCESS_COOKIE = 'lv_at';
-export const REFRESH_COOKIE = 'lv_rt';
+export { ACCESS_COOKIE, REFRESH_COOKIE };
 
 export interface TokenPair {
   accessToken: string;
@@ -41,9 +40,11 @@ export function setSessionCookies(response: NextResponse, tokens: TokenPair): vo
     path: '/',
     maxAge: tokens.expiresIn,
   });
-  // The refresh secret is path-scoped, so page middleware needs a non-secret session hint.
+  // The refresh secret is path-scoped, so pages need a non-secret session hint.
+  // It is readable by JS on purpose: the client uses it to decide whether to try a
+  // silent refresh even when the persisted user in localStorage is gone.
   response.cookies.set(SESSION_HINT_COOKIE, '1', {
-    httpOnly: true,
+    httpOnly: false,
     sameSite: 'lax',
     secure,
     path: '/',
@@ -65,7 +66,7 @@ export function clearSessionCookies(response: NextResponse): void {
     maxAge: 0,
   });
   response.cookies.set(SESSION_HINT_COOKIE, '', {
-    httpOnly: true,
+    httpOnly: false,
     sameSite: 'lax',
     path: '/',
     maxAge: 0,

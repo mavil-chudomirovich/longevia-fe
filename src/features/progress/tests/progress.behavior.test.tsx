@@ -13,6 +13,11 @@ import {
 } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import {
+  FRIENDLY_ERRORS,
+  NETWORK_ERROR_MESSAGE,
+  friendlyMessageForStatus,
+} from '@/lib/error-messages';
 import { AxiosError, type InternalAxiosRequestConfig, type AxiosResponse } from 'axios';
 import { useAuthStore } from '@/store/useAuthStore';
 import api from '@/lib/axios';
@@ -555,7 +560,9 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
         fireEvent.click(startBtn);
       });
 
-      expect(toast.error).toHaveBeenCalledWith('Bạn đang có một phiên nhịn ăn chưa kết thúc.');
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringContaining('Bạn đang có một phiên nhịn ăn chưa kết thúc')
+      );
     });
 
     it('displays 422 height unavailable error toast with guidance in active session', async () => {
@@ -580,7 +587,10 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
-          expect.stringContaining('Hồ sơ của bạn chưa có thông tin chiều cao')
+          expect.stringContaining('Hồ sơ của bạn chưa có chiều cao'),
+          expect.objectContaining({
+            action: expect.objectContaining({ label: 'Cập nhật hồ sơ' }),
+          })
         );
       });
     });
@@ -1558,9 +1568,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       });
 
       expect(toast.error).toHaveBeenCalledTimes(1);
-      expect(toast.error).toHaveBeenCalledWith(
-        'Lỗi kết nối với dịch vụ máy chủ (502 Gateway). Vui lòng thử lại sau.'
-      );
+      expect(toast.error).toHaveBeenCalledWith(friendlyMessageForStatus(502));
     });
 
     it('displays 503 Service Unavailable error toast in active session through real Axios interceptor with zero duplicate toast', async () => {
@@ -1586,9 +1594,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       });
 
       expect(toast.error).toHaveBeenCalledTimes(1);
-      expect(toast.error).toHaveBeenCalledWith(
-        'Dịch vụ tạm thời không khả dụng (503 Service Unavailable). Vui lòng thử lại sau ít phút.'
-      );
+      expect(toast.error).toHaveBeenCalledWith(friendlyMessageForStatus(503));
     });
 
     it('displays 500 server error toast in active session through real Axios interceptor with zero duplicate toast', async () => {
@@ -1614,7 +1620,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       });
 
       expect(toast.error).toHaveBeenCalledTimes(1);
-      expect(toast.error).toHaveBeenCalledWith('Lỗi hệ thống máy chủ. Vui lòng thử lại sau.');
+      expect(toast.error).toHaveBeenCalledWith(friendlyMessageForStatus(500));
     });
 
     it('displays network disconnection error toast in active session through real Axios interceptor with zero duplicate toast', async () => {
@@ -1636,9 +1642,20 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       });
 
       expect(toast.error).toHaveBeenCalledTimes(1);
-      expect(toast.error).toHaveBeenCalledWith(
-        'Không thể kết nối đến máy chủ. Vui lòng kiểm tra đường truyền.'
-      );
+      expect(toast.error).toHaveBeenCalledWith(NETWORK_ERROR_MESSAGE);
+    });
+
+    it('does not show a network toast for a request cancelled by the client (refetch/abort)', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      api.defaults.adapter = async (config) => {
+        throw new AxiosError('canceled', 'ERR_CANCELED', config, {}, undefined);
+      };
+
+      await expect(api.get('/progress/water/today')).rejects.toBeDefined();
+
+      expect(toast.error).not.toHaveBeenCalled();
     });
 
     it('displays 409 conflict error toast through real Axios interceptor in active session', async () => {
@@ -1670,7 +1687,9 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       });
 
       expect(toast.error).toHaveBeenCalledTimes(1);
-      expect(toast.error).toHaveBeenCalledWith('Bạn đang có một phiên nhịn ăn chưa kết thúc.');
+      expect(toast.error).toHaveBeenCalledWith(
+        FRIENDLY_ERRORS['progress.fasting_active_conflict'].message
+      );
     });
 
     it('displays 422 height unavailable error toast through real Axios interceptor in active session', async () => {
@@ -1701,7 +1720,10 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
 
       expect(toast.error).toHaveBeenCalledTimes(1);
       expect(toast.error).toHaveBeenCalledWith(
-        expect.stringContaining('Hồ sơ của bạn chưa có thông tin chiều cao')
+        FRIENDLY_ERRORS['progress.height_unavailable'].message,
+        expect.objectContaining({
+          action: expect.objectContaining({ label: 'Cập nhật hồ sơ' }),
+        })
       );
     });
 
@@ -1752,9 +1774,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       });
 
       expect(toast.error).toHaveBeenCalledTimes(1);
-      expect(toast.error).toHaveBeenCalledWith(
-        'Bạn đang gửi quá nhiều yêu cầu. Vui lòng thử lại sau.'
-      );
+      expect(toast.error).toHaveBeenCalledWith(friendlyMessageForStatus(429));
     });
 
     it('completely suppresses error toasts when session switches to User B during network transport', async () => {

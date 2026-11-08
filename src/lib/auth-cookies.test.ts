@@ -22,7 +22,7 @@ describe('auth session cookies', () => {
     expect(response.cookies.get(SESSION_HINT_COOKIE)).toMatchObject({
       value: '1',
       path: '/',
-      httpOnly: true,
+      httpOnly: false,
     });
   });
 

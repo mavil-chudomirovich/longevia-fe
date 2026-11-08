@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { forceLogout } from '@/lib/auth-refresh';
 import { AUTH_QUERY_KEYS } from '@/features/auth/queries/auth.queries';
 import { authApi } from '@/features/auth/api/auth.api';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -45,12 +47,17 @@ export function useUpdateProfileMutation() {
 
 export function useChangePasswordMutation() {
   const client = useQueryClient();
+  const router = useRouter();
   return useMutation({
     mutationFn: (payload: { currentPassword: string; newPassword: string }) =>
       authApi.changePassword(payload),
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: AUTH_QUERY_KEYS.me() });
-      toast.success('Đã đổi mật khẩu. Các phiên đăng nhập khác đã bị thu hồi.');
+    onSuccess: async () => {
+      // BE thu hồi MỌI refresh token của user (kể cả thiết bị này), nên phiên hiện tại
+      // sẽ không gia hạn được nữa -> đăng xuất ngay và yêu cầu đăng nhập lại.
+      toast.success('Đã đổi mật khẩu. Vui lòng đăng nhập lại bằng mật khẩu mới.');
+      await forceLogout();
+      client.clear();
+      router.replace('/login');
     },
   });
 }

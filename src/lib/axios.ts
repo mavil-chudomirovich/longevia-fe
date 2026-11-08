@@ -7,6 +7,8 @@ import { API_BASE_URL } from './env';
 import { sharedRefresh, forceLogout } from './auth-refresh';
 import { PROTECTED_PREFIXES } from '@/common/constants/routes';
 import { API_ENDPOINTS } from '@/common/constants/api-endpoints';
+import { getApiErrorMessage } from './api-error';
+import { NETWORK_ERROR_MESSAGE } from './error-messages';
 
 declare module 'axios' {
   export interface AxiosRequestConfig {
@@ -92,6 +94,11 @@ api.interceptors.response.use(
     return response;
   },
   async (error: AxiosError<ProblemDetails>) => {
+    // Request bị huỷ chủ động (TanStack Query refetch/huỷ, đổi trang, đăng xuất) không phải lỗi:
+    // không toast, không refresh token. Trước đây nhánh `error.request` báo nhầm "mất kết nối".
+    if (axios.isCancel(error) || error.code === 'ERR_CANCELED') {
+      return Promise.reject(error);
+    }
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
     const silent = originalRequest?.silent === true;
     const showErrorToast = originalRequest?.showErrorToast === true;
@@ -99,7 +106,6 @@ api.interceptors.response.use(
 
     if (error.response) {
       const status = error.response.status;
-      const errorData = error.response.data;
 
       // Kiểm tra lỗi xác thực 401 (hỗ trợ cả envelope mới lồng `error`)
       const isAuthError = status === 401;
@@ -146,7 +152,7 @@ api.interceptors.response.use(
           // Sự kiện mất phiên là toàn cục: luôn toast 1 lần kể cả khi request
           // kích hoạt có `silent` (silent chỉ áp dụng cho lỗi nghiệp vụ của request đó).
           if (!hasShownSessionExpiredToast) {
-            toast.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+            toast.error('Phiên đăng nhập đã hết hạn. Bạn vui lòng đăng nhập lại nhé.');
             hasShownSessionExpiredToast = true;
           }
           redirectToLoginIfProtected();
@@ -160,23 +166,14 @@ api.interceptors.response.use(
       if (!silent) {
         if (customErrorMessage) {
           toast.error(customErrorMessage);
-        } else if (status >= 500) {
-          toast.error('Lỗi hệ thống máy chủ. Vui lòng thử lại sau.');
-        } else if (status === 403) {
-          toast.error(
-            errorData?.detail || errorData?.title || 'Bạn không có quyền thực hiện thao tác này.'
-          );
-        } else if (status === 429) {
-          toast.error('Bạn đang gửi quá nhiều yêu cầu. Vui lòng thử lại sau.');
-        } else if (showErrorToast) {
-          toast.error(
-            errorData?.detail || errorData?.title || 'Thao tác thất bại. Vui lòng thử lại.'
-          );
+        } else if (status >= 500 || status === 403 || status === 429 || showErrorToast) {
+          // Thông báo thân thiện theo mã lỗi (không lộ mã HTTP / tên dịch vụ).
+          toast.error(getApiErrorMessage(error));
         }
       }
     } else if (error.request) {
       if (!silent) {
-        toast.error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra đường truyền.');
+        toast.error(NETWORK_ERROR_MESSAGE);
       }
     }
 

@@ -13,6 +13,27 @@ describe('session middleware', () => {
     expect(response.headers.get('x-middleware-next')).toBe('1');
   });
 
+  it('does not bounce /login back to the app on a hint-only session (avoids redirect loop)', () => {
+    const response = middleware(
+      new NextRequest('http://localhost:3000/login', {
+        headers: { cookie: 'lv_session_hint=1' },
+      })
+    );
+
+    expect(response.headers.get('x-middleware-next')).toBe('1');
+  });
+
+  it('redirects /login to /progress when the access cookie is still valid', () => {
+    const payload = btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 600 }));
+    const response = middleware(
+      new NextRequest('http://localhost:3000/login', {
+        headers: { cookie: `lv_at=h.${payload}.s; lv_session_hint=1` },
+      })
+    );
+
+    expect(response.headers.get('location')).toBe('http://localhost:3000/progress');
+  });
+
   it('redirects a guest away from protected routes', () => {
     const response = middleware(new NextRequest('http://localhost:3000/progress'));
 

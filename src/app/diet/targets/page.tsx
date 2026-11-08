@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { getApiErrorCode } from '@/lib/api-error';
+import { getApiErrorAction, getApiErrorCode, getApiErrorMessage } from '@/lib/api-error';
+import type { ErrorAction } from '@/lib/error-messages';
 import { targetSchema, type TargetFormValues } from '@/features/diet/schemas/diet.schema';
 import {
   useCalculateTargetMutation,
@@ -44,6 +45,7 @@ export default function TargetsPage() {
     defaultValues: defaults,
   });
   const [formError, setFormError] = React.useState('');
+  const [formAction, setFormAction] = React.useState<ErrorAction | undefined>();
   const code = getApiErrorCode(query.error);
   const missing = code === 'diet.target_not_found';
 
@@ -60,26 +62,31 @@ export default function TargetsPage() {
   const submit = (mode: 'manual' | 'calculate') =>
     form.handleSubmit(async (values) => {
       setFormError('');
+      setFormAction(undefined);
       const calories = Number(values.targetCalories);
       const fromMacros =
         Number(values.targetProteinGrams) * 4 +
         Number(values.targetCarbsGrams) * 4 +
         Number(values.targetFatGrams) * 9;
       if (Math.abs(fromMacros - calories) > calories * 0.05) {
-        setFormError('Năng lượng từ macro cần lệch tối đa 5% so với mục tiêu calo.');
+        setFormError(
+          `Tổng năng lượng từ protein, carb và chất béo (≈ ${Math.round(fromMacros)} kcal) đang chênh khá nhiều so với calo mục tiêu. Bạn điều chỉnh để hai con số gần nhau hơn nhé (lệch không quá 5%).`
+        );
         return;
       }
       try {
         if (mode === 'manual') await save.mutateAsync(values);
         else await calculate.mutateAsync(values);
-        await query.refetch();
+        // Không gọi query.refetch() ở đây: mutation đã invalidate query mục tiêu, gọi thêm
+        // sẽ huỷ request đang chạy (và trước đây sinh toast "mất kết nối" giả).
       } catch (error) {
-        const reason = getApiErrorCode(error);
-        if (reason === 'diet.profile_not_found' || reason === 'diet.profile_incomplete')
-          setFormError('Cần hoàn thiện hồ sơ trước khi tính tự động.');
-        else if (reason === 'diet.weight_not_found')
-          setFormError('Hãy ghi nhận cân nặng trước khi tính mục tiêu.');
-        else setFormError('Không thể lưu mục tiêu. Vui lòng kiểm tra thông tin và thử lại.');
+        setFormError(
+          getApiErrorMessage(
+            error,
+            'Chưa lưu được mục tiêu. Bạn kiểm tra lại thông tin rồi thử lại nhé.'
+          )
+        );
+        setFormAction(getApiErrorAction(error));
       }
     });
 
@@ -94,21 +101,37 @@ export default function TargetsPage() {
         <CardHeader>
           <CardTitle>Mục tiêu dinh dưỡng</CardTitle>
           <CardDescription>
-            Nhập mục tiêu thủ công hoặc tính BMR/TDEE từ hồ sơ và cân nặng mới nhất.
+            Tự nhập mục tiêu, hoặc để Longevia tính từ hồ sơ và cân nặng gần nhất. BMR là năng lượng
+            cơ thể cần khi nghỉ ngơi; TDEE là tổng năng lượng bạn tiêu hao mỗi ngày.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {query.isLoading ? (
             <p>Đang tải mục tiêu…</p>
           ) : query.isError && !missing ? (
-            <div>
-              <p role="alert">Không thể tải mục tiêu.</p>
+            <div className="space-y-3">
+              <p role="alert">
+                {getApiErrorMessage(
+                  query.error,
+                  'Chưa tải được mục tiêu của bạn. Bạn thử lại giúp mình nhé.'
+                )}
+              </p>
               <Button variant="outline" onClick={() => void query.refetch()}>
                 Thử lại
               </Button>
             </div>
           ) : (
             <>
+              {missing && (
+                <div className="mb-5 rounded-lg border border-primary/30 bg-primary/5 p-4 text-sm">
+                  <p className="font-medium">Bạn chưa có mục tiêu dinh dưỡng.</p>
+                  <p className="mt-1 text-muted-foreground">
+                    Bấm <strong>Tính tự động</strong> để Longevia đề xuất dựa trên hồ sơ và cân nặng
+                    gần nhất của bạn, hoặc tự nhập các con số bên dưới rồi bấm{' '}
+                    <strong>Lưu thủ công</strong>.
+                  </p>
+                </div>
+              )}
               {query.data && (
                 <div className="mb-5 grid gap-3 rounded-lg bg-muted/60 p-4 sm:grid-cols-2">
                   <p>
@@ -158,14 +181,9 @@ export default function TargetsPage() {
                     className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive"
                   >
                     {formError}
-                    {formError.includes('hồ sơ') && (
-                      <Link href="/profile" className="ml-1 underline">
-                        Cập nhật hồ sơ
-                      </Link>
-                    )}
-                    {formError.includes('cân nặng') && (
-                      <Link href="/progress/metrics" className="ml-1 underline">
-                        Ghi cân nặng
+                    {formAction && (
+                      <Link href={formAction.href} className="ml-1 font-medium underline">
+                        {formAction.label}
                       </Link>
                     )}
                   </div>

@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { AUTH_ROUTES, PROTECTED_PREFIXES, SESSION_HINT_COOKIE } from '@/common/constants/routes';
+import {
+  ACCESS_COOKIE,
+  AUTH_ROUTES,
+  PROTECTED_PREFIXES,
+  SESSION_HINT_COOKIE,
+} from '@/common/constants/routes';
 
 function isTokenExpired(token: string): boolean {
   try {
@@ -16,11 +21,10 @@ function isTokenExpired(token: string): boolean {
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const accessToken = request.cookies.get('lv_at')?.value;
-  const hasSession = Boolean(
-    (accessToken && !isTokenExpired(accessToken)) ||
-    request.cookies.get(SESSION_HINT_COOKIE)?.value === '1'
-  );
+  const accessToken = request.cookies.get(ACCESS_COOKIE)?.value;
+  const hasValidAccess = Boolean(accessToken && !isTokenExpired(accessToken));
+  // Trang cần đăng nhập: cho qua khi còn hint để client tự silent refresh.
+  const hasSession = hasValidAccess || request.cookies.get(SESSION_HINT_COOKIE)?.value === '1';
 
   if (
     PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix)) ||
@@ -33,7 +37,9 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  if (AUTH_ROUTES.includes(pathname as (typeof AUTH_ROUTES)[number]) && hasSession) {
+  // Trang auth: chỉ đẩy đi khi access token còn hạn. Nếu chỉ dựa vào hint, một phiên
+  // đã hỏng (refresh thất bại) sẽ kẹt vòng /progress ↔ /login.
+  if (AUTH_ROUTES.includes(pathname as (typeof AUTH_ROUTES)[number]) && hasValidAccess) {
     return NextResponse.redirect(new URL('/progress', request.url));
   }
 

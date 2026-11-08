@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { LogMealDialog } from '@/features/diet/components/log-meal-dialog';
 import { useRecommendationsQuery } from '@/features/diet/queries/diet.queries';
 import type { MealSuggestionModel } from '@/features/diet/types/diet.model';
-import { getApiErrorCode } from '@/lib/api-error';
+import { getApiErrorAction, getApiErrorMessage } from '@/lib/api-error';
 
 export default function SuggestionsPage() {
   const [mealType, setMealType] = React.useState('Breakfast');
@@ -16,7 +16,7 @@ export default function SuggestionsPage() {
   const [selected, setSelected] = React.useState<MealSuggestionModel>();
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const query = useRecommendationsQuery(mealType, goal, requested);
-  const errorCode = getApiErrorCode(query.error);
+  const errorAction = getApiErrorAction(query.error);
   const choose = (setter: (value: string) => void, value: string) => {
     setter(value);
     setRequested(false);
@@ -81,31 +81,17 @@ export default function SuggestionsPage() {
         <Card className="mt-6">
           <CardContent className="space-y-3 py-6">
             <p role="alert">
-              {errorCode === 'diet.weight_not_found'
-                ? 'Hãy ghi nhận cân nặng trước khi tạo gợi ý.'
-                : errorCode === 'diet.profile_not_found' || errorCode === 'diet.profile_incomplete'
-                  ? 'Hoàn thiện hồ sơ sức khỏe trước khi tạo gợi ý.'
-                  : errorCode === 'diet.no_safe_candidate'
-                    ? 'Chưa có món đủ thông tin dị ứng để đưa ra gợi ý an toàn.'
-                    : errorCode === 'diet.ai_timeout' || errorCode === 'diet.ai_unavailable'
-                      ? 'Dịch vụ gợi ý đang bận. Bạn có thể thử lại.'
-                      : 'Không thể tạo gợi ý lúc này.'}
+              {getApiErrorMessage(
+                query.error,
+                'Chưa tạo được gợi ý lúc này. Bạn thử lại sau giây lát nhé.'
+              )}
             </p>
             <div className="flex flex-wrap gap-2">
-              {errorCode === 'diet.weight_not_found' ? (
-                <Button asChild variant="outline">
-                  <Link href="/progress/metrics">Ghi cân nặng</Link>
+              {errorAction && (
+                <Button asChild>
+                  <Link href={errorAction.href}>{errorAction.label}</Link>
                 </Button>
-              ) : errorCode === 'diet.profile_not_found' ||
-                errorCode === 'diet.profile_incomplete' ? (
-                <Button asChild variant="outline">
-                  <Link href="/profile">Cập nhật hồ sơ</Link>
-                </Button>
-              ) : errorCode === 'diet.no_safe_candidate' ? (
-                <Button asChild variant="outline">
-                  <Link href="/diet/foods">Thêm món và dị nguyên</Link>
-                </Button>
-              ) : null}
+              )}
               <Button variant="outline" onClick={() => void query.refetch()}>
                 Thử lại
               </Button>

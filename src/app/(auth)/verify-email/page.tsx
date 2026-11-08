@@ -37,10 +37,10 @@ function VerifyContent() {
         {state === 'success'
           ? 'Tài khoản của bạn đã được kích hoạt. Bạn có thể đăng nhập.'
           : state === 'error'
-            ? 'Liên kết có thể đã hết hạn hoặc được sử dụng trước đó. Hãy đăng ký lại nếu cần.'
+            ? 'Liên kết có thể đã hết hạn hoặc đã được sử dụng. Nếu tài khoản đã kích hoạt, bạn chỉ cần đăng nhập. Nếu chưa, bạn hãy liên hệ bộ phận hỗ trợ của Longevia nhé.'
             : 'Vui lòng đợi trong giây lát.'}
       </p>
-      {state === 'success' && (
+      {(state === 'success' || state === 'error') && (
         <Button asChild className="mt-6">
           <Link href="/login">Đăng nhập</Link>
         </Button>

@@ -14,7 +14,9 @@ export const profileApi = {
   },
   update: async (values: ProfileFormValues): Promise<UserModel> => {
     const payload: UpdateProfileDto = profileMapper.toUpdateDto(values);
-    const response = await api.put<UserDto>(API_ENDPOINTS.IDENTITY.USERS.ME_PROFILE, payload);
+    const response = await api.put<UserDto>(API_ENDPOINTS.IDENTITY.USERS.ME_PROFILE, payload, {
+      silent: true,
+    });
     return authMapper.toModel(response.data);
   },
 };
