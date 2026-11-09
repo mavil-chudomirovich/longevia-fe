@@ -41,6 +41,21 @@ export const dietApi = {
     );
     return dietMapper.toModel(response.data);
   },
+  updateFood: async (
+    id: string,
+    values: CreateFoodValues,
+    signal: AbortSignal
+  ): Promise<FoodModel> => {
+    const response = await api.put<FoodDto>(
+      `${API_ENDPOINTS.DIET.FOODS}/${id}`,
+      dietMapper.toCreateFoodDto(values),
+      { signal, silent: true }
+    );
+    return dietMapper.toModel(response.data);
+  },
+  deleteFood: async (id: string, signal: AbortSignal): Promise<void> => {
+    await api.delete(`${API_ENDPOINTS.DIET.FOODS}/${id}`, { signal, silent: true });
+  },
   getTarget: async (signal?: AbortSignal): Promise<TargetModel> => {
     const response = await api.get<TargetDto>(API_ENDPOINTS.DIET.TARGETS_ME, { signal });
     return dietMapper.toTarget(response.data);

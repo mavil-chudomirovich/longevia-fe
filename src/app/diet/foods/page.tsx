@@ -10,7 +10,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useDebounce } from '@/hooks/useDebounce';
 import { createFoodSchema, type CreateFoodValues } from '@/features/diet/schemas/diet.schema';
-import { useCreateFoodMutation, useFoodsQuery } from '@/features/diet/queries/diet.queries';
+import {
+  useCreateFoodMutation,
+  useDeleteFoodMutation,
+  useFoodsQuery,
+} from '@/features/diet/queries/diet.queries';
 
 const defaults: CreateFoodValues = {
   name: '',
@@ -168,6 +172,7 @@ export default function FoodsPage() {
   const [search, setSearch] = React.useState('');
   const [category, setCategory] = React.useState('');
   const [pageNumber, setPage] = React.useState(1);
+  const removeFood = useDeleteFoodMutation();
   const query = useFoodsQuery({
     search: useDebounce(search, 300),
     category: useDebounce(category, 300),
@@ -232,7 +237,22 @@ export default function FoodsPage() {
                   <li key={food.id} className="py-3">
                     <div className="flex justify-between gap-3">
                       <strong>{food.name}</strong>
-                      <span className="text-sm">{food.calories} kcal</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">{food.calories} kcal</span>
+                        {food.isCustom && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={removeFood.isPending}
+                            onClick={() => {
+                              if (window.confirm(`Xoá món “${food.name}”?`))
+                                removeFood.mutate(food.id);
+                            }}
+                          >
+                            Xoá
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {food.category} · {food.servingSize} {food.servingUnit} · P{' '}

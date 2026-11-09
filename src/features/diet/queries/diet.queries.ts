@@ -139,6 +139,25 @@ export function useCreateFoodMutation() {
   });
 }
 
+export function useUpdateFoodMutation() {
+  const client = useQueryClient();
+  return useDietMutation<{ id: string; values: CreateFoodValues }, unknown>(
+    ({ id, values }, signal) => dietApi.updateFood(id, values, signal),
+    (_food, userId) => {
+      void client.invalidateQueries({ queryKey: dietKeys.user(userId) });
+      toast.success('Đã cập nhật món ăn.');
+    }
+  );
+}
+
+export function useDeleteFoodMutation() {
+  const client = useQueryClient();
+  return useDietMutation<string, void>(dietApi.deleteFood, (_result, userId) => {
+    void client.invalidateQueries({ queryKey: dietKeys.user(userId) });
+    toast.success('Đã xoá món ăn.');
+  });
+}
+
 export function useSaveTargetMutation() {
   const client = useQueryClient();
   return useDietMutation<TargetFormValues, unknown>(
