@@ -19,4 +19,18 @@ export const profileApi = {
     });
     return authMapper.toModel(response.data);
   },
+  getPreferences: async (): Promise<{ receiveWeeklyDigest: boolean }> => {
+    const response = await api.get<{ receiveWeeklyDigest?: boolean }>(
+      API_ENDPOINTS.IDENTITY.USERS.ME_PREFERENCES
+    );
+    return { receiveWeeklyDigest: Boolean(response.data.receiveWeeklyDigest) };
+  },
+  updatePreferences: async (receiveWeeklyDigest: boolean) => {
+    const response = await api.put<{ receiveWeeklyDigest?: boolean }>(
+      API_ENDPOINTS.IDENTITY.USERS.ME_PREFERENCES,
+      { receiveWeeklyDigest },
+      { silent: true }
+    );
+    return { receiveWeeklyDigest: Boolean(response.data.receiveWeeklyDigest) };
+  },
 };

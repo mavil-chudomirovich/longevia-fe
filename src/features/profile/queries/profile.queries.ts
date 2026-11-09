@@ -12,6 +12,7 @@ export const profileKeys = {
   all: ['profile'] as const,
   user: (userId: string) => [...profileKeys.all, userId] as const,
   me: (userId: string) => [...profileKeys.user(userId), 'me'] as const,
+  preferences: (userId: string) => [...profileKeys.user(userId), 'preferences'] as const,
 };
 
 export function useProfileQuery() {
@@ -58,6 +59,27 @@ export function useChangePasswordMutation() {
       await forceLogout();
       client.clear();
       router.replace('/login');
+    },
+  });
+}
+
+export function usePreferencesQuery() {
+  const userId = useAuthStore((state) => state.user?.id ?? '');
+  return useQuery({
+    queryKey: profileKeys.preferences(userId),
+    queryFn: () => profileApi.getPreferences(),
+    enabled: Boolean(userId),
+  });
+}
+
+export function useUpdatePreferencesMutation() {
+  const client = useQueryClient();
+  const userId = useAuthStore((state) => state.user?.id ?? '');
+  return useMutation({
+    mutationFn: (receiveWeeklyDigest: boolean) => profileApi.updatePreferences(receiveWeeklyDigest),
+    onSuccess: (data) => {
+      client.setQueryData(profileKeys.preferences(userId), data);
+      toast.success(data.receiveWeeklyDigest ? 'Đã bật báo cáo tuần.' : 'Đã tắt báo cáo tuần.');
     },
   });
 }
