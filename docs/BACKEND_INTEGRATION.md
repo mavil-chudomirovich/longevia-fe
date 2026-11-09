@@ -49,7 +49,7 @@ Các route dưới `/api/progress` cần Bearer JWT. FE đã nối đủ 9 busin
 | Method | Path | Trạng thái FE |
 | --- | --- | --- |
 | GET | `/dashboard/summary` | READY |
-| GET | `/fasting/current` | READY; body `null` nghĩa là chưa có phiên |
+| GET | `/fasting/current` | READY; **204 No Content** khi chưa có phiên (thay cho 200 body rỗng) |
 | POST | `/fasting/start` | READY |
 | POST | `/fasting/end` | READY |
 | GET | `/water/today` | READY |
@@ -59,6 +59,31 @@ Các route dưới `/api/progress` cần Bearer JWT. FE đã nối đủ 9 busin
 | GET | `/metrics/history` | READY; phân trang không trả `hasPreviousPage`/`hasNextPage` |
 
 Lỗi được phân nhánh theo mã: `progress.fasting_active_conflict`, `progress.fasting_not_found`, `progress.fasting_no_active`, `progress.sleep_overlap`, `progress.height_unavailable`, `progress.identity_unavailable`, `progress.identity_integration_failure`. Metrics cần chiều cao hồ sơ từ Identity. Ngày hôm nay, water, và khoảng tuần dùng lịch UTC; ngày lịch sử người dùng chọn được giữ nguyên.
+
+## Hỏi sách chat & AI mục tiêu (duck-004)
+
+### `/api/diet/knowledge`
+
+| Method | Path | Trạng thái FE |
+| --- | --- | --- |
+| POST | `/ask/stream` | READY; SSE `delta` → `citation` → `done`/`error`, gọi qua BFF `/api/knowledge/ask/stream` |
+| GET | `/conversations` | READY; `[{ id, title, messageCount, updatedAt }]` |
+| GET | `/conversations/{id}` | READY; messages kèm citations |
+| DELETE | `/conversations/{id}` | READY; 404 `diet.conversation_not_found` nếu không thuộc owner |
+
+### `/api/diet/targets/me/suggest`
+
+READY. Body `{ description?, goal? }`; trả `{ targetCalories, targetProteinGrams,
+targetCarbsGrams, targetFatGrams, rationale, source, safetyNote }`. **Không ghi DB** —
+FE điền form, người dùng bấm "Lưu thủ công" (`PUT /targets/me`) mới persist.
+`source=formula` khi AI lỗi hoặc trả macro ngoài khoảng an toàn.
+
+### Trường additive
+
+- Meal plan & workout plan: `usedFallbackReason` (`provider_timeout`,
+  `provider_unavailable`, `invalid_model_output`, `corpus_missing`, `no_safe_activity`).
+- Workout day: `activityLabel` (tiếng Việt); ngày nghỉ để rỗng.
+- Fasting current: 204 thay vì 200 body rỗng.
 
 ## Đồng bộ OpenAPI
 
