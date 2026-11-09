@@ -14,7 +14,9 @@ import {
   useCreateFoodMutation,
   useDeleteFoodMutation,
   useFoodsQuery,
+  useUpdateFoodMutation,
 } from '@/features/diet/queries/diet.queries';
+import type { FoodModel } from '@/features/diet/types/diet.model';
 
 const defaults: CreateFoodValues = {
   name: '',
@@ -36,12 +38,30 @@ const nutrientFields = [
   'fiberGrams',
 ] as const;
 
-function CreateFoodForm() {
+function toValues(food: FoodModel): CreateFoodValues {
+  return {
+    name: food.name,
+    category: food.category,
+    servingSize: String(food.servingSize),
+    servingUnit: food.servingUnit,
+    calories: String(food.calories),
+    proteinGrams: String(food.proteinGrams),
+    carbsGrams: String(food.carbsGrams),
+    fatGrams: String(food.fatGrams),
+    fiberGrams: String(food.fiberGrams),
+    allergens: food.allergens ?? [],
+  };
+}
+
+function CreateFoodForm({ initial, onDone }: { initial?: FoodModel; onDone?: () => void }) {
   const form = useForm<CreateFoodValues>({
     resolver: zodResolver(createFoodSchema),
-    defaultValues: defaults,
+    defaultValues: initial ? toValues(initial) : defaults,
   });
-  const mutation = useCreateFoodMutation();
+  const createMutation = useCreateFoodMutation();
+  const updateMutation = useUpdateFoodMutation();
+  const mutation = initial ? updateMutation : createMutation;
+  const isEditing = Boolean(initial);
   const [allergen, setAllergen] = React.useState('');
   const add = () => {
     const value = allergen.trim();
@@ -52,8 +72,13 @@ function CreateFoodForm() {
   };
   const submit = form.handleSubmit(async (values) => {
     try {
-      await mutation.mutateAsync(values);
-      form.reset(defaults);
+      if (initial) {
+        await updateMutation.mutateAsync({ id: initial.id, values });
+        onDone?.();
+      } else {
+        await createMutation.mutateAsync(values);
+        form.reset(defaults);
+      }
     } catch {
       // Lỗi đã được báo bằng thông báo thân thiện trong mutation; giữ nguyên dữ liệu đã nhập.
     }
@@ -161,9 +186,16 @@ function CreateFoodForm() {
           ))}
         </div>
       </div>
-      <Button type="submit" disabled={mutation.isPending}>
-        {mutation.isPending ? 'Đang lưu…' : 'Thêm món tự tạo'}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending ? 'Đang lưu…' : isEditing ? 'Lưu thay đổi' : 'Thêm món tự tạo'}
+        </Button>
+        {isEditing && (
+          <Button type="button" variant="outline" onClick={onDone}>
+            Huỷ sửa
+          </Button>
+        )}
+      </div>
     </form>
   );
 }
@@ -172,6 +204,7 @@ export default function FoodsPage() {
   const [search, setSearch] = React.useState('');
   const [category, setCategory] = React.useState('');
   const [pageNumber, setPage] = React.useState(1);
+  const [editing, setEditing] = React.useState<FoodModel | undefined>();
   const removeFood = useDeleteFoodMutation();
   const query = useFoodsQuery({
     search: useDebounce(search, 300),
@@ -240,17 +273,22 @@ export default function FoodsPage() {
                       <div className="flex items-center gap-2">
                         <span className="text-sm">{food.calories} kcal</span>
                         {food.isCustom && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={removeFood.isPending}
-                            onClick={() => {
-                              if (window.confirm(`Xoá món “${food.name}”?`))
-                                removeFood.mutate(food.id);
-                            }}
-                          >
-                            Xoá
-                          </Button>
+                          <>
+                            <Button size="sm" variant="outline" onClick={() => setEditing(food)}>
+                              Sửa
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={removeFood.isPending}
+                              onClick={() => {
+                                if (window.confirm(`Xoá món “${food.name}”?`))
+                                  removeFood.mutate(food.id);
+                              }}
+                            >
+                              Xoá
+                            </Button>
+                          </>
                         )}
                       </div>
                     </div>
@@ -297,10 +335,14 @@ export default function FoodsPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Thêm món tự tạo</CardTitle>
+            <CardTitle>{editing ? 'Sửa món tự tạo' : 'Thêm món tự tạo'}</CardTitle>
           </CardHeader>
           <CardContent>
-            <CreateFoodForm />
+            <CreateFoodForm
+              key={editing?.id ?? 'new'}
+              initial={editing}
+              onDone={() => setEditing(undefined)}
+            />
           </CardContent>
         </Card>
       </div>
