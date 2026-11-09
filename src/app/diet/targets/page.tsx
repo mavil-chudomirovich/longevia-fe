@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { getApiErrorAction, getApiErrorCode, getApiErrorMessage } from '@/lib/api-error';
 import type { ErrorAction } from '@/lib/error-messages';
+import { InfoTooltip } from '@/components/shared/info-tooltip';
 import { targetSchema, type TargetFormValues } from '@/features/diet/schemas/diet.schema';
 import {
   useCalculateTargetMutation,
@@ -34,6 +35,12 @@ const labels = {
   targetProteinGrams: 'Protein (g)',
   targetCarbsGrams: 'Carbohydrate (g)',
   targetFatGrams: 'Chất béo (g)',
+};
+const hints = {
+  targetCalories: 'Tổng năng lượng bạn muốn ăn mỗi ngày.',
+  targetProteinGrams: 'Đạm giúp giữ và xây cơ; 1 g protein ≈ 4 kcal.',
+  targetCarbsGrams: 'Tinh bột là nguồn năng lượng chính; 1 g carb ≈ 4 kcal.',
+  targetFatGrams: 'Chất béo cần cho hormone và hấp thu vitamin; 1 g chất béo ≈ 9 kcal.',
 };
 
 export default function TargetsPage() {
@@ -93,16 +100,16 @@ export default function TargetsPage() {
   return (
     <div className="container mx-auto max-w-3xl px-4 py-8 sm:px-6">
       <div className="mb-6">
-        <Button variant="outline" asChild>
-          <Link href="/diet">Về nhật ký</Link>
-        </Button>
+        <p className="text-sm text-muted-foreground">
+          Chỉ số dưới đây là mục tiêu mỗi ngày; bạn có thể để Longevia tính giúp hoặc tự nhập.
+        </p>
       </div>
       <Card>
         <CardHeader>
           <CardTitle>Mục tiêu dinh dưỡng</CardTitle>
           <CardDescription>
-            Tự nhập mục tiêu, hoặc để Longevia tính từ hồ sơ và cân nặng gần nhất. BMR là năng lượng
-            cơ thể cần khi nghỉ ngơi; TDEE là tổng năng lượng bạn tiêu hao mỗi ngày.
+            Mục tiêu calo và macro bạn muốn duy trì mỗi ngày. Bấm “Tính tự động” để Longevia đề xuất
+            từ hồ sơ, hoặc tự nhập rồi bấm “Lưu thủ công”.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -134,14 +141,22 @@ export default function TargetsPage() {
               )}
               {query.data && (
                 <div className="mb-5 grid gap-3 rounded-lg bg-muted/60 p-4 sm:grid-cols-2">
-                  <p>
-                    BMR:{' '}
+                  <p className="flex items-center gap-1.5">
+                    BMR:
+                    <InfoTooltip
+                      label="BMR là gì?"
+                      content="BMR (Basal Metabolic Rate) là năng lượng cơ thể dùng khi nghỉ hoàn toàn — chỉ để duy trì tim đập, hô hấp, nhiệt độ."
+                    />
                     <strong>
                       {query.data.bmr === null ? 'Chưa tính' : `${query.data.bmr} kcal`}
                     </strong>
                   </p>
-                  <p>
-                    TDEE:{' '}
+                  <p className="flex items-center gap-1.5">
+                    TDEE:
+                    <InfoTooltip
+                      label="TDEE là gì?"
+                      content="TDEE (Total Daily Energy Expenditure) là tổng năng lượng bạn tiêu hao mỗi ngày, gồm BMR cộng vận động và tiêu hóa."
+                    />
                     <strong>
                       {query.data.tdee === null ? 'Chưa tính' : `${query.data.tdee} kcal`}
                     </strong>
@@ -159,7 +174,10 @@ export default function TargetsPage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   {fields.map((field) => (
                     <div key={field} className="space-y-2">
-                      <Label htmlFor={field}>{labels[field]}</Label>
+                      <div className="flex items-center gap-1.5">
+                        <Label htmlFor={field}>{labels[field]}</Label>
+                        <InfoTooltip label={hints[field]} content={hints[field]} />
+                      </div>
                       <Input
                         id={field}
                         type="number"

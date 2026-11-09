@@ -3,7 +3,6 @@
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -221,9 +220,6 @@ export default function FoodsPage() {
             Tìm món hoặc thêm món riêng cho tài khoản của bạn.
           </p>
         </div>
-        <Button variant="outline" asChild>
-          <Link href="/diet">Về nhật ký</Link>
-        </Button>
       </div>
       <div className="mt-6 grid gap-5 lg:grid-cols-[1.3fr_0.7fr]">
         <Card>

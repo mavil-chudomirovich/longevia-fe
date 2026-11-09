@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getApiErrorMessage } from '@/lib/api-error';
+import { CitationChipList } from '@/components/shared/citation-chip';
+import { MarkdownText } from '@/components/shared/markdown-text';
+import { longevityComponentLabel } from '@/features/progress/mappers/progress-labels';
 import { useLongevityQuery } from '@/features/progress/queries/progress-ai.queries';
 
 export default function LongevityPage() {
@@ -62,12 +65,12 @@ export default function LongevityPage() {
               <Card key={item.key}>
                 <CardHeader>
                   <CardTitle className="text-base">
-                    {item.key} · {item.score}/100
+                    {longevityComponentLabel(item.key)} · {item.score}/100
                   </CardTitle>
                   <CardDescription>Trọng số {item.weight}%</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground">{item.reason}</p>
+                  <MarkdownText content={item.reason} compact className="text-muted-foreground" />
                 </CardContent>
               </Card>
             ))}
@@ -84,12 +87,7 @@ export default function LongevityPage() {
               </ul>
             </CardContent>
           </Card>
-          {data.citations.map((c, i) => (
-            <p key={`${c.sourceFile}-${i}`} className="rounded bg-muted p-3 text-sm">
-              “{c.quote}” — {c.chapterTitle}, tr. {c.bookPage};{' '}
-              {c.verified ? 'đã xác minh' : 'chưa kiểm chứng'}
-            </p>
-          ))}
+          <CitationChipList citations={data.citations} />
           <p className="text-sm text-muted-foreground">{data.disclaimer}</p>
         </div>
       ) : null}

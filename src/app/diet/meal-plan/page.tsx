@@ -1,11 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { getApiErrorMessage } from '@/lib/api-error';
+import { CitationChipList } from '@/components/shared/citation-chip';
+import { MarkdownText } from '@/components/shared/markdown-text';
+import { partitionWarnings } from '@/features/diet/utils/meal-plan-warnings';
 import {
   useGenerateMealPlanMutation,
   useMealPlanQuery,
@@ -27,6 +29,10 @@ export default function MealPlanPage() {
   const query = useMealPlanQuery(weekStart, requested);
   const generate = useGenerateMealPlanMutation();
   const plan = query.data;
+  const warnings = React.useMemo(
+    () => partitionWarnings(plan?.warnings ?? [], plan?.days.map((day) => day.date) ?? []),
+    [plan]
+  );
   const error = query.error ?? generate.error;
 
   const onCreate = async () => {
@@ -47,9 +53,6 @@ export default function MealPlanPage() {
             Kế hoạch được lưu lại để bạn mở lại bất cứ lúc nào.
           </p>
         </div>
-        <Button variant="outline" asChild>
-          <Link href="/diet">Về nhật ký</Link>
-        </Button>
       </div>
 
       <Card className="mt-6">
@@ -118,57 +121,70 @@ export default function MealPlanPage() {
               Kế hoạch dùng phương án dự phòng do nguồn AI không sẵn sàng.
             </p>
           )}
-          {plan.warnings.map((warning) => (
-            <p key={`${warning.code}-${warning.scope}`} className="rounded bg-muted p-3 text-sm">
+          {warnings.global.map((warning) => (
+            <p
+              key={`${warning.code}-${warning.scope}`}
+              className="rounded bg-amber-500/10 p-3 text-sm"
+            >
               {warning.message}
             </p>
           ))}
           <p className="text-sm text-muted-foreground">{plan.disclaimer}</p>
           <div className="grid gap-4 md:grid-cols-2">
-            {plan.days.map((day) => (
-              <Card key={day.date}>
-                <CardHeader>
-                  <CardTitle className="text-base">Ngày {day.date}</CardTitle>
-                  <CardDescription>
-                    {day.totalCalories} / {day.targetCalories} kcal · P{' '}
-                    {Math.round(day.totalProteinGrams)}g
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {day.calorieCapReached ? (
-                    <p className="text-sm">Đã chạm ngưỡng calo; chỉ còn gợi ý nhẹ.</p>
-                  ) : (
-                    day.meals.map((meal) => (
-                      <div key={meal.mealType} className="rounded border p-3 text-sm">
-                        <p className="font-medium">{meal.mealType}</p>
-                        <p className="text-muted-foreground">{meal.rationale}</p>
-                        <ul className="mt-2 list-disc pl-5">
-                          {meal.foods.map((food) => (
-                            <li key={food.foodId}>
-                              {food.name} · {food.servingSize}
-                              {food.servingUnit} · {food.calories} kcal
-                            </li>
-                          ))}
-                        </ul>
-                        {meal.citations.map((citation, index) => (
-                          <p
-                            key={`${citation.sourceFile}-${index}`}
-                            className="mt-2 text-xs text-muted-foreground"
-                          >
-                            “{citation.quote}” — {citation.chapterTitle}, tr. {citation.bookPage}
-                          </p>
-                        ))}
+            {plan.days.map((day) => {
+              const dayWarnings = warnings.byDate[day.date] ?? [];
+
+              return (
+                <Card key={day.date}>
+                  <CardHeader>
+                    <CardTitle className="text-base">Ngày {day.date}</CardTitle>
+                    <CardDescription>
+                      {day.totalCalories} / {day.targetCalories} kcal · P{' '}
+                      {Math.round(day.totalProteinGrams)}g
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {dayWarnings.map((warning) => (
+                      <p
+                        key={`${warning.code}-${warning.scope}`}
+                        className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-900 dark:text-amber-200"
+                      >
+                        {warning.message}
+                      </p>
+                    ))}
+                    {day.calorieCapReached ? (
+                      <p className="text-sm">Đã chạm ngưỡng calo; chỉ còn gợi ý nhẹ.</p>
+                    ) : (
+                      day.meals.map((meal) => (
+                        <div key={meal.mealType} className="rounded border p-3 text-sm">
+                          <p className="font-medium">{meal.mealType}</p>
+                          <MarkdownText
+                            content={meal.rationale}
+                            compact
+                            className="text-muted-foreground"
+                          />
+                          <ul className="mt-2 list-disc pl-5">
+                            {meal.foods.map((food) => (
+                              <li key={food.foodId}>
+                                {food.name} · {food.servingSize}
+                                {food.servingUnit} · {food.calories} kcal
+                              </li>
+                            ))}
+                          </ul>
+                          <CitationChipList citations={meal.citations} className="mt-2" />
+                        </div>
+                      ))
+                    )}
+                    {day.suggestions.map((suggestion, index) => (
+                      <div key={index} className="space-y-1.5 rounded bg-muted p-2">
+                        <MarkdownText content={suggestion.text} compact />
+                        <CitationChipList citations={suggestion.citations} />
                       </div>
-                    ))
-                  )}
-                  {day.suggestions.map((suggestion, index) => (
-                    <p key={index} className="rounded bg-muted p-2 text-sm">
-                      {suggestion.text}
-                    </p>
-                  ))}
-                </CardContent>
-              </Card>
-            ))}
+                    ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </div>
       ) : (

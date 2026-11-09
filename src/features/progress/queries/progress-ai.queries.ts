@@ -11,14 +11,14 @@ export const progressAiKeys = {
     [...progressAiKeys.all, 'longevity', userId, days] as const,
 };
 
-function session() {
+function useProgressAiSession() {
   const userId = useAuthStore((state) => state.user?.id);
   const authenticated = useAuthStore((state) => state.isAuthenticated);
   return { userId: userId ?? '', enabled: Boolean(authenticated && userId) };
 }
 
 export function useWorkoutPlanQuery(weekStartDate: string, enabled: boolean) {
-  const { userId, enabled: authenticated } = session();
+  const { userId, enabled: authenticated } = useProgressAiSession();
   return useQuery({
     queryKey: progressAiKeys.workout(userId, weekStartDate),
     queryFn: ({ signal }) => progressAiApi.getWorkoutPlan(weekStartDate, signal),
@@ -56,7 +56,7 @@ export function useGenerateWorkoutPlanMutation() {
 }
 
 export function useLongevityQuery(days: number) {
-  const { userId, enabled } = session();
+  const { userId, enabled } = useProgressAiSession();
   return useQuery({
     queryKey: progressAiKeys.longevity(userId, days),
     queryFn: ({ signal }) => progressAiApi.getLongevity(days, signal),

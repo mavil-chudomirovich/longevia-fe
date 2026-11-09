@@ -49,24 +49,6 @@ export default function DietPage() {
           <p className="mt-1 text-muted-foreground">Theo dõi những gì bạn ăn mỗi ngày.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/diet/foods">Danh mục món</Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/diet/targets">Mục tiêu</Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/diet/suggestions">Gợi ý AI</Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/diet/meal-plan">Kế hoạch tuần</Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/diet/nutrients">Vi chất</Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/knowledge">Hỏi sách</Link>
-          </Button>
           <Button onClick={() => setDialogOpen(true)}>Ghi bữa ăn</Button>
         </div>
       </div>

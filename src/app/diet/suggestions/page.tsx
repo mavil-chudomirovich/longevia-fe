@@ -8,6 +8,9 @@ import { LogMealDialog } from '@/features/diet/components/log-meal-dialog';
 import { useRecommendationsQuery } from '@/features/diet/queries/diet.queries';
 import type { MealSuggestionModel } from '@/features/diet/types/diet.model';
 import { getApiErrorAction, getApiErrorMessage } from '@/lib/api-error';
+import { CitationChipList } from '@/components/shared/citation-chip';
+import { InfoTooltip } from '@/components/shared/info-tooltip';
+import { MarkdownText } from '@/components/shared/markdown-text';
 
 export default function SuggestionsPage() {
   const [mealType, setMealType] = React.useState('Breakfast');
@@ -30,9 +33,6 @@ export default function SuggestionsPage() {
             Gợi ý dựa trên mục tiêu, hồ sơ và nhật ký hiện tại.
           </p>
         </div>
-        <Button variant="outline" asChild>
-          <Link href="/diet">Về nhật ký</Link>
-        </Button>
       </div>
       <Card className="mt-6">
         <CardContent className="grid gap-4 pt-6 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
@@ -123,19 +123,8 @@ export default function SuggestionsPage() {
                 <CardTitle>Mẹo trường thọ</CardTitle>
               </CardHeader>
               <CardContent>
-                <p>{query.data.longevityTip}</p>
-                {query.data.tipCitations.map((citation, index) => (
-                  <p
-                    key={`${citation.sourceFile}-${index}`}
-                    className="mt-3 rounded bg-muted p-3 text-sm"
-                  >
-                    “{citation.quote}”{' '}
-                    <span className="text-muted-foreground">
-                      — {citation.chapterTitle}, trang {citation.bookPage};{' '}
-                      {citation.verified ? 'đã xác minh' : 'chưa kiểm chứng'}
-                    </span>
-                  </p>
-                ))}
+                <MarkdownText content={query.data.longevityTip} />
+                <CitationChipList citations={query.data.tipCitations} className="mt-3" />
               </CardContent>
             </Card>
             <section className="grid gap-4 md:grid-cols-2">
@@ -150,21 +139,35 @@ export default function SuggestionsPage() {
                   <CardContent className="space-y-3">
                     <p className="text-sm">{meal.description}</p>
                     <p className="text-sm text-muted-foreground">{meal.rationale}</p>
-                    <p className="text-sm">
-                      P {meal.proteinGrams}g · C {meal.carbsGrams}g · F {meal.fatGrams}g
-                    </p>
-                    {meal.citations.map((citation, index) => (
-                      <p
-                        key={`${citation.sourceFile}-${index}`}
-                        className="rounded bg-muted p-3 text-sm"
-                      >
-                        “{citation.quote}”{' '}
-                        <span className="text-muted-foreground">
-                          — {citation.chapterTitle}, tr. {citation.bookPage};{' '}
-                          {citation.verified ? 'đã xác minh' : 'chưa kiểm chứng'}
-                        </span>
-                      </p>
-                    ))}
+                    <div className="flex flex-wrap items-center gap-1.5 text-sm">
+                      <span>
+                        <strong>P</strong> {meal.proteinGrams}g
+                        <InfoTooltip
+                          label="P là gì?"
+                          content="P = Protein (đạm): giúp giữ cơ, no lâu; 1 g ≈ 4 kcal."
+                          className="ml-1 align-middle"
+                        />
+                      </span>
+                      <span className="text-muted-foreground">·</span>
+                      <span>
+                        <strong>C</strong> {meal.carbsGrams}g
+                        <InfoTooltip
+                          label="C là gì?"
+                          content="C = Carbohydrate (tinh bột): nguồn năng lượng chính; 1 g ≈ 4 kcal."
+                          className="ml-1 align-middle"
+                        />
+                      </span>
+                      <span className="text-muted-foreground">·</span>
+                      <span>
+                        <strong>F</strong> {meal.fatGrams}g
+                        <InfoTooltip
+                          label="F là gì?"
+                          content="F = Fat (chất béo): cần cho hormone và hấp thu vitamin; 1 g ≈ 9 kcal."
+                          className="ml-1 align-middle"
+                        />
+                      </span>
+                    </div>
+                    <CitationChipList citations={meal.citations} />
                     {!query.data?.calorieCapReached && (
                       <Button
                         onClick={() => {

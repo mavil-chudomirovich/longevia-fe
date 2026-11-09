@@ -35,7 +35,7 @@ const NAV_ITEMS = [
   { label: 'Trang chủ', href: '/', icon: House },
   { label: 'Dinh dưỡng', href: '/diet', icon: Apple },
   { label: 'Gợi ý AI', href: '/diet/suggestions', icon: Sparkles },
-  { label: 'Tri thức', href: '/knowledge', icon: BookOpen },
+  { label: 'Hỏi sách', href: '/knowledge', icon: BookOpen },
   { label: 'Tiến trình', href: '/progress', icon: LineChart },
 ];
 

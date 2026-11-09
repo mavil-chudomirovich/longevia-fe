@@ -1,11 +1,11 @@
 'use client';
 
 import * as React from 'react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { getApiErrorMessage } from '@/lib/api-error';
+import { CitationChipList } from '@/components/shared/citation-chip';
 import { useNutrientGapsQuery } from '@/features/diet/queries/diet.queries';
 
 export default function NutrientGapsPage() {
@@ -23,9 +23,6 @@ export default function NutrientGapsPage() {
             Dựa trên nhật ký ăn uống {days} ngày gần nhất.
           </p>
         </div>
-        <Button variant="outline" asChild>
-          <Link href="/diet">Về nhật ký</Link>
-        </Button>
       </div>
 
       <Card className="mt-6">
@@ -100,12 +97,7 @@ export default function NutrientGapsPage() {
               )}
             </CardContent>
           </Card>
-          {data.citations.map((citation, index) => (
-            <p key={`${citation.sourceFile}-${index}`} className="rounded bg-muted p-3 text-sm">
-              “{citation.quote}” — {citation.chapterTitle}, tr. {citation.bookPage};{' '}
-              {citation.verified ? 'đã xác minh' : 'chưa kiểm chứng'}
-            </p>
-          ))}
+          <CitationChipList citations={data.citations} />
           <p className="text-sm text-muted-foreground">{data.disclaimer}</p>
         </div>
       ) : null}

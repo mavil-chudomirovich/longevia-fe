@@ -137,12 +137,19 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
    * - dto = null hoặc undefined: trả về null (trạng thái hợp lệ: không có phiên nhịn ăn nào).
    * - dto là object nhưng thiếu sessionId hoặc timestamp không hợp lệ: ném ProgressDataIntegrityError (không ngụy tạo thành null).
    */
-  toCurrentFastingSession(dto?: CurrentFastingResponseDto | null): CurrentFastingSession | null {
+  /**
+   * `GET /fasting/current` trả 204/body rỗng khi người dùng chưa có phiên nào —
+   * đó là trạng thái hợp lệ (chưa bắt đầu), không phải lỗi dữ liệu.
+   */
+  toCurrentFastingSession(dto?: unknown): CurrentFastingSession | null {
     if (dto === null || dto === undefined) {
       return null;
     }
 
-    if (typeof dto !== 'object') {
+    if (typeof dto === 'string') {
+      if (dto.trim().length === 0) {
+        return null;
+      }
       throw new ProgressDataIntegrityError(
         'dto',
         'PROGRESS_DATA_INTEGRITY_VIOLATION',
@@ -150,7 +157,16 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
       );
     }
 
-    const sessionId = safeString(dto.sessionId).trim();
+    if (typeof dto !== 'object' || Array.isArray(dto)) {
+      throw new ProgressDataIntegrityError(
+        'dto',
+        'PROGRESS_DATA_INTEGRITY_VIOLATION',
+        'CurrentFasting'
+      );
+    }
+
+    const session = dto as CurrentFastingResponseDto;
+    const sessionId = safeString(session.sessionId).trim();
     if (!sessionId) {
       throw new ProgressDataIntegrityError(
         'sessionId',
@@ -160,23 +176,23 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
       );
     }
 
-    const startedAt = parseRequiredInstant(dto.startedAt, 'startedAt', 'CurrentFasting');
+    const startedAt = parseRequiredInstant(session.startedAt, 'startedAt', 'CurrentFasting');
     const targetEndedAt = parseRequiredInstant(
-      dto.targetEndedAt,
+      session.targetEndedAt,
       'targetEndedAt',
       'CurrentFasting'
     );
 
-    const targetHours = safeNumber(dto.targetHours, 16);
-    const elapsedHours = Math.max(0, safeNumber(dto.elapsedHours, 0));
-    const remainingHours = Math.max(0, safeNumber(dto.remainingHours, 0));
+    const targetHours = safeNumber(session.targetHours, 16);
+    const elapsedHours = Math.max(0, safeNumber(session.elapsedHours, 0));
+    const remainingHours = Math.max(0, safeNumber(session.remainingHours, 0));
 
     const progressPercent = targetHours > 0 ? Math.round((elapsedHours / targetHours) * 100) : 0;
     const visualPercent = Math.min(100, Math.max(0, progressPercent));
 
     return {
       sessionId,
-      protocol: safeString(dto.protocol, '16:8'),
+      protocol: safeString(session.protocol, '16:8'),
       startedAt,
       targetEndedAt,
       targetHours,

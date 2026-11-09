@@ -4,6 +4,33 @@
 
 ---
 
+## [2026-11-09] Phase 1 UI/UX: markdown, citation chip, sub-nav Dinh dưỡng, sửa lỗi trạng thái
+
+- **Vấn đề**:
+  - `/knowledge` là trang mồ côi (không header/footer), tiêu đề "Tri thức" khó hiểu.
+  - Trích dẫn hiện inline dài dòng kèm "đã xác minh / chưa kiểm chứng" ở 5 màn hình; nội dung sách/AI không render markdown.
+  - `/diet` tự render cụm nút điều hướng, các trang con chỉ có "Về nhật ký" nên phải quay lại `/diet` mới đổi trang.
+  - `/progress/fasting` báo "sự cố kết nối" khi chưa có phiên nhịn ăn: API trả 204/body rỗng, mapper coi là dữ liệu sai.
+  - `/progress/longevity` và `/progress/workout` lộ key tiếng Anh (`fasting`, `walking`…).
+  - Cảnh báo thiếu chất xơ của meal plan bị dồn lên đầu trang thay vì nằm trong ngày tương ứng.
+- **Đã thực hiện**:
+  - Component dùng chung: `MarkdownText` (react-markdown + remark-gfm + remark-breaks, chặn HTML thô), `CitationChip`/`CitationChipList` (icon + popover hover, bấm mở được), `InfoTooltip`.
+  - `diet-subnav.tsx` + gắn vào `diet/layout.tsx`; bỏ cụm nút ở `/diet` và nút "Về nhật ký" ở 5 trang con.
+  - `knowledge/layout.tsx` (header/footer), đổi tiêu đề/nhãn menu thành "Hỏi sách"; trả lời + tra cứu render markdown; tra cứu sort theo chương/trang và dedupe.
+  - `/diet/targets`: thêm tooltip giải thích BMR, TDEE, calo, P/C/F.
+  - `/diet/suggestions`: tooltip P/C/F, citation chip; `/diet/meal-plan`: cảnh báo gắn theo ngày (`partitionWarnings`), markdown rationale/suggestion.
+  - `/progress/workout`, `/progress/longevity`: nhãn tiếng Việt qua `progress-labels.ts`, citation chip.
+  - Fasting: mapper coi `''`/204 là "không có phiên".
+  - Sửa lỗi lint có sẵn: đổi `session()` → `useProgressAiSession()` trong `progress-ai.queries.ts`.
+- **Kiểm chứng**:
+  - `npx tsc --noEmit`: 0 lỗi.
+  - `npm test`: 20 file, **205/205** test pass (thêm test markdown, citation order, partitionWarnings, nhãn tiếng Việt, fasting rỗng).
+  - `npm run lint`: 0 error.
+  - `npm run build`: 22 route thành công.
+- **Chưa làm (phase sau)**: chat + SSE, AI diễn giải mẹo trường thọ, AI gợi ý mục tiêu, viết lại rationale workout phía BE, lý do fallback meal plan.
+
+---
+
 ## [2026-11-09] Hoàn thiện các màn AI: meal plan, vi chất, tri thức, workout, longevity, digest
 
 - **Đã thêm**:

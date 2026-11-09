@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { getApiErrorMessage } from '@/lib/api-error';
+import { CitationChipList } from '@/components/shared/citation-chip';
+import { MarkdownText } from '@/components/shared/markdown-text';
+import { workoutActivityLabel } from '@/features/progress/mappers/progress-labels';
 import {
   useGenerateWorkoutPlanMutation,
   useWorkoutPlanQuery,
@@ -149,7 +152,7 @@ export default function WorkoutPage() {
       ) : plan ? (
         <div className="mt-6 space-y-4">
           {plan.warnings.map((w) => (
-            <p key={`${w.code}-${w.scope}`} className="rounded bg-muted p-3 text-sm">
+            <p key={`${w.code}-${w.scope}`} className="rounded bg-amber-500/10 p-3 text-sm">
               {w.message}
             </p>
           ))}
@@ -157,21 +160,26 @@ export default function WorkoutPage() {
             {plan.days.map((day) => (
               <Card key={day.date}>
                 <CardHeader>
-                  <CardTitle className="text-base">{day.date}</CardTitle>
+                  <CardTitle className="text-base">
+                    {day.restDay ? 'Ngày nghỉ' : workoutActivityLabel(day.activity)}
+                  </CardTitle>
                   <CardDescription>
+                    {day.date}
                     {day.restDay
-                      ? 'Ngày nghỉ'
-                      : `${day.activity} · ${day.durationMinutes} phút · ${day.intensity}`}
+                      ? ' · nghỉ hồi phục'
+                      : ` · ${day.durationMinutes} phút · ${day.intensity}`}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
-                  {!day.restDay && <p className="text-muted-foreground">{day.rationale}</p>}
+                  {!day.restDay && day.rationale && (
+                    <MarkdownText
+                      content={day.rationale}
+                      compact
+                      className="text-muted-foreground"
+                    />
+                  )}
                   {day.equipmentUsed.length > 0 && <p>Dụng cụ: {day.equipmentUsed.join(', ')}</p>}
-                  {day.citations.map((c, i) => (
-                    <p key={`${c.sourceFile}-${i}`} className="rounded bg-muted p-2 text-xs">
-                      “{c.quote}” — {c.chapterTitle}, tr. {c.bookPage}
-                    </p>
-                  ))}
+                  <CitationChipList citations={day.citations} />
                 </CardContent>
               </Card>
             ))}
