@@ -58,6 +58,24 @@ export interface CurrentFastingResponseDto {
   status: string;
 }
 
+export interface FastingHistoryItemDto {
+  sessionId?: string;
+  protocol?: string;
+  startedAt?: string;
+  endedAt?: string;
+  targetHours?: number;
+  actualHours?: number;
+  isGoalReached?: boolean;
+  status?: string;
+}
+
+export interface FastingHistoryPageDto {
+  page?: number;
+  pageSize?: number;
+  totalCount?: number;
+  items?: FastingHistoryItemDto[] | null;
+}
+
 // 3. Water
 export interface LogWaterRequestDto {
   amountMl: number;

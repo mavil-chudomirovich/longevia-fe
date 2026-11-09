@@ -1,9 +1,18 @@
-import { BaseMapper, pickField, safeNumber, safeString, safeArray } from '@/lib/mapper';
+import {
+  BaseMapper,
+  pickField,
+  safeBoolean,
+  safeNumber,
+  safeString,
+  safeArray,
+} from '@/lib/mapper';
 import {
   BodyMetricResponseDto,
   CurrentFastingResponseDto,
   DashboardSummaryResponseDto,
   EndFastingResponseDto,
+  FastingHistoryItemDto,
+  FastingHistoryPageDto,
   FastingSessionResponseDto,
   MetricsHistoryResponseDto,
   SleepResponseDto,
@@ -15,6 +24,7 @@ import {
   CurrentFastingSession,
   DashboardSummary,
   EndFastingResult,
+  FastingHistoryPageModel,
   FastingSessionResult,
   FastingStatusEnum,
   MetricsHistory,
@@ -203,6 +213,26 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
       isGoalReached: elapsedHours >= targetHours,
       status: FastingStatusEnum.IN_PROGRESS,
       statusLabel: 'Đang nhịn ăn',
+    };
+  }
+
+  toFastingHistoryPage(dto: FastingHistoryPageDto | null | undefined): FastingHistoryPageModel {
+    const items = safeArray<FastingHistoryItemDto>(dto?.items ?? []).map((item) => ({
+      sessionId: safeString(pickField(item, ['sessionId'], '')),
+      protocol: safeString(pickField(item, ['protocol'], '')),
+      startedAt: parseRequiredInstant(item.startedAt, 'startedAt', 'FastingHistory'),
+      endedAt: parseRequiredInstant(item.endedAt, 'endedAt', 'FastingHistory'),
+      targetHours: safeNumber(pickField(item, ['targetHours'], 0)),
+      actualHours: safeNumber(pickField(item, ['actualHours'], 0)),
+      isGoalReached: safeBoolean(pickField(item, ['isGoalReached'], false)),
+      status: safeString(pickField(item, ['status'], 'Completed')),
+    }));
+
+    return {
+      page: safeNumber(pickField(dto, ['page'], 1)),
+      pageSize: safeNumber(pickField(dto, ['pageSize'], 20)),
+      totalCount: safeNumber(pickField(dto, ['totalCount'], items.length)),
+      items,
     };
   }
 

@@ -33,6 +33,7 @@ export const API_ENDPOINTS = {
   PROGRESS: {
     DASHBOARD_SUMMARY: '/progress/dashboard/summary',
     FASTING_CURRENT: '/progress/fasting/current',
+    FASTING_HISTORY: '/progress/fasting/history',
     FASTING_START: '/progress/fasting/start',
     FASTING_END: '/progress/fasting/end',
     WATER_TODAY: '/progress/water/today',

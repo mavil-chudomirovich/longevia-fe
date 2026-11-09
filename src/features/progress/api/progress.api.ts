@@ -7,6 +7,7 @@ import {
   EndFastingRequestDto,
   EndFastingResponseDto,
   FastingSessionResponseDto,
+  FastingHistoryPageDto,
   GetMetricsHistoryParamsDto,
   LogBodyMetricRequestDto,
   LogSleepRequestDto,
@@ -21,6 +22,7 @@ import {
   CurrentFastingSession,
   DashboardSummary,
   EndFastingResult,
+  FastingHistoryPageModel,
   FastingSessionResult,
   GetMetricsHistoryFilters,
   MetricsHistory,
@@ -60,6 +62,19 @@ export const progressApi = {
       { signal }
     );
     return progressMapper.toCurrentFastingSession(res.data);
+  },
+
+  getFastingHistory: async (
+    page: number,
+    pageSize: number,
+    signal?: AbortSignal
+  ): Promise<FastingHistoryPageModel> => {
+    const res = await api.get<FastingHistoryPageDto>(API_ENDPOINTS.PROGRESS.FASTING_HISTORY, {
+      params: { page, pageSize },
+      signal,
+      silent: true,
+    });
+    return progressMapper.toFastingHistoryPage(res.data);
   },
 
   /**

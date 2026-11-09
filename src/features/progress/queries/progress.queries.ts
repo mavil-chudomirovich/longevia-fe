@@ -12,6 +12,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { progressApi } from '../api/progress.api';
 import {
   CurrentFastingSession,
+  FastingHistoryPageModel,
   DashboardSummary,
   EndFastingResult,
   FastingSessionResult,
@@ -54,6 +55,8 @@ export const progressKeys = {
   dashboard: (userId: string) => [...progressKeys.user(userId), 'dashboard'] as const,
   fasting: (userId: string) => [...progressKeys.user(userId), 'fasting'] as const,
   fastingCurrent: (userId: string) => [...progressKeys.fasting(userId), 'current'] as const,
+  fastingHistory: (userId: string, page: number, pageSize: number) =>
+    [...progressKeys.fasting(userId), 'history', page, pageSize] as const,
   water: (userId: string) => [...progressKeys.user(userId), 'water'] as const,
   waterToday: (userId: string, utcDate?: string) =>
     [...progressKeys.water(userId), 'today', utcDate ?? getUtcTodayDateString()] as const,
@@ -127,6 +130,19 @@ export function useCurrentFastingQuery(customUserId?: string) {
       // Tự động làm mới mỗi 60 giây nếu có phiên đang diễn ra
       return query.state.data ? 60 * 1000 : false;
     },
+  });
+}
+
+export function useFastingHistoryQuery(page: number, pageSize = 10, customUserId?: string) {
+  const { userId, isEnabled } = useProgressAuth(customUserId);
+
+  return useQuery<FastingHistoryPageModel>({
+    queryKey: progressKeys.fastingHistory(userId, page, pageSize),
+    queryFn: ({ signal }) => progressApi.getFastingHistory(page, pageSize, signal),
+    enabled: isEnabled,
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+    placeholderData: (previous) => previous,
   });
 }
 

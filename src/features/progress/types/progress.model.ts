@@ -58,6 +58,24 @@ export interface CurrentFastingSession {
   statusLabel: string;
 }
 
+export interface FastingHistoryItemModel {
+  sessionId: string;
+  protocol: string;
+  startedAt: Date;
+  endedAt: Date;
+  targetHours: number;
+  actualHours: number;
+  isGoalReached: boolean;
+  status: string;
+}
+
+export interface FastingHistoryPageModel {
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  items: FastingHistoryItemModel[];
+}
+
 export interface FastingSessionResult {
   sessionId: string;
   protocol: string;
