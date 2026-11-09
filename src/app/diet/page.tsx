@@ -58,6 +58,15 @@ export default function DietPage() {
           <Button variant="outline" asChild>
             <Link href="/diet/suggestions">Gợi ý AI</Link>
           </Button>
+          <Button variant="outline" asChild>
+            <Link href="/diet/meal-plan">Kế hoạch tuần</Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/diet/nutrients">Vi chất</Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/knowledge">Hỏi sách</Link>
+          </Button>
           <Button onClick={() => setDialogOpen(true)}>Ghi bữa ăn</Button>
         </div>
       </div>

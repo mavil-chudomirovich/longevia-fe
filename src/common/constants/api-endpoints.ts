@@ -22,6 +22,10 @@ export const API_ENDPOINTS = {
     MEALS: '/diet/meals',
     DAILY_SUMMARY: '/diet/meals/daily-summary',
     AI_RECOMMENDATIONS: '/diet/meals/ai-recommendations',
+    MEAL_PLANS: '/diet/meal-plans',
+    NUTRIENT_GAPS: '/diet/nutrition/nutrient-gaps',
+    KNOWLEDGE_ASK: '/diet/knowledge/ask',
+    KNOWLEDGE_SEARCH: '/diet/knowledge/search',
   },
   PROGRESS: {
     DASHBOARD_SUMMARY: '/progress/dashboard/summary',

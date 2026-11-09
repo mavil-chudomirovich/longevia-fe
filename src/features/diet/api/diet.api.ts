@@ -1,6 +1,8 @@
 import api from '@/lib/axios';
 import { API_ENDPOINTS } from '@/common/constants/api-endpoints';
 import { dietMapper } from '../mappers/diet.mapper';
+import { mealPlanMapper } from '../mappers/meal-plan.mapper';
+import { nutritionMapper } from '../mappers/nutrition.mapper';
 import type {
   CreateFoodDto,
   DailySummaryDto,
@@ -10,6 +12,8 @@ import type {
   RecommendationsDto,
   TargetDto,
 } from '../types/diet.dto';
+import type { MealPlanDto, GenerateMealPlanDto } from '../types/meal-plan.dto';
+import type { NutrientGapDto } from '../types/nutrition.dto';
 import type { CreateFoodValues, TargetFormValues } from '../schemas/diet.schema';
 import type {
   DailySummaryModel,
@@ -18,6 +22,8 @@ import type {
   RecommendationsModel,
   TargetModel,
 } from '../types/diet.model';
+import type { MealPlanModel } from '../types/meal-plan.model';
+import type { NutrientGapModel } from '../types/nutrition.model';
 
 export const dietApi = {
   getFoods: async (
@@ -76,5 +82,36 @@ export const dietApi = {
       silent: true,
     });
     return dietMapper.toRecommendations(response.data);
+  },
+  getMealPlan: async (weekStartDate: string, signal?: AbortSignal): Promise<MealPlanModel> => {
+    const response = await api.get<MealPlanDto>(
+      `${API_ENDPOINTS.DIET.MEAL_PLANS}/${weekStartDate}`,
+      {
+        signal,
+        silent: true,
+      }
+    );
+    return mealPlanMapper.toModel(response.data);
+  },
+  generateMealPlan: async (
+    weekStartDate: string,
+    days: number,
+    mealsPerDay: number,
+    signal: AbortSignal
+  ): Promise<MealPlanModel> => {
+    const payload: GenerateMealPlanDto = mealPlanMapper.toRequest(weekStartDate, days, mealsPerDay);
+    const response = await api.post<MealPlanDto>(API_ENDPOINTS.DIET.MEAL_PLANS, payload, {
+      signal,
+      silent: true,
+    });
+    return mealPlanMapper.toModel(response.data);
+  },
+  getNutrientGaps: async (days: number, signal?: AbortSignal): Promise<NutrientGapModel> => {
+    const response = await api.get<NutrientGapDto>(API_ENDPOINTS.DIET.NUTRIENT_GAPS, {
+      params: { days },
+      signal,
+      silent: true,
+    });
+    return nutritionMapper.toModel(response.data);
   },
 };
