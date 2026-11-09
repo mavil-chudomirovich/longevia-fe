@@ -5,6 +5,7 @@ import { LineChart as ChartIcon, AlertTriangle, RotateCcw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BodyMetricRecord } from '../types/progress.model';
+import { getBusinessTodayDateString } from '@/lib/business-date';
 import { formatDateOnlyDisplay } from '../utils/progress-date';
 
 interface WeightTrendChartProps {
@@ -209,7 +210,7 @@ export function WeightTrendChart({ metrics, isLoading, isError, onRetry }: Weigh
                 />
                 <title>
                   {`${pt.metric.weightKg} kg (BMI: ${pt.metric.bmi.toFixed(1)}) - ${formatDateOnlyDisplay(
-                    pt.metric.loggedAt.toISOString().slice(0, 10)
+                    pt.metric.loggedAt && getBusinessTodayDateString(pt.metric.loggedAt)
                   )}`}
                 </title>
 

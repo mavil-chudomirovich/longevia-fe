@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { getApiErrorMessage } from '@/lib/api-error';
+import { getBusinessTodayDateString } from '@/lib/business-date';
 import { CitationChipList } from '@/components/shared/citation-chip';
 import { MarkdownText } from '@/components/shared/markdown-text';
 import { workoutActivityLabel } from '@/features/progress/mappers/progress-labels';
@@ -17,10 +18,10 @@ import {
 
 function nextMonday(): string {
   const now = new Date();
-  const day = now.getUTCDay();
+  const day = now.getDay();
   const delta = day === 1 ? 0 : (8 - day) % 7;
-  now.setUTCDate(now.getUTCDate() + delta);
-  return now.toISOString().slice(0, 10);
+  now.setDate(now.getDate() + delta);
+  return getBusinessTodayDateString(now);
 }
 
 export default function WorkoutPage() {

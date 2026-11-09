@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useDebounce } from '@/hooks/useDebounce';
+import { getBusinessTodayDateString } from '@/lib/business-date';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -66,7 +67,7 @@ export function LogMealDialog(props: LogMealDialogProps) {
 function LogMealDialogContent({ open, onOpenChange, suggested }: LogMealDialogProps) {
   const [search, setSearch] = React.useState(suggested?.name ?? '');
   const [mealType, setMealType] = React.useState('Breakfast');
-  const [date, setDate] = React.useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = React.useState(() => getBusinessTodayDateString());
   const [selected, setSelected] = React.useState<SelectedFood[]>(
     suggested ? [toSelected(suggested.foodId, suggested)] : []
   );

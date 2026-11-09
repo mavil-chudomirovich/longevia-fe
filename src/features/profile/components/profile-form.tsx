@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { ProfileModel } from '@/features/auth/types/auth.model';
+import { getBusinessTodayDateString } from '@/lib/business-date';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -84,7 +85,7 @@ export function ProfileForm({
           <Input
             id="birthDate"
             type="date"
-            max={new Date().toISOString().slice(0, 10)}
+            max={getBusinessTodayDateString()}
             {...form.register('birthDate')}
           />
           {form.formState.errors.birthDate && (

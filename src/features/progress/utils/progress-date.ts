@@ -9,6 +9,7 @@
  * - Khoảng thời gian (fasting/sleep) tính theo chênh lệch instant (mili-giây), không trừ wall-clock.
  */
 
+import { getBusinessTodayDateString, getMsUntilNextBusinessMidnight } from '@/lib/business-date';
 import { ProgressDataIntegrityError } from '../errors/progress-data-integrity.error';
 
 function isLeapYear(year: number): boolean {
@@ -107,16 +108,12 @@ export function parseRequiredInstant(
 }
 
 /**
- * Trả về chuỗi ngày YYYY-MM-DD theo lịch UTC.
- * Ví dụ: 00:30 ngày 05/11 tại Việt Nam (UTC+7) -> '2026-11-04' (vì UTC mới là 17:30 ngày 04/11).
- * Đến 07:00 ngày 05/11 tại Việt Nam (UTC+7) -> '2026-11-05' (UTC chạm 00:00 ngày 05/11).
+ * Ngày nghiệp vụ YYYY-MM-DD theo ADR006 (local, mặc định Asia/Ho_Chi_Minh).
+ * Giữ tên cũ để không phá call site; code mới nên dùng
+ * `getBusinessTodayDateString` từ `@/lib/business-date`.
  */
 export function getUtcTodayDateString(referenceDate?: Date): string {
-  const d = referenceDate ?? new Date();
-  const year = d.getUTCFullYear();
-  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return getBusinessTodayDateString(referenceDate);
 }
 
 /**
@@ -268,15 +265,5 @@ export function localInputToUtcIsoString(localDateTimeString: string): string {
  * Dùng cho scheduler tự động làm mới dữ liệu chu kỳ ngày (nước uống, dashboard).
  */
 export function getMsUntilNextUtcMidnight(referenceDate?: Date): number {
-  const d = referenceDate ?? new Date();
-  const nextMidnightUtc = Date.UTC(
-    d.getUTCFullYear(),
-    d.getUTCMonth(),
-    d.getUTCDate() + 1,
-    0,
-    0,
-    0,
-    0
-  );
-  return Math.max(0, nextMidnightUtc - d.getTime());
+  return getMsUntilNextBusinessMidnight(referenceDate);
 }

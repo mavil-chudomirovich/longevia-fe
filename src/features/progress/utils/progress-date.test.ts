@@ -14,28 +14,23 @@ import {
   getMsUntilNextUtcMidnight,
 } from './progress-date';
 
-describe('Progress Date Utilities (Q01 / ADR005 Canonical UTC Policy)', () => {
-  describe('getUtcTodayDateString - VN midnight vs UTC midnight boundaries', () => {
-    it('returns previous day for Vietnam 00:30 (still previous day in UTC)', () => {
-      // 2026-11-05T00:30:00+07:00 is 2026-11-04T17:30:00.000Z
-      const dateVnMidnight = new Date('2026-11-04T17:30:00.000Z');
-      expect(getUtcTodayDateString(dateVnMidnight)).toBe('2026-11-04');
+describe('Progress Date Utilities (ADR006 business-local day)', () => {
+  describe('getUtcTodayDateString - local business day', () => {
+    it('returns the local day around local midnight', () => {
+      const lateNight = new Date(2026, 10, 4, 23, 59, 59);
+      expect(getUtcTodayDateString(lateNight)).toBe('2026-11-04');
+
+      const justAfterMidnight = new Date(2026, 10, 5, 0, 0, 1);
+      expect(getUtcTodayDateString(justAfterMidnight)).toBe('2026-11-05');
     });
 
-    it('returns previous day for Vietnam 06:59:59 (+07:00)', () => {
-      // 2026-11-05T06:59:59+07:00 is 2026-11-04T23:59:59.000Z
-      const dateVnJustBeforeUtcMidnight = new Date('2026-11-04T23:59:59.000Z');
-      expect(getUtcTodayDateString(dateVnJustBeforeUtcMidnight)).toBe('2026-11-04');
-    });
-
-    it('advances to new day exactly at Vietnam 07:00:00 (+07:00) when UTC reaches 00:00', () => {
-      // 2026-11-05T07:00:00+07:00 is 2026-11-05T00:00:00.000Z
-      const dateVnUtcMidnight = new Date('2026-11-05T00:00:00.000Z');
-      expect(getUtcTodayDateString(dateVnUtcMidnight)).toBe('2026-11-05');
+    it('does not shift the day because of UTC offset', () => {
+      const earlyMorning = new Date(2026, 10, 5, 0, 30, 0);
+      expect(getUtcTodayDateString(earlyMorning)).toBe('2026-11-05');
     });
 
     it('formats single-digit months and days with leading zeros', () => {
-      const date = new Date('2026-03-05T12:00:00.000Z');
+      const date = new Date(2026, 2, 5, 12, 0, 0);
       expect(getUtcTodayDateString(date)).toBe('2026-03-05');
     });
   });
@@ -156,21 +151,20 @@ describe('Progress Date Utilities (Q01 / ADR005 Canonical UTC Policy)', () => {
   });
 
   describe('getMsUntilNextUtcMidnight', () => {
-    it('calculates exact milliseconds until next UTC midnight', () => {
-      // 2026-11-04 22:00:00.000 UTC -> next midnight is 2026-11-05 00:00:00.000 UTC (2 hours = 7,200,000 ms)
-      const ref = new Date(Date.UTC(2026, 10, 4, 22, 0, 0, 0));
+    it('calculates exact milliseconds until next local midnight', () => {
+      const ref = new Date(2026, 10, 4, 22, 0, 0, 0);
       const ms = getMsUntilNextUtcMidnight(ref);
       expect(ms).toBe(2 * 60 * 60 * 1000);
     });
 
-    it('calculates 1 millisecond before UTC midnight', () => {
-      const ref = new Date(Date.UTC(2026, 10, 4, 23, 59, 59, 999));
+    it('calculates 1 millisecond before local midnight', () => {
+      const ref = new Date(2026, 10, 4, 23, 59, 59, 999);
       const ms = getMsUntilNextUtcMidnight(ref);
       expect(ms).toBe(1);
     });
 
-    it('calculates full 24 hours at exact 00:00:00 UTC', () => {
-      const ref = new Date(Date.UTC(2026, 10, 4, 0, 0, 0, 0));
+    it('calculates full 24 hours at exact local midnight', () => {
+      const ref = new Date(2026, 10, 4, 0, 0, 0, 0);
       const ms = getMsUntilNextUtcMidnight(ref);
       expect(ms).toBe(24 * 60 * 60 * 1000);
     });
