@@ -128,7 +128,7 @@ export default function TargetsPage() {
     });
 
   return (
-    <div className="container mx-auto max-w-3xl px-4 py-8 sm:px-6">
+    <div className="container mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <div className="mb-6">
         <p className="text-sm text-muted-foreground">
           Chỉ số dưới đây là mục tiêu mỗi ngày; bạn có thể để Longevia tính giúp hoặc tự nhập.
@@ -145,7 +145,7 @@ export default function TargetsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+            <div className="grid gap-3">
               <div className="space-y-2">
                 <Label htmlFor="suggest-description">Mô tả mong muốn</Label>
                 <Textarea
@@ -161,7 +161,7 @@ export default function TargetsPage() {
                 <Label htmlFor="suggest-goal">Mục tiêu</Label>
                 <select
                   id="suggest-goal"
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm sm:w-40"
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={goal}
                   onChange={(event) => setGoal(event.target.value)}
                 >
