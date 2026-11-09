@@ -9,6 +9,7 @@ import { getApiErrorMessage } from '@/lib/api-error';
 import { CitationChipList } from '@/components/shared/citation-chip';
 import { MarkdownText } from '@/components/shared/markdown-text';
 import { workoutActivityLabel } from '@/features/progress/mappers/progress-labels';
+import { describeAiFallback } from '@/lib/ai-fallback';
 import {
   useGenerateWorkoutPlanMutation,
   useWorkoutPlanQuery,
@@ -33,6 +34,7 @@ export default function WorkoutPage() {
   const generate = useGenerateWorkoutPlanMutation();
   const error = query.error ?? generate.error;
   const plan = query.data;
+  const fallbackInfo = plan ? describeAiFallback(plan.usedFallbackReason) : null;
 
   return (
     <div className="container mx-auto max-w-5xl px-4 py-8 sm:px-6">
@@ -151,6 +153,21 @@ export default function WorkoutPage() {
         </Card>
       ) : plan ? (
         <div className="mt-6 space-y-4">
+          {plan.usedFallback && fallbackInfo && (
+            <div className="space-y-2 rounded border border-amber-500/30 bg-amber-500/10 p-3">
+              <p className="text-sm">{fallbackInfo.message}</p>
+              {fallbackInfo.retryable && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setRequested(true)}
+                  disabled={generate.isPending}
+                >
+                  Thử tạo lại
+                </Button>
+              )}
+            </div>
+          )}
           {plan.warnings.map((w) => (
             <p key={`${w.code}-${w.scope}`} className="rounded bg-amber-500/10 p-3 text-sm">
               {w.message}
@@ -161,7 +178,9 @@ export default function WorkoutPage() {
               <Card key={day.date}>
                 <CardHeader>
                   <CardTitle className="text-base">
-                    {day.restDay ? 'Ngày nghỉ' : workoutActivityLabel(day.activity)}
+                    {day.restDay
+                      ? 'Ngày nghỉ'
+                      : day.activityLabel || workoutActivityLabel(day.activity)}
                   </CardTitle>
                   <CardDescription>
                     {day.date}

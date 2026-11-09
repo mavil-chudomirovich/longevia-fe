@@ -8,6 +8,7 @@ import { getApiErrorMessage } from '@/lib/api-error';
 import { CitationChipList } from '@/components/shared/citation-chip';
 import { MarkdownText } from '@/components/shared/markdown-text';
 import { partitionWarnings } from '@/features/diet/utils/meal-plan-warnings';
+import { describeAiFallback } from '@/lib/ai-fallback';
 import {
   useGenerateMealPlanMutation,
   useMealPlanQuery,
@@ -34,6 +35,7 @@ export default function MealPlanPage() {
     [plan]
   );
   const error = query.error ?? generate.error;
+  const fallbackInfo = plan ? describeAiFallback(plan.usedFallbackReason) : null;
 
   const onCreate = async () => {
     setRequested(true);
@@ -116,10 +118,20 @@ export default function MealPlanPage() {
         </Card>
       ) : plan ? (
         <div className="mt-6 space-y-4">
-          {plan.usedFallback && (
-            <p className="rounded bg-amber-500/10 p-3 text-sm">
-              Kế hoạch dùng phương án dự phòng do nguồn AI không sẵn sàng.
-            </p>
+          {plan.usedFallback && fallbackInfo && (
+            <div className="space-y-2 rounded border border-amber-500/30 bg-amber-500/10 p-3">
+              <p className="text-sm">{fallbackInfo.message}</p>
+              {fallbackInfo.retryable && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void onCreate()}
+                  disabled={generate.isPending}
+                >
+                  Thử tạo lại
+                </Button>
+              )}
+            </div>
           )}
           {warnings.global.map((warning) => (
             <p

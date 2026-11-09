@@ -12,6 +12,7 @@ export interface WorkoutPlanDayDto {
   date?: string;
   restDay?: boolean;
   activity?: string;
+  activityLabel?: string;
   durationMinutes?: number;
   intensity?: string;
   equipmentUsed?: string[] | null;
@@ -32,6 +33,7 @@ export interface WorkoutPlanDto {
   sessionsScheduled?: number;
   minutesPerSession?: number;
   usedFallback?: boolean;
+  usedFallbackReason?: string;
   disclaimer?: string;
   warnings?: WorkoutWarningDto[] | null;
   days?: WorkoutPlanDayDto[] | null;

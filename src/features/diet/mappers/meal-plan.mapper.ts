@@ -94,6 +94,7 @@ export const mealPlanMapper = {
       weeklyTargetFatGrams: safeNumber(pickField(dto, ['weeklyTargetFatGrams'], 0)),
       weeklyTargetFiberGrams: safeNumber(pickField(dto, ['weeklyTargetFiberGrams'], 0)),
       usedFallback: safeBoolean(pickField(dto, ['usedFallback'], false)),
+      usedFallbackReason: safeString(pickField(dto, ['usedFallbackReason'], '')) || null,
       disclaimer: safeString(pickField(dto, ['disclaimer'], '')),
       warnings: safeArray<MealPlanWarningDto>(dto?.warnings ?? []).map(warning),
       days: safeArray<MealPlanDayDto>(dto?.days ?? []).map(day),

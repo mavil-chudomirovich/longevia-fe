@@ -68,6 +68,7 @@ export interface MealPlanDto {
   weeklyTargetFatGrams?: number;
   weeklyTargetFiberGrams?: number;
   usedFallback?: boolean;
+  usedFallbackReason?: string;
   disclaimer?: string;
   warnings?: MealPlanWarningDto[] | null;
   days?: MealPlanDayDto[] | null;

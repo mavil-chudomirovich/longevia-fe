@@ -68,6 +68,7 @@ export interface MealPlanModel {
   weeklyTargetFatGrams: number;
   weeklyTargetFiberGrams: number;
   usedFallback: boolean;
+  usedFallbackReason: string | null;
   disclaimer: string;
   warnings: MealPlanWarningModel[];
   days: MealPlanDayModel[];

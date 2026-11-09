@@ -12,6 +12,7 @@ export interface WorkoutPlanDayModel {
   date: string;
   restDay: boolean;
   activity: string;
+  activityLabel: string;
   durationMinutes: number;
   intensity: string;
   equipmentUsed: string[];
@@ -32,6 +33,7 @@ export interface WorkoutPlanModel {
   sessionsScheduled: number;
   minutesPerSession: number;
   usedFallback: boolean;
+  usedFallbackReason: string | null;
   disclaimer: string;
   warnings: WorkoutWarningModel[];
   days: WorkoutPlanDayModel[];

@@ -4,6 +4,23 @@
 
 ---
 
+## [2026-11-09] Phase 2 — lý do fallback AI, nhãn tập luyện tiếng Việt, fasting 204
+
+- **BE**:
+  - `fasting/current` trả **204** khi chưa có phiên (trước đây 200 body rỗng).
+  - Thêm `usedFallbackReason` cho meal plan & workout plan (proto additive + DTO Diet/Progress).
+  - Thêm `activityLabel` (tiếng Việt) cho từng ngày tập.
+  - Viết lại `rationale`: bỏ từ "caller", dùng nhãn hoạt động tiếng Việt; meal rationale gọn hơn.
+  - Test: Recommendation unit 378, Recommendation integration 66, Progress integration 152, Diet integration 46.
+- **FE**:
+  - DTO/model/mapper nhận `usedFallbackReason` + `activityLabel`; tương thích response cũ (null).
+  - Banner fallback hiển thị đúng nguyên nhân, chỉ hiện nút "Thử tạo lại" khi có thể thử lại.
+  - Tiêu đề ngày tập ưu tiên `activityLabel` từ BE.
+  - Test: 23 file, 212 test pass.
+- **Kiểm chứng**: `make lint` PASS (0 warning); `npx tsc --noEmit` 0 lỗi; `npm run build` thành công.
+
+---
+
 ## [2026-11-09] Phase 1 UI/UX: markdown, citation chip, sub-nav Dinh dưỡng, sửa lỗi trạng thái
 
 - **Vấn đề**:
