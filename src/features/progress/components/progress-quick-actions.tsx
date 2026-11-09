@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Flame, Droplets, Moon, Scale, ArrowRight } from 'lucide-react';
+import { Flame, Droplets, Moon, Scale, ArrowRight, Dumbbell, HeartPulse } from 'lucide-react';
 export function ProgressQuickActions() {
   const actions = [
     {
@@ -32,6 +32,20 @@ export function ProgressQuickActions() {
       href: '/progress/metrics',
       icon: Scale,
       color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:border-emerald-500/50',
+    },
+    {
+      title: 'Kế hoạch tập',
+      desc: 'Lịch tập theo tuần và giới hạn sức khỏe',
+      href: '/progress/workout',
+      icon: Dumbbell,
+      color: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:border-rose-500/50',
+    },
+    {
+      title: 'Điểm trường thọ',
+      desc: 'Xem điểm thói quen và gợi ý cải thiện',
+      href: '/progress/longevity',
+      icon: HeartPulse,
+      color: 'bg-violet-500/10 text-violet-600 dark:text-violet-400 hover:border-violet-500/50',
     },
   ];
 

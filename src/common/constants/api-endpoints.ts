@@ -13,6 +13,7 @@ export const API_ENDPOINTS = {
     USERS: {
       ME: '/identity/users/me',
       ME_PROFILE: '/identity/users/me/profile',
+      ME_PREFERENCES: '/identity/users/me/preferences',
     },
   },
   DIET: {
@@ -37,6 +38,8 @@ export const API_ENDPOINTS = {
     SLEEP_LOG: '/progress/sleep/log',
     METRICS: '/progress/metrics',
     METRICS_HISTORY: '/progress/metrics/history',
+    WORKOUT_PLANS: '/progress/workout-plans',
+    LONGEVITY_HABITS: '/progress/longevity-habits',
   },
   BFF: {
     LOGIN: '/api/auth/login',
