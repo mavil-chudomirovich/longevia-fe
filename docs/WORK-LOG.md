@@ -4,6 +4,22 @@
 
 ---
 
+## [2026-11-09] Fix navbar active state theo path sâu nhất
+
+- **Vấn đề**: `SiteHeader` dùng `pathname.startsWith(item.href)`, nên `/diet/suggestions` khớp cả `/diet` và `/diet/suggestions`; bấm “Gợi ý AI” thì “Dinh dưỡng” cũng sáng.
+- **Đã thực hiện**:
+  - Thêm `src/components/layout/nav-active.ts` với `getActiveNavHref(pathname, hrefs)`: khớp exact hoặc `href + '/'`, chọn href dài nhất; bỏ query/hash và trailing slash.
+  - `site-header.tsx`: tính một `activeHref` và dùng cho cả desktop nav lẫn mobile drawer.
+  - Thêm `nav-active.test.ts` với 7 case: `/`, `/diet`, `/diet/`, `/diet/foods`, `/diet/suggestions`, `/progress/metrics`, `/dietary`, `/login`, query/hash.
+- **Kiểm chứng**:
+  - `npx vitest run src/components/layout/nav-active.test.ts`: 7/7 pass.
+  - `npx tsc --noEmit`: 0 lỗi.
+  - `npm test`: 16 file, **188/188** test pass.
+  - `npm run lint`: 0 error (119 warning có sẵn).
+  - `npm run build`: 22 route thành công.
+
+---
+
 ## [2026-11-08] Thông báo lỗi thân thiện với người dùng
 
 - **Bảng thông báo dùng chung** `src/lib/error-messages.ts`: mỗi mã lỗi BE (identity/diet/progress/validation/system) có câu tiếng Việt dễ hiểu và, khi có cách khắc phục, nút dẫn tới trang phù hợp (Cập nhật hồ sơ, Ghi cân nặng, Thiết lập mục tiêu, Thêm món ăn, Đăng nhập…).
