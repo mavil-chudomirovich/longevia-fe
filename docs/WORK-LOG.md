@@ -4,6 +4,19 @@
 
 ---
 
+## [2026-11-09] Đợt UI fixes + giờ Việt Nam + lịch sử nhịn ăn
+
+- **Điều hướng**: bỏ "Hỏi sách" khỏi sub-nav Dinh dưỡng; bỏ "Gợi ý AI" khỏi navbar chính; đổi tên "Gợi ý bữa ăn".
+- **Targets**: desktop 30% gợi ý AI / 70% form; mobile form trước AI.
+- **Hỏi sách**: bỏ tiêu đề/mô tả; khung chat cao cố định + scroll riêng + auto-scroll; mở hội thoại cũ và gửi tiếp đúng hội thoại.
+- **Meal plan**: 2 tab Đã lưu / Tạo mới; chọn ngày tự chuẩn hoá thứ Hai; hiện lý do fallback theo ngày.
+- **Fasting**: thêm card lịch sử phân trang (`GET /progress/fasting/history`).
+- **Giờ Việt Nam (ADR006)**: helper `src/lib/business-date.ts`; các trang dùng ngày local thay UTC; `progress-date` đổi sang ngày nghiệp vụ; test cập nhật theo +7.
+- **Favicon**: `app/icon.svg` + `apple-icon.png` + `favicon.ico` mô phỏng heart-pulse xanh của header, bỏ `logo-mark.png` veggie.
+- **Kiểm chứng**: `tsc` 0 lỗi; 216 test pass; lint 0 error; build thành công.
+
+---
+
 ## [2026-11-09] Phase 4 — AI diễn giải mẹo trường thọ & gợi ý mục tiêu dinh dưỡng
 
 - **BE**:

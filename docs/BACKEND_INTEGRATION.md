@@ -50,6 +50,7 @@ Các route dưới `/api/progress` cần Bearer JWT. FE đã nối đủ 9 busin
 | --- | --- | --- |
 | GET | `/dashboard/summary` | READY |
 | GET | `/fasting/current` | READY; **204 No Content** khi chưa có phiên (thay cho 200 body rỗng) |
+| GET | `/fasting/history?page&pageSize` | READY; phiên đã kết thúc, mới nhất trước, `pageSize` 1..50 |
 | POST | `/fasting/start` | READY |
 | POST | `/fasting/end` | READY |
 | GET | `/water/today` | READY |
@@ -60,7 +61,7 @@ Các route dưới `/api/progress` cần Bearer JWT. FE đã nối đủ 9 busin
 
 Lỗi được phân nhánh theo mã: `progress.fasting_active_conflict`, `progress.fasting_not_found`, `progress.fasting_no_active`, `progress.sleep_overlap`, `progress.height_unavailable`, `progress.identity_unavailable`, `progress.identity_integration_failure`. Metrics cần chiều cao hồ sơ từ Identity. Ngày hôm nay, water, và khoảng tuần dùng lịch UTC; ngày lịch sử người dùng chọn được giữ nguyên.
 
-## Hỏi sách chat & AI mục tiêu (duck-004)
+§ 4b. **Hỏi sách chat & AI mục tiêu (duck-004/005)**
 
 ### `/api/diet/knowledge`
 
@@ -84,6 +85,9 @@ FE điền form, người dùng bấm "Lưu thủ công" (`PUT /targets/me`) m�
   `provider_unavailable`, `invalid_model_output`, `corpus_missing`, `no_safe_activity`).
 - Workout day: `activityLabel` (tiếng Việt); ngày nghỉ để rỗng.
 - Fasting current: 204 thay vì 200 body rỗng.
+- **Ngày nghiệp vụ (ADR006)**: water/dashboard/meal summary/longevity/digest reset
+  00:00 giờ `APP_TIMEZONE` (mặc định Việt Nam). FE gửi `DateOnly` local; timestamp
+  vẫn ISO UTC. Không backfill dữ liệu cũ.
 
 ## Đồng bộ OpenAPI
 
