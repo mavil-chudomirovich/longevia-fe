@@ -3,15 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  Apple,
-  BookOpen,
-  CalendarDays,
-  FlaskConical,
-  LayoutList,
-  Sparkles,
-  Target,
-} from 'lucide-react';
+import { Apple, CalendarDays, FlaskConical, LayoutList, Sparkles, Target } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface DietNavItem {
@@ -23,11 +15,10 @@ export interface DietNavItem {
 export const DIET_NAV_ITEMS: DietNavItem[] = [
   { title: 'Nhật ký', href: '/diet', icon: LayoutList },
   { title: 'Mục tiêu', href: '/diet/targets', icon: Target },
-  { title: 'Gợi ý AI', href: '/diet/suggestions', icon: Sparkles },
+  { title: 'Gợi ý bữa ăn', href: '/diet/suggestions', icon: Sparkles },
   { title: 'Kế hoạch tuần', href: '/diet/meal-plan', icon: CalendarDays },
   { title: 'Vi chất', href: '/diet/nutrients', icon: FlaskConical },
   { title: 'Danh mục món', href: '/diet/foods', icon: Apple },
-  { title: 'Hỏi sách', href: '/knowledge', icon: BookOpen },
 ];
 
 /**

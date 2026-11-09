@@ -27,16 +27,16 @@ export function KnowledgeChat() {
   const [activeId, setActiveId] = React.useState<string | null>(null);
   const [question, setQuestion] = React.useState('');
   const detail = useKnowledgeConversationQuery(activeId ?? chat.conversationId);
-  const scrollRef = React.useRef<HTMLDivElement | null>(null);
+  const bottomRef = React.useRef<HTMLDivElement | null>(null);
+  const stickToBottom = React.useRef(true);
   const activeConversationId = activeId ?? chat.conversationId;
   const messages = chat.messages.length > 0 ? chat.messages : (detail.data?.messages ?? []);
 
   React.useEffect(() => {
-    const node = scrollRef.current;
-    if (node) {
-      node.scrollTop = node.scrollHeight;
+    if (stickToBottom.current) {
+      bottomRef.current?.scrollIntoView({ block: 'end' });
     }
-  }, [messages]);
+  }, [messages, chat.isStreaming]);
 
   const startNewConversation = () => {
     chat.reset();
@@ -47,6 +47,7 @@ export function KnowledgeChat() {
   const selectConversation = (id: string) => {
     if (chat.isStreaming) return;
     chat.reset();
+    chat.setConversationId(id);
     setActiveId(id);
   };
 
@@ -58,8 +59,8 @@ export function KnowledgeChat() {
   };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
-      <aside className="space-y-3">
+    <div className="grid gap-4 lg:grid-cols-[260px_1fr] lg:items-start">
+      <aside className="space-y-3 lg:max-h-[calc(100dvh-11rem)] lg:overflow-y-auto lg:pr-1">
         <Button onClick={startNewConversation} className="w-full justify-start gap-2">
           <MessageSquarePlus className="size-4" aria-hidden="true" />
           Cuộc trò chuyện mới
@@ -108,13 +109,16 @@ export function KnowledgeChat() {
         </div>
       </aside>
 
-      <Card className="flex min-h-[540px] flex-col">
-        <CardContent className="flex flex-1 flex-col gap-3 pt-6">
+      <Card className="flex h-[calc(100dvh-11rem)] min-h-[520px] flex-col">
+        <CardContent className="flex min-h-0 flex-1 flex-col gap-3 pt-6">
           <div
-            ref={scrollRef}
-            className="flex-1 space-y-4 overflow-y-auto pr-1"
+            className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1"
             aria-live="polite"
             aria-busy={chat.isStreaming}
+            onScroll={(event) => {
+              const node = event.currentTarget;
+              stickToBottom.current = node.scrollHeight - node.scrollTop - node.clientHeight < 120;
+            }}
           >
             {messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 py-10 text-center">
@@ -171,6 +175,7 @@ export function KnowledgeChat() {
                 </div>
               ))
             )}
+            <div ref={bottomRef} />
           </div>
 
           {chat.error && (

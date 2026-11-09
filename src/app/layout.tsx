@@ -18,10 +18,6 @@ export const metadata: Metadata = {
   title: 'Longevia — Chế độ ăn trường thọ & Sống khỏe mỗi ngày',
   description:
     'Nền tảng cá nhân hóa dinh dưỡng, chế độ ăn trường thọ dựa trên khoa học và theo dõi sức khỏe thông minh.',
-  icons: {
-    icon: [{ url: '/logo/logo-mark.png', type: 'image/png' }],
-    apple: [{ url: '/logo/logo-mark.png', type: 'image/png' }],
-  },
 };
 
 export default function RootLayout({

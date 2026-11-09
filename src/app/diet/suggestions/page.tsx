@@ -28,7 +28,7 @@ export default function SuggestionsPage() {
     <div className="container mx-auto max-w-5xl px-4 py-8 sm:px-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Gợi ý bữa ăn bằng AI</h1>
+          <h1 className="text-3xl font-bold">Gợi ý bữa ăn</h1>
           <p className="mt-1 text-muted-foreground">
             Gợi ý dựa trên mục tiêu, hồ sơ và nhật ký hiện tại.
           </p>

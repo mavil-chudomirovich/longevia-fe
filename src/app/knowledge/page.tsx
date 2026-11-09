@@ -23,16 +23,8 @@ export default function KnowledgePage() {
   );
 
   return (
-    <div className="container mx-auto max-w-6xl px-4 py-8 sm:px-6">
-      <div className="max-w-2xl">
-        <h1 className="text-3xl font-bold tracking-tight">Hỏi sách</h1>
-        <p className="mt-1.5 text-pretty text-muted-foreground">
-          Trò chuyện với trợ lý đọc sách “Chế độ ăn trường thọ”. Câu trả lời chỉ lấy từ sách và luôn
-          kèm trích dẫn.
-        </p>
-      </div>
-
-      <Tabs defaultValue="ask" className="mt-6">
+    <div className="container mx-auto max-w-6xl px-4 py-6 sm:px-6">
+      <Tabs defaultValue="ask">
         <TabsList>
           <TabsTrigger value="ask" className="gap-1.5">
             <Sparkles className="size-4" aria-hidden="true" />
