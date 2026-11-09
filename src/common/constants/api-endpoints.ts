@@ -27,6 +27,7 @@ export const API_ENDPOINTS = {
     NUTRIENT_GAPS: '/diet/nutrition/nutrient-gaps',
     KNOWLEDGE_ASK: '/diet/knowledge/ask',
     KNOWLEDGE_SEARCH: '/diet/knowledge/search',
+    KNOWLEDGE_CONVERSATIONS: '/diet/knowledge/conversations',
   },
   PROGRESS: {
     DASHBOARD_SUMMARY: '/progress/dashboard/summary',

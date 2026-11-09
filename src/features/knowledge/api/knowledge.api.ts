@@ -1,8 +1,17 @@
 import api from '@/lib/axios';
 import { API_ENDPOINTS } from '@/common/constants/api-endpoints';
 import { knowledgeMapper } from '../mappers/knowledge.mapper';
+import { knowledgeConversationMapper } from '../mappers/knowledge-conversation.mapper';
 import type { KnowledgeAnswerDto, KnowledgeSearchDto } from '../types/knowledge.dto';
 import type { KnowledgeAnswerModel, KnowledgeSearchModel } from '../types/knowledge.model';
+import type {
+  KnowledgeConversationDetailDto,
+  KnowledgeConversationSummaryDto,
+} from '../types/knowledge-conversation.dto';
+import type {
+  KnowledgeConversationDetail,
+  KnowledgeConversationSummary,
+} from '../types/knowledge-conversation.model';
 
 export const knowledgeApi = {
   ask: async (
@@ -29,5 +38,31 @@ export const knowledgeApi = {
       silent: true,
     });
     return knowledgeMapper.toSearch(response.data);
+  },
+
+  listConversations: async (signal?: AbortSignal): Promise<KnowledgeConversationSummary[]> => {
+    const response = await api.get<KnowledgeConversationSummaryDto[]>(
+      API_ENDPOINTS.DIET.KNOWLEDGE_CONVERSATIONS,
+      { signal, silent: true }
+    );
+    return knowledgeConversationMapper.toSummaryList(response.data);
+  },
+
+  getConversation: async (
+    id: string,
+    signal?: AbortSignal
+  ): Promise<KnowledgeConversationDetail> => {
+    const response = await api.get<KnowledgeConversationDetailDto>(
+      `${API_ENDPOINTS.DIET.KNOWLEDGE_CONVERSATIONS}/${id}`,
+      { signal, silent: true }
+    );
+    return knowledgeConversationMapper.toDetail(response.data);
+  },
+
+  deleteConversation: async (id: string, signal?: AbortSignal): Promise<void> => {
+    await api.delete(`${API_ENDPOINTS.DIET.KNOWLEDGE_CONVERSATIONS}/${id}`, {
+      signal,
+      silent: true,
+    });
   },
 };

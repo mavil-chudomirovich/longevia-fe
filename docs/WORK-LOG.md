@@ -4,6 +4,24 @@
 
 ---
 
+## [2026-11-09] Phase 3 — Hỏi sách dạng chat: SSE + lịch sử hội thoại
+
+- **BE**:
+  - gRPC mới `AskLongevityQuestionStream` (server streaming) + `ConversationTurn history`; Gemini stream token qua `IChatStreamModel`.
+  - Use case chat: chào hỏi/cảm ơn trả lời cố định không gọi AI; truy xuất + stream câu trả lời grounded; gắn 3 citation từ đoạn sách; câu follow-up ngắn dùng ngữ cảnh lượt trước.
+  - Diet: `POST /knowledge/ask/stream` (SSE: delta/citation/done/error), GET/DELETE `/knowledge/conversations`; lưu hội thoại ở `diet_db` (migration `AddKnowledgeConversations`).
+  - Nginx: location riêng cho SSE, tắt `proxy_buffering`.
+  - Test: Recommendation unit 383 (thêm 5 test stream), Diet unit 19, Diet integration 47, Recommendation integration 66.
+- **FE**:
+  - BFF route `/api/knowledge/ask/stream` đọc cookie `lv_at` và proxy `ReadableStream` (không buffer).
+  - Hook `useKnowledgeChat`: parse SSE theo buffer, ghép delta, gắn citation, đồng bộ id hội thoại; huỷ khi đổi phiên.
+  - UI chat: sidebar hội thoại (mới/xoá/chọn), bong bóng tin nhắn, markdown, citation chip, caret streaming, Enter gửi/Shift+Enter xuống dòng.
+  - Test: 24 file, 216 test pass.
+- **Kiểm chứng thật**: gọi SSE qua nginx với JWT thật → nhận chuỗi `delta` từ Gemini, `citation`, `done`; `GET /conversations` trả `messageCount=2`.
+- **Sửa lỗi phát hiện khi verify**: EF đánh dấu message mới là `Modified` khi thêm qua navigation (concurrency 0 rows) → thêm `AddMessage` tường minh vào repository + test hồi quy hai lần SaveChanges.
+
+---
+
 ## [2026-11-09] Phase 2 — lý do fallback AI, nhãn tập luyện tiếng Việt, fasting 204
 
 - **BE**:
