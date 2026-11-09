@@ -4,7 +4,23 @@
 
 ---
 
-## [2026-11-09] Fix navbar active state theo path sâu nhất
+## [2026-11-09] Hoàn thiện các màn AI: meal plan, vi chất, tri thức, workout, longevity, digest
+
+- **Đã thêm**:
+  - `/diet/meal-plan`, `/diet/nutrients`, `/knowledge`.
+  - `/progress/workout`, `/progress/longevity`.
+  - `/profile` toggle nhận báo cáo tuần.
+  - API/query/mapper cho meal plan, nutrient gaps, knowledge, workout, longevity.
+  - Nút xoá custom food trong `/diet/foods`.
+  - Navbar thêm mục “Tri thức”; giữ logic active path dài nhất.
+- **Kiểm chứng**:
+  - `npx tsc --noEmit`: 0 lỗi.
+  - `npm test`: 16 file, 188 test pass.
+  - `npm run build`: 27 route thành công.
+- **Chưa làm**: FE sửa custom food, Playwright E2E.
+
+---
+
 
 - **Vấn đề**: `SiteHeader` dùng `pathname.startsWith(item.href)`, nên `/diet/suggestions` khớp cả `/diet` và `/diet/suggestions`; bấm “Gợi ý AI” thì “Dinh dưỡng” cũng sáng.
 - **Đã thực hiện**:
