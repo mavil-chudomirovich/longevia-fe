@@ -75,3 +75,13 @@ export interface RecommendationsModel {
   calorieCapReached: boolean;
   safetyNote: string;
 }
+
+export interface SuggestedTargetsModel {
+  targetCalories: number;
+  targetProteinGrams: number;
+  targetCarbsGrams: number;
+  targetFatGrams: number;
+  rationale: string;
+  source: 'ai' | 'formula';
+  safetyNote: string;
+}

@@ -8,13 +8,17 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { getApiErrorAction, getApiErrorCode, getApiErrorMessage } from '@/lib/api-error';
 import type { ErrorAction } from '@/lib/error-messages';
 import { InfoTooltip } from '@/components/shared/info-tooltip';
+import { MarkdownText } from '@/components/shared/markdown-text';
 import { targetSchema, type TargetFormValues } from '@/features/diet/schemas/diet.schema';
+import type { SuggestedTargetsModel } from '@/features/diet/types/diet.model';
 import {
   useCalculateTargetMutation,
   useSaveTargetMutation,
+  useSuggestTargetsMutation,
   useTargetQuery,
 } from '@/features/diet/queries/diet.queries';
 
@@ -47,6 +51,10 @@ export default function TargetsPage() {
   const query = useTargetQuery();
   const save = useSaveTargetMutation();
   const calculate = useCalculateTargetMutation();
+  const suggest = useSuggestTargetsMutation();
+  const [goal, setGoal] = React.useState('Maintain');
+  const [description, setDescription] = React.useState('');
+  const [suggestion, setSuggestion] = React.useState<SuggestedTargetsModel | null>(null);
   const form = useForm<TargetFormValues>({
     resolver: zodResolver(targetSchema),
     defaultValues: defaults,
@@ -65,6 +73,28 @@ export default function TargetsPage() {
       targetFatGrams: String(query.data.targetFatGrams),
     });
   }, [form, query.data]);
+
+  const onSuggest = async () => {
+    setFormError('');
+    setFormAction(undefined);
+    try {
+      const { data: result } = await suggest.mutateAsync({ description, goal });
+      setSuggestion(result);
+      form.reset({
+        targetCalories: String(result.targetCalories),
+        targetProteinGrams: String(result.targetProteinGrams),
+        targetCarbsGrams: String(result.targetCarbsGrams),
+        targetFatGrams: String(result.targetFatGrams),
+      });
+    } catch (error) {
+      setFormError(
+        getApiErrorMessage(
+          error,
+          'Chưa gợi ý được mục tiêu. Bạn kiểm tra hồ sơ/cân nặng rồi thử lại nhé.'
+        )
+      );
+    }
+  };
 
   const submit = (mode: 'manual' | 'calculate') =>
     form.handleSubmit(async (values) => {
@@ -104,6 +134,67 @@ export default function TargetsPage() {
           Chỉ số dưới đây là mục tiêu mỗi ngày; bạn có thể để Longevia tính giúp hoặc tự nhập.
         </p>
       </div>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="text-base">Gợi ý bằng AI</CardTitle>
+          <CardDescription>
+            Mô tả mục tiêu hiện tại của bạn; Longevia sẽ đề xuất calo và macro, bạn xem lại rồi mới
+            bấm “Lưu thủ công”.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+            <div className="space-y-2">
+              <Label htmlFor="suggest-description">Mô tả mong muốn</Label>
+              <Textarea
+                id="suggest-description"
+                value={description}
+                maxLength={500}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder="Ví dụ: mình 32 tuổi, tập gym 3 buổi/tuần, muốn giảm mỡ bụng nhưng vẫn đủ sức tập."
+                className="min-h-20"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="suggest-goal">Mục tiêu</Label>
+              <select
+                id="suggest-goal"
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm sm:w-40"
+                value={goal}
+                onChange={(event) => setGoal(event.target.value)}
+              >
+                <option value="LoseWeight">Giảm cân</option>
+                <option value="Maintain">Duy trì</option>
+                <option value="BuildMuscle">Tăng cơ</option>
+                <option value="Longevity">Trường thọ</option>
+              </select>
+            </div>
+          </div>
+          <Button
+            onClick={() => void onSuggest()}
+            disabled={suggest.isPending}
+            variant="outline"
+            className="gap-1.5"
+          >
+            {suggest.isPending ? 'Đang gợi ý…' : 'Gợi ý bằng AI'}
+          </Button>
+
+          {suggestion && (
+            <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-4">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">
+                  {suggestion.source === 'ai' ? 'AI đề xuất' : 'Công thức chuẩn'}
+                </span>
+                <span>Chưa lưu — kiểm tra rồi bấm “Lưu thủ công”.</span>
+              </div>
+              <MarkdownText content={suggestion.rationale} compact />
+              <p className="text-xs text-muted-foreground">{suggestion.safetyNote}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Mục tiêu dinh dưỡng</CardTitle>

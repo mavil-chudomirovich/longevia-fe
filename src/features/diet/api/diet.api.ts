@@ -10,6 +10,7 @@ import type {
   FoodDto,
   LogMealDto,
   RecommendationsDto,
+  SuggestedTargetsDto,
   TargetDto,
 } from '../types/diet.dto';
 import type { MealPlanDto, GenerateMealPlanDto } from '../types/meal-plan.dto';
@@ -20,6 +21,7 @@ import type {
   FoodModel,
   FoodPageModel,
   RecommendationsModel,
+  SuggestedTargetsModel,
   TargetModel,
 } from '../types/diet.model';
 import type { MealPlanModel } from '../types/meal-plan.model';
@@ -75,6 +77,17 @@ export const dietApi = {
       { signal, silent: true }
     );
     return dietMapper.toTarget(response.data);
+  },
+  suggestTargets: async (
+    input: { description: string; goal: string },
+    signal: AbortSignal
+  ): Promise<SuggestedTargetsModel> => {
+    const response = await api.post<SuggestedTargetsDto>(
+      API_ENDPOINTS.DIET.SUGGEST_TARGETS,
+      input,
+      { signal, silent: true }
+    );
+    return dietMapper.toSuggestedTargets(response.data);
   },
   getDailySummary: async (date: string, signal?: AbortSignal): Promise<DailySummaryModel> => {
     const response = await api.get<DailySummaryDto>(API_ENDPOINTS.DIET.DAILY_SUMMARY, {

@@ -102,3 +102,13 @@ export interface LogMealDto {
   mealType: string;
   items: { foodId: string; quantity: number }[];
 }
+
+export interface SuggestedTargetsDto {
+  targetCalories?: number;
+  targetProteinGrams?: number;
+  targetCarbsGrams?: number;
+  targetFatGrams?: number;
+  rationale?: string;
+  source?: string;
+  safetyNote?: string;
+}

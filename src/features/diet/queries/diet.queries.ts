@@ -9,6 +9,7 @@ import {
 } from '@/features/progress/utils/progress-session';
 import { dietApi } from '../api/diet.api';
 import type { CreateFoodValues, TargetFormValues } from '../schemas/diet.schema';
+import type { SuggestedTargetsModel } from '../types/diet.model';
 
 export const dietKeys = {
   all: ['diet'] as const,
@@ -178,6 +179,16 @@ export function useCalculateTargetMutation() {
     (_target, userId) => {
       void client.invalidateQueries({ queryKey: dietKeys.target(userId) });
       toast.success('Đã tính và lưu mục tiêu từ hồ sơ của bạn.');
+    },
+    { toastOnError: false }
+  );
+}
+
+export function useSuggestTargetsMutation() {
+  return useDietMutation<{ description: string; goal: string }, SuggestedTargetsModel>(
+    dietApi.suggestTargets,
+    () => {
+      // Trang tự hiển thị kết quả gợi ý; không toast để tránh nhiễu.
     },
     { toastOnError: false }
   );

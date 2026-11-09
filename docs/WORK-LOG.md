@@ -4,6 +4,20 @@
 
 ---
 
+## [2026-11-09] Phase 4 — AI diễn giải mẹo trường thọ & gợi ý mục tiêu dinh dưỡng
+
+- **BE**:
+  - Prompt `LongevityTip`: `MealSelector` diễn giải đoạn sách thành 1–2 câu tiếng Việt thay vì trả raw chunk; fallback câu curate sẵn, citation vẫn giữ đoạn gốc.
+  - gRPC `SuggestNutritionTargets` + `StructuredResponseKind.NutritionTargetSuggestion`: calo tính bằng Mifflin-St Jeor/TDEE, AI chỉ tinh chỉnh protein/fat trong khoảng an toàn; ngoài khoảng → công thức (`source=formula`).
+  - Diet `POST /targets/me/suggest` (không ghi DB) dùng hồ sơ + cân nặng mới nhất.
+  - Test: Recommendation unit 387, Recommendation integration 66, Diet integration 47.
+- **FE**:
+  - `/diet/targets`: khối "Gợi ý bằng AI" (mô tả + mục tiêu), hiển thị rationale markdown, nhãn nguồn (AI/công thức), cảnh báo chưa lưu; điền form, người dùng bấm "Lưu thủ công" mới ghi DB.
+  - DTO/model/mapper/API/query cho suggest targets; test mapper source fallback.
+- **Kiểm chứng**: `make lint` PASS; `npx tsc --noEmit` 0 lỗi; 24 file / 217 test; `npm run build` thành công.
+
+---
+
 ## [2026-11-09] Phase 3 — Hỏi sách dạng chat: SSE + lịch sử hội thoại
 
 - **BE**:

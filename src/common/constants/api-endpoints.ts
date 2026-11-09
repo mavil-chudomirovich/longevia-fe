@@ -20,6 +20,7 @@ export const API_ENDPOINTS = {
     FOODS: '/diet/foods',
     TARGETS_ME: '/diet/targets/me',
     CALCULATE_TARGETS: '/diet/targets/me/calculate',
+    SUGGEST_TARGETS: '/diet/targets/me/suggest',
     MEALS: '/diet/meals',
     DAILY_SUMMARY: '/diet/meals/daily-summary',
     AI_RECOMMENDATIONS: '/diet/meals/ai-recommendations',

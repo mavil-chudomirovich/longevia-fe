@@ -18,6 +18,7 @@ import type {
   MealSummaryDto,
   MealSuggestionDto,
   RecommendationsDto,
+  SuggestedTargetsDto,
   TargetDto,
 } from '../types/diet.dto';
 import type {
@@ -28,6 +29,7 @@ import type {
   MealCitationModel,
   MealSuggestionModel,
   RecommendationsModel,
+  SuggestedTargetsModel,
   TargetModel,
 } from '../types/diet.model';
 
@@ -85,6 +87,18 @@ export class DietMapper extends BaseMapper<FoodDto, FoodModel> {
       targetCarbsGrams: safeNumber(pickField(dto, ['targetCarbsGrams'], 0)),
       targetFatGrams: safeNumber(pickField(dto, ['targetFatGrams'], 0)),
       updatedAt: safeDate(pickField(dto, ['updatedAt'], null)),
+    };
+  }
+
+  toSuggestedTargets(dto: SuggestedTargetsDto | null | undefined): SuggestedTargetsModel {
+    return {
+      targetCalories: safeNumber(pickField(dto, ['targetCalories'], 0)),
+      targetProteinGrams: safeNumber(pickField(dto, ['targetProteinGrams'], 0)),
+      targetCarbsGrams: safeNumber(pickField(dto, ['targetCarbsGrams'], 0)),
+      targetFatGrams: safeNumber(pickField(dto, ['targetFatGrams'], 0)),
+      rationale: safeString(pickField(dto, ['rationale'], '')),
+      source: safeString(pickField(dto, ['source'], 'formula')) === 'ai' ? 'ai' : 'formula',
+      safetyNote: safeString(pickField(dto, ['safetyNote'], '')),
     };
   }
 
