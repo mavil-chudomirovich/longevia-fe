@@ -281,7 +281,6 @@ export default function TodayPage() {
                 <Button className="w-full gap-1.5" onClick={() => openMealDialog(activeMeal.slot)}>
                   <Utensils className="size-4" aria-hidden="true" />
                   Ghi bữa ăn
-                  {plannedFoods.length > 0 && ' (điền sẵn kế hoạch)'}
                 </Button>
               </div>
             ) : (
