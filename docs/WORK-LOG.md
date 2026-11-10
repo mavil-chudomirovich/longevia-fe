@@ -15,6 +15,9 @@
   sửa ghi chú UTC cũ.
 - **Workout**: tự tải plan đã lưu, 404 là trạng thái rỗng; nhập/lưu giới hạn sức khỏe +
   dụng cụ, prefill từ hồ sơ; hiển thị input của plan đã lưu.
+- **Workout nâng cao**: giới hạn sức khỏe chọn nhanh + nhập tự do (tối đa 8 mục/50 ký tự);
+  mỗi buổi hiển thị 1–3 bài (chính + phụ) với thời lượng/cường độ; AI ưu tiên bài theo goal
+  (tăng cơ → tập tạ, giảm cân → cardio).
 - **Hồ sơ**: thêm checkbox "Đau hoặc tổn thương khớp".
 - **Meal-plan**: bỏ UI fallback; request generate timeout 150 giây; đổi sang WeekPicker.
 - **Xác minh**: `tsc` 0 lỗi; 221 test pass; lint 0 error; build thành công.

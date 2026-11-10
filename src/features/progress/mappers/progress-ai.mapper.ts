@@ -8,12 +8,14 @@ import type {
   WorkoutPlanDayDto,
   WorkoutPlanDto,
   WorkoutWarningDto,
+  WorkoutActivityDto,
 } from '../types/progress-ai.dto';
 import type {
   LongevityCitationModel,
   LongevityComponentModel,
   LongevityHabitsModel,
   WorkoutCitationModel,
+  WorkoutActivityModel,
   WorkoutPlanDayModel,
   WorkoutPlanModel,
   WorkoutWarningModel,
@@ -29,6 +31,14 @@ const workoutCitation = (dto: WorkoutCitationDto): WorkoutCitationModel => ({
   sourceFile: safeString(pickField(dto, ['sourceFile'], '')),
 });
 
+const workoutActivity = (dto: WorkoutActivityDto): WorkoutActivityModel => ({
+  activity: safeString(pickField(dto, ['activity'], '')),
+  activityLabel: safeString(pickField(dto, ['activityLabel'], '')),
+  durationMinutes: safeNumber(pickField(dto, ['durationMinutes'], 0)),
+  intensity: safeString(pickField(dto, ['intensity'], '')),
+  equipmentUsed: safeArray<string>(dto.equipmentUsed ?? []),
+});
+
 const workoutDay = (dto: WorkoutPlanDayDto): WorkoutPlanDayModel => ({
   date: safeString(pickField(dto, ['date'], '')),
   restDay: safeBoolean(pickField(dto, ['restDay'], false)),
@@ -39,6 +49,7 @@ const workoutDay = (dto: WorkoutPlanDayDto): WorkoutPlanDayModel => ({
   equipmentUsed: safeArray<string>(dto.equipmentUsed ?? []),
   rationale: safeString(pickField(dto, ['rationale'], '')),
   citations: safeArray<WorkoutCitationDto>(dto.citations ?? []).map(workoutCitation),
+  activities: safeArray<WorkoutActivityDto>(dto.activities ?? []).map(workoutActivity),
 });
 
 const workoutWarning = (dto: WorkoutWarningDto): WorkoutWarningModel => ({

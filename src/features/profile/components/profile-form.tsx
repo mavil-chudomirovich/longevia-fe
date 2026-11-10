@@ -6,9 +6,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import type { ProfileModel } from '@/features/auth/types/auth.model';
 import { getBusinessTodayDateString } from '@/lib/business-date';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { HealthLimitationsPicker } from '@/components/shared/health-limitations-picker';
 import { profileSchema, type ProfileFormValues } from '../schemas/profile.schema';
 import { useUpdateProfileMutation } from '../queries/profile.queries';
 import { getApiErrorFields, toastFriendlyError } from '@/lib/api-error';
@@ -203,30 +203,10 @@ export function ProfileForm({
       </div>
       <div className="space-y-2">
         <Label>Giới hạn sức khỏe</Label>
-        <label htmlFor="limitation-joint-pain" className="flex items-start gap-2 text-sm">
-          <Checkbox
-            id="limitation-joint-pain"
-            checked={form.watch('healthLimitations').includes('joint_pain')}
-            onCheckedChange={(checked) => {
-              const current = form.getValues('healthLimitations');
-              form.setValue(
-                'healthLimitations',
-                checked === true
-                  ? (Array.from(
-                      new Set([...current, 'joint_pain'])
-                    ) as ProfileFormValues['healthLimitations'])
-                  : current.filter((item) => item !== 'joint_pain'),
-                { shouldValidate: true }
-              );
-            }}
-          />
-          <span>
-            Đau hoặc tổn thương khớp
-            <span className="block text-xs text-muted-foreground">
-              Lịch tập sẽ tránh hoạt động tác động mạnh lên khớp.
-            </span>
-          </span>
-        </label>
+        <HealthLimitationsPicker
+          value={form.watch('healthLimitations')}
+          onChange={(next) => form.setValue('healthLimitations', next, { shouldValidate: true })}
+        />
         {form.formState.errors.healthLimitations && (
           <p role="alert" className="text-sm text-destructive">
             {form.formState.errors.healthLimitations.message}

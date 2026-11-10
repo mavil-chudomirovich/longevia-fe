@@ -4,13 +4,13 @@ import * as React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { getApiErrorCode, getApiErrorMessage } from '@/lib/api-error';
 import { getBusinessTodayDateString, getBusinessWeekStart } from '@/lib/business-date';
 import { CitationChipList } from '@/components/shared/citation-chip';
 import { MarkdownText } from '@/components/shared/markdown-text';
 import { WeekPicker } from '@/components/shared/week-picker';
+import { HealthLimitationsPicker } from '@/components/shared/health-limitations-picker';
 import { workoutActivityLabel } from '@/features/progress/mappers/progress-labels';
 import { useProfileQuery } from '@/features/profile/queries/profile.queries';
 import { describeAiFallback } from '@/lib/ai-fallback';
@@ -18,8 +18,6 @@ import {
   useGenerateWorkoutPlanMutation,
   useWorkoutPlanQuery,
 } from '@/features/progress/queries/progress-ai.queries';
-
-const JOINT_PAIN = 'joint_pain';
 
 export default function WorkoutPage() {
   const [weekStart, setWeekStart] = React.useState(() =>
@@ -70,13 +68,6 @@ export default function WorkoutPage() {
         .filter(Boolean),
     [equipmentText]
   );
-
-  const toggleLimitation = (value: string, checked: boolean) => {
-    const next = checked
-      ? [...new Set([...limitations, value])]
-      : limitations.filter((item) => item !== value);
-    setLimitationsEdit({ key: planKey, value: next });
-  };
 
   const visibleWarnings = (plan?.warnings ?? []).filter(
     (warning) => warning.code !== 'no_limitations_assumed'
@@ -213,25 +204,11 @@ export default function WorkoutPage() {
 
           <div className="space-y-2 border-t pt-3">
             <p className="text-sm font-medium">Giới hạn sức khỏe</p>
-            <label htmlFor="workout-joint-pain" className="flex items-start gap-2 text-sm">
-              <Checkbox
-                id="workout-joint-pain"
-                checked={limitations.includes(JOINT_PAIN)}
-                onCheckedChange={(checked) => toggleLimitation(JOINT_PAIN, checked === true)}
-              />
-              <span>
-                Đau hoặc tổn thương khớp
-                <span className="block text-xs text-muted-foreground">
-                  Lịch tập sẽ tránh hoạt động tác động mạnh lên khớp.
-                </span>
-              </span>
-            </label>
-            {limitations.length === 0 && (
-              <p className="text-xs text-muted-foreground">
-                Bạn chưa khai giới hạn sức khỏe. Có thể bật ở đây hoặc cập nhật trong Hồ sơ cá nhân
-                để lần sau tự điền.
-              </p>
-            )}
+            <HealthLimitationsPicker
+              value={limitations}
+              onChange={(next) => setLimitationsEdit({ key: planKey, value: next })}
+              disabled={generate.isPending}
+            />
           </div>
         </CardContent>
       </Card>
@@ -279,16 +256,35 @@ export default function WorkoutPage() {
                   <CardTitle className="text-base">
                     {day.restDay
                       ? 'Ngày nghỉ'
-                      : day.activityLabel || workoutActivityLabel(day.activity)}
+                      : day.activities.length > 1
+                        ? `${day.activities[0].activityLabel || workoutActivityLabel(day.activities[0].activity)} + ${day.activities.length - 1} bài phụ`
+                        : day.activityLabel || workoutActivityLabel(day.activity)}
                   </CardTitle>
                   <CardDescription>
                     {day.date}
-                    {day.restDay
-                      ? ' · nghỉ hồi phục'
-                      : ` · ${day.durationMinutes} phút · ${day.intensity}`}
+                    {day.restDay ? ' · nghỉ hồi phục' : ` · ${day.durationMinutes} phút`}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
+                  {!day.restDay && day.activities.length > 0 && (
+                    <ul className="space-y-1.5">
+                      {day.activities.map((activity, index) => (
+                        <li
+                          key={`${activity.activity}-${index}`}
+                          className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 rounded bg-muted/60 px-2.5 py-1.5"
+                        >
+                          <span className="font-medium">
+                            {index === 0 ? 'Chính: ' : 'Phụ: '}
+                            {activity.activityLabel || workoutActivityLabel(activity.activity)}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {activity.durationMinutes} phút
+                            {activity.intensity ? ` · ${activity.intensity}` : ''}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   {!day.restDay && day.rationale && (
                     <MarkdownText
                       content={day.rationale}

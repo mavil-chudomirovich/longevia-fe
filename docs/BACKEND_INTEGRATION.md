@@ -21,7 +21,7 @@ API service routes dưới `/api/identity`:
 | POST | `/auth/forgot-password` | Gửi email; luôn nhận `202`, không tiết lộ email có tài khoản hay không |
 | POST | `/auth/reset-password` | Gửi mã 64-hex và `newPassword`; thành công `204` |
 | GET | `/users/me` | Đọc `id`, `email`, `fullName`, `status`, `createdAt`, `profile` |
-| PUT | `/users/me/profile` | Gửi hồ sơ sức khỏe, gồm `healthLimitations` (hiện chỉ `joint_pain`); thành công trả `ProfileResponse` |
+| PUT | `/users/me/profile` | Gửi hồ sơ sức khỏe, gồm `healthLimitations` (tối đa 8 mục, mỗi mục ≤50 ký tự, nhập tự do); thành công trả `ProfileResponse` |
 
 Next BFF routes: `/api/auth/login`, `/api/auth/register`, `/api/auth/refresh-token`, `/api/auth/logout`. Cookie `lv_rt` là HttpOnly, giới hạn path `/api/auth`, sống 7 ngày; `lv_at` là HttpOnly ở path `/` theo thời hạn access token. `lv_session_hint` là cookie không HttpOnly, không chứa token, để middleware và client biết nên thử silent refresh; API vẫn yêu cầu Bearer JWT. Access token cho API chỉ nằm trong memory của client. JWT access token hết hạn sau 15 phút; `lv_rt` cho phép silent refresh. Identity không phát role claim.
 
@@ -89,7 +89,12 @@ FE điền form, người dùng bấm "Lưu mục tiêu" (`PUT /targets/me`) m�
   Generate có thể mất 30–90 giây nên request đặt timeout 150 giây.
 - Workout plan: vẫn có `usedFallbackReason` (`provider_timeout`,
   `provider_unavailable`, `invalid_model_output`, `corpus_missing`, `no_safe_activity`).
-  Request nhận `activityPreference`, `equipmentAvailable`, `limitations`; response echo lại.
+  Request nhận `activityPreference`, `equipmentAvailable`, `limitations` (text tự do);
+  response echo lại. Mỗi ngày có `activities[]` 1–3 bài (bài chính đầu tiên) và các field
+  cũ `activity/activityLabel/...` giữ bài chính để tương thích.
+- Goal ảnh hưởng thứ tự ưu tiên: `BuildMuscle` ưu tiên tập tạ/sức mạnh; `LoseWeight` ưu tiên
+  cardio; `Longevity` ưu tiên vận động nhẹ. `limitations` free text được đưa vào prompt cho AI.
+- Bỏ warning `no_limitations_assumed`/`unsupported_limitation`.
 - Workout day: `activityLabel` (tiếng Việt); ngày nghỉ để rỗng.
 - Fasting current: 204 thay vì 200 body rỗng.
 - **Ngày nghiệp vụ (ADR006)**: water/dashboard/meal summary/longevity/digest reset

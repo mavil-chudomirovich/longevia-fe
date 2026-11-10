@@ -30,7 +30,9 @@ export const profileSchema = z.object({
     message: 'Vui lòng chọn chế độ ăn.',
   }),
   allergies: z.array(z.string().trim().min(1)).max(32, 'Tối đa 32 mục dị ứng.'),
-  healthLimitations: z.array(z.enum(['joint_pain'])).max(8, 'Tối đa 8 giới hạn sức khỏe.'),
+  healthLimitations: z
+    .array(z.string().trim().min(1).max(50, 'Mỗi mục tối đa 50 ký tự.'))
+    .max(8, 'Tối đa 8 giới hạn sức khỏe.'),
 });
 
 export type ProfileFormValues = z.infer<typeof profileSchema>;

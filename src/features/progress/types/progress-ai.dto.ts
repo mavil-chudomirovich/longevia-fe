@@ -18,6 +18,15 @@ export interface WorkoutPlanDayDto {
   equipmentUsed?: string[] | null;
   rationale?: string;
   citations?: WorkoutCitationDto[] | null;
+  activities?: WorkoutActivityDto[] | null;
+}
+
+export interface WorkoutActivityDto {
+  activity?: string;
+  activityLabel?: string;
+  durationMinutes?: number;
+  intensity?: string;
+  equipmentUsed?: string[] | null;
 }
 
 export interface WorkoutWarningDto {

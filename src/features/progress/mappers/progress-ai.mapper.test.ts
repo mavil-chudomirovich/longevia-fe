@@ -24,4 +24,38 @@ describe('progressAiMapper workout', () => {
 
     expect(model.usedFallbackReason).toBeNull();
   });
+
+  it('map danh sách activities của buổi tập', () => {
+    const model = progressAiMapper.toWorkoutPlan({
+      id: 'plan-1',
+      weekStartDate: '2026-11-09',
+      days: [
+        {
+          date: '2026-11-09',
+          activity: 'strength',
+          activityLabel: 'Tập tạ',
+          durationMinutes: 30,
+          activities: [
+            {
+              activity: 'strength',
+              activityLabel: 'Tập tạ',
+              durationMinutes: 20,
+              intensity: 'Trung bình',
+              equipmentUsed: ['gym'],
+            },
+            {
+              activity: 'walking',
+              activityLabel: 'Đi bộ',
+              durationMinutes: 10,
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(model.days[0].activities).toHaveLength(2);
+    expect(model.days[0].activities[0].activityLabel).toBe('Tập tạ');
+    expect(model.days[0].activities[1].durationMinutes).toBe(10);
+    expect(model.days[0].activities[1].equipmentUsed).toEqual([]);
+  });
 });

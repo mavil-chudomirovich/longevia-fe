@@ -8,6 +8,14 @@ export interface WorkoutCitationModel {
   sourceFile: string;
 }
 
+export interface WorkoutActivityModel {
+  activity: string;
+  activityLabel: string;
+  durationMinutes: number;
+  intensity: string;
+  equipmentUsed: string[];
+}
+
 export interface WorkoutPlanDayModel {
   date: string;
   restDay: boolean;
@@ -18,6 +26,7 @@ export interface WorkoutPlanDayModel {
   equipmentUsed: string[];
   rationale: string;
   citations: WorkoutCitationModel[];
+  activities: WorkoutActivityModel[];
 }
 
 export interface WorkoutWarningModel {
