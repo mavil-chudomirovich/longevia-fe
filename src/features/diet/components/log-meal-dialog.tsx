@@ -58,18 +58,47 @@ type LogMealDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   suggested?: MealSuggestionModel;
+  initialMealType?: string;
+  initialItems?: MealPrefillItem[];
 };
 
-export function LogMealDialog(props: LogMealDialogProps) {
-  return <LogMealDialogContent key={`${props.open}:${props.suggested?.foodId ?? ''}`} {...props} />;
+export type MealPrefillItem = {
+  foodId: string;
+  name: string;
+  servingSize: number;
+  servingUnit: string;
+  calories: number;
+};
+
+function prefillKey(items?: MealPrefillItem[]): string {
+  return items?.map((item) => item.foodId).join(',') ?? '';
 }
 
-function LogMealDialogContent({ open, onOpenChange, suggested }: LogMealDialogProps) {
+export function LogMealDialog(props: LogMealDialogProps) {
+  return (
+    <LogMealDialogContent
+      key={`${props.open}:${props.suggested?.foodId ?? ''}:${props.initialMealType ?? ''}:${prefillKey(props.initialItems)}`}
+      {...props}
+    />
+  );
+}
+
+function LogMealDialogContent({
+  open,
+  onOpenChange,
+  suggested,
+  initialMealType,
+  initialItems,
+}: LogMealDialogProps) {
   const [search, setSearch] = React.useState(suggested?.name ?? '');
-  const [mealType, setMealType] = React.useState('Breakfast');
+  const [mealType, setMealType] = React.useState(initialMealType ?? 'Breakfast');
   const [date, setDate] = React.useState(() => getBusinessTodayDateString());
   const [selected, setSelected] = React.useState<SelectedFood[]>(
-    suggested ? [toSelected(suggested.foodId, suggested)] : []
+    initialItems?.length
+      ? initialItems.map((item) => toSelected(item.foodId, item))
+      : suggested
+        ? [toSelected(suggested.foodId, suggested)]
+        : []
   );
   const [validationError, setValidationError] = React.useState('');
   const debouncedSearch = useDebounce(search, 300);

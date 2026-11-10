@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { LogMealDialog } from '@/features/diet/components/log-meal-dialog';
+import { LogMealDialog, type MealPrefillItem } from '@/features/diet/components/log-meal-dialog';
 import { getApiErrorCode } from '@/lib/api-error';
 import { getBusinessTodayDateString, getBusinessWeekStart } from '@/lib/business-date';
 import { cn } from '@/lib/utils';
@@ -65,6 +65,8 @@ export default function TodayPage() {
   const today = getBusinessTodayDateString();
   const weekStart = getBusinessWeekStart(today);
   const [mealOpen, setMealOpen] = React.useState(false);
+  const [selectedMeal, setSelectedMeal] = React.useState('Breakfast');
+  const [prefill, setPrefill] = React.useState<MealPrefillItem[]>([]);
   const summary = useDailySummaryQuery(today);
   const water = useWaterTodayQuery();
   const fasting = useCurrentFastingQuery();
@@ -84,6 +86,24 @@ export default function TodayPage() {
     logged: summary.data?.meals.find((meal) => meal.mealType.toUpperCase() === slot.toUpperCase()),
     planned: planDay?.meals.find((meal) => meal.mealType.toUpperCase() === slot.toUpperCase()),
   }));
+  const activeMeal = mealSlots.find((row) => row.slot === selectedMeal) ?? mealSlots[0];
+  const plannedFoods = activeMeal.planned?.foods ?? [];
+  const plannedCalories = plannedFoods.reduce((sum, food) => sum + Number(food.calories || 0), 0);
+
+  const openMealDialog = (slot: string) => {
+    const row = mealSlots.find((item) => item.slot === slot);
+    setSelectedMeal(slot);
+    setPrefill(
+      (row?.planned?.foods ?? []).map((food) => ({
+        foodId: food.foodId,
+        name: food.name,
+        servingSize: Number(food.servingSize) || 1,
+        servingUnit: food.servingUnit,
+        calories: Number(food.calories) || 0,
+      }))
+    );
+    setMealOpen(true);
+  };
   const calories = summary.data?.consumedCalories ?? 0;
   const targetCalories = summary.data?.targetCalories ?? 0;
   const caloriePercent = targetCalories > 0 ? Math.min(100, (calories / targetCalories) * 100) : 0;
@@ -102,7 +122,7 @@ export default function TodayPage() {
             Mọi thứ bạn cần cho một ngày: ăn uống, vận động, phục hồi và thói quen.
           </p>
         </div>
-        <Button onClick={() => setMealOpen(true)} className="gap-1.5">
+        <Button onClick={() => openMealDialog(selectedMeal)} className="gap-1.5">
           <Utensils className="size-4" aria-hidden="true" />
           Ghi bữa ăn
         </Button>
@@ -166,6 +186,34 @@ export default function TodayPage() {
             <CardDescription>Đã ăn gì và kế hoạch bữa hôm nay.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="grid grid-cols-4 gap-1 rounded-lg bg-muted p-1">
+              {mealSlots.map(({ slot, logged, planned }) => (
+                <button
+                  key={slot}
+                  type="button"
+                  onClick={() => setSelectedMeal(slot)}
+                  aria-pressed={selectedMeal === slot}
+                  className={cn(
+                    'rounded-md px-1.5 py-1.5 text-xs font-medium transition-colors',
+                    selectedMeal === slot
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  {mealLabel(slot).replace('Bữa ', '')}
+                  {(logged || planned) && (
+                    <span
+                      className={cn(
+                        'ml-1 inline-block size-1.5 rounded-full align-middle',
+                        logged ? 'bg-emerald-500' : 'bg-primary/50'
+                      )}
+                      aria-hidden="true"
+                    />
+                  )}
+                </button>
+              ))}
+            </div>
+
             {summary.isLoading ? (
               <p className="text-sm text-muted-foreground">Đang tải nhật ký ăn uống…</p>
             ) : summary.isError ? (
@@ -173,39 +221,69 @@ export default function TodayPage() {
                 Chưa tải được nhật ký. Bạn cần thiết lập mục tiêu dinh dưỡng trước.
               </p>
             ) : summary.data ? (
-              <ul className="space-y-3">
-                {mealSlots.map(({ slot, logged, planned }) => (
-                  <li key={slot} className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-semibold text-foreground">{mealLabel(slot)}</span>
-                      <span
-                        className={cn(
-                          'font-medium',
-                          logged ? 'text-foreground' : 'text-muted-foreground'
-                        )}
-                      >
-                        {logged ? `${Math.round(logged.totalCalories)} kcal` : 'Chưa ghi'}
-                      </span>
+              <div className="space-y-4">
+                <section className="space-y-1.5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Kế hoạch
+                  </p>
+                  {plannedFoods.length > 0 ? (
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-semibold text-foreground">
+                          {mealLabel(activeMeal.slot)}
+                        </span>
+                        <span className="font-medium text-foreground">
+                          {Math.round(plannedCalories)} kcal
+                        </span>
+                      </div>
+                      <ul className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
+                        {plannedFoods.map((food) => (
+                          <li key={food.foodId}>
+                            {food.name} · {food.servingSize} {food.servingUnit} ·{' '}
+                            {Math.round(food.calories)} kcal
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                    {logged && logged.items.length > 0 && (
-                      <ul className="space-y-0.5 text-xs text-muted-foreground">
-                        {logged.items.map((item) => (
-                          <li key={`${slot}-${item.foodId}`}>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Chưa có kế hoạch cho bữa này.</p>
+                  )}
+                </section>
+
+                <section className="space-y-1.5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Thực tế
+                  </p>
+                  {activeMeal.logged ? (
+                    <div className="rounded-lg border p-3">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-semibold text-foreground">
+                          {mealLabel(activeMeal.slot)}
+                        </span>
+                        <span className="font-medium text-foreground">
+                          {Math.round(activeMeal.logged.totalCalories)} kcal
+                        </span>
+                      </div>
+                      <ul className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
+                        {activeMeal.logged.items.map((item) => (
+                          <li key={`${activeMeal.slot}-${item.foodId}`}>
                             {item.name} · {item.quantity}
                             {item.servingUnit} · {Math.round(item.calories)} kcal
                           </li>
                         ))}
                       </ul>
-                    )}
-                    {planned && planned.foods.length > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground">Kế hoạch:</span>{' '}
-                        {planned.foods.map((food) => food.name).join(', ')}
-                      </p>
-                    )}
-                  </li>
-                ))}
-              </ul>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Chưa ghi bữa này.</p>
+                  )}
+                </section>
+
+                <Button className="w-full gap-1.5" onClick={() => openMealDialog(activeMeal.slot)}>
+                  <Utensils className="size-4" aria-hidden="true" />
+                  Ghi bữa ăn
+                  {plannedFoods.length > 0 && ' (điền sẵn kế hoạch)'}
+                </Button>
+              </div>
             ) : (
               <p className="text-sm text-muted-foreground">Hôm nay chưa ghi bữa ăn nào.</p>
             )}
@@ -218,10 +296,6 @@ export default function TodayPage() {
                 </Link>
               </p>
             )}
-
-            <Button variant="outline" className="w-full" onClick={() => setMealOpen(true)}>
-              Ghi bữa ăn
-            </Button>
           </CardContent>
         </Card>
 
@@ -388,7 +462,12 @@ export default function TodayPage() {
         </CardContent>
       </Card>
 
-      <LogMealDialog open={mealOpen} onOpenChange={setMealOpen} />
+      <LogMealDialog
+        open={mealOpen}
+        onOpenChange={setMealOpen}
+        initialMealType={selectedMeal}
+        initialItems={prefill}
+      />
     </div>
   );
 }
