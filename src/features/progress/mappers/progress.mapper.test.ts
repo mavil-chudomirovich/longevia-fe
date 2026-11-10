@@ -113,6 +113,11 @@ describe('ProgressMapper & Strict Timestamp Data Integrity (Corrective A)', () =
       expect(progressMapper.toCurrentFastingSession(undefined)).toBeNull();
     });
 
+    it('14b. treats an empty body (HTTP 204) as no active session', () => {
+      expect(progressMapper.toCurrentFastingSession('')).toBeNull();
+      expect(progressMapper.toCurrentFastingSession('   ')).toBeNull();
+    });
+
     it('15. rejects malformed non-null fasting response (empty object)', () => {
       expect(() => progressMapper.toCurrentFastingSession({} as CurrentFastingResponseDto)).toThrow(
         ProgressDataIntegrityError

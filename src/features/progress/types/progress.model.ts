@@ -58,6 +58,24 @@ export interface CurrentFastingSession {
   statusLabel: string;
 }
 
+export interface FastingHistoryItemModel {
+  sessionId: string;
+  protocol: string;
+  startedAt: Date;
+  endedAt: Date;
+  targetHours: number;
+  actualHours: number;
+  isGoalReached: boolean;
+  status: string;
+}
+
+export interface FastingHistoryPageModel {
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  items: FastingHistoryItemModel[];
+}
+
 export interface FastingSessionResult {
   sessionId: string;
   protocol: string;
@@ -82,6 +100,28 @@ export interface WaterSummary {
   percentComplete: number; // % thực tế (vd: 120%)
   visualPercent: number; // % kẹp [0..100] cho thanh tiến trình
   remainingMl: number; // Số ml còn thiếu để đạt mục tiêu (tối thiểu 0)
+}
+
+export interface WaterHistoryDay {
+  date: string;
+  consumedMl: number;
+  targetMl: number;
+  percentComplete: number;
+  visualPercent: number;
+  goalReached: boolean;
+}
+
+export interface WaterHistory {
+  days: number;
+  targetMl: number;
+  items: WaterHistoryDay[];
+}
+
+export interface SleepHistoryPage {
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  items: SleepRecord[];
 }
 
 export interface SleepRecord {

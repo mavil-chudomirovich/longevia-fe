@@ -9,6 +9,7 @@ import {
 } from '@/features/progress/utils/progress-session';
 import { dietApi } from '../api/diet.api';
 import type { CreateFoodValues, TargetFormValues } from '../schemas/diet.schema';
+import type { SuggestedTargetsModel } from '../types/diet.model';
 
 export const dietKeys = {
   all: ['diet'] as const,
@@ -19,6 +20,10 @@ export const dietKeys = {
   summary: (userId: string, date: string) => [...dietKeys.user(userId), 'summary', date] as const,
   recommendations: (userId: string, mealType: string, goal: string) =>
     [...dietKeys.user(userId), 'recommendations', mealType, goal] as const,
+  mealPlan: (userId: string, weekStartDate: string) =>
+    [...dietKeys.user(userId), 'meal-plan', weekStartDate] as const,
+  nutrientGaps: (userId: string, days: number) =>
+    [...dietKeys.user(userId), 'nutrient-gaps', days] as const,
 };
 
 function useDietSession() {
@@ -64,6 +69,26 @@ export function useRecommendationsQuery(mealType: string, goal: string, enabled:
   return useQuery({
     queryKey: dietKeys.recommendations(userId ?? '', mealType, goal),
     queryFn: ({ signal }) => dietApi.getRecommendations({ mealType, goal }, signal),
+    enabled: enabled && authenticated,
+    retry: false,
+  });
+}
+
+export function useMealPlanQuery(weekStartDate: string, enabled: boolean) {
+  const { userId, enabled: authenticated } = useDietSession();
+  return useQuery({
+    queryKey: dietKeys.mealPlan(userId ?? '', weekStartDate),
+    queryFn: ({ signal }) => dietApi.getMealPlan(weekStartDate, signal),
+    enabled: enabled && authenticated && Boolean(weekStartDate),
+    retry: false,
+  });
+}
+
+export function useNutrientGapsQuery(days: number, enabled = true) {
+  const { userId, enabled: authenticated } = useDietSession();
+  return useQuery({
+    queryKey: dietKeys.nutrientGaps(userId ?? '', days),
+    queryFn: ({ signal }) => dietApi.getNutrientGaps(days, signal),
     enabled: enabled && authenticated,
     retry: false,
   });
@@ -115,6 +140,25 @@ export function useCreateFoodMutation() {
   });
 }
 
+export function useUpdateFoodMutation() {
+  const client = useQueryClient();
+  return useDietMutation<{ id: string; values: CreateFoodValues }, unknown>(
+    ({ id, values }, signal) => dietApi.updateFood(id, values, signal),
+    (_food, userId) => {
+      void client.invalidateQueries({ queryKey: dietKeys.user(userId) });
+      toast.success('Đã cập nhật món ăn.');
+    }
+  );
+}
+
+export function useDeleteFoodMutation() {
+  const client = useQueryClient();
+  return useDietMutation<string, void>(dietApi.deleteFood, (_result, userId) => {
+    void client.invalidateQueries({ queryKey: dietKeys.user(userId) });
+    toast.success('Đã xoá món ăn.');
+  });
+}
+
 export function useSaveTargetMutation() {
   const client = useQueryClient();
   return useDietMutation<TargetFormValues, unknown>(
@@ -140,6 +184,16 @@ export function useCalculateTargetMutation() {
   );
 }
 
+export function useSuggestTargetsMutation() {
+  return useDietMutation<{ description: string; goal: string }, SuggestedTargetsModel>(
+    dietApi.suggestTargets,
+    () => {
+      // Trang tự hiển thị kết quả gợi ý; không toast để tránh nhiễu.
+    },
+    { toastOnError: false }
+  );
+}
+
 export function useLogMealMutation() {
   const client = useQueryClient();
   return useDietMutation<
@@ -149,6 +203,21 @@ export function useLogMealMutation() {
     void client.invalidateQueries({ queryKey: [...dietKeys.user(userId), 'summary'] });
     toast.success('Đã ghi bữa ăn vào nhật ký.');
   });
+}
+
+export function useGenerateMealPlanMutation() {
+  const client = useQueryClient();
+  return useDietMutation<
+    { weekStartDate: string; days: number; mealsPerDay: number },
+    Awaited<ReturnType<typeof dietApi.generateMealPlan>>
+  >(
+    (values, signal) =>
+      dietApi.generateMealPlan(values.weekStartDate, values.days, values.mealsPerDay, signal),
+    (_plan, userId) => {
+      void client.invalidateQueries({ queryKey: [...dietKeys.user(userId), 'meal-plan'] });
+      toast.success('Đã tạo và lưu kế hoạch ăn uống.');
+    }
+  );
 }
 
 export function isDietProfileError(error: unknown): boolean {

@@ -6,6 +6,7 @@ import { ArrowLeft, BedDouble, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { SleepLogForm } from '@/features/progress/components/sleep-log-form';
+import { SleepHistory } from '@/features/progress/components/sleep-history';
 
 export default function SleepPage() {
   const sleepHygienePrinciples = [
@@ -84,6 +85,8 @@ export default function SleepPage() {
           </Card>
         </div>
       </div>
+
+      <SleepHistory />
     </div>
   );
 }

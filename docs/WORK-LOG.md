@@ -4,6 +4,150 @@
 
 ---
 
+## [2026-11-10] Targets BMR/TDEE, WeekPicker, lịch sử nước/ngủ, AI-only meal-plan
+
+- **Navbar**: đổi thứ tự Trang chủ → Dinh dưỡng → Tiến trình → Hỏi sách.
+- **Targets**: bỏ nút "Tính tự động", chỉ còn "Lưu mục tiêu"; BMR/TDEE do PUT tự đính kèm,
+  có chú thích nguồn; bỏ câu mô tả đã yêu cầu.
+- **WeekPicker**: component dùng chung (lùi/tới tuần + lịch tháng + "Tuần này") cho
+  `/diet/meal-plan` và `/progress/workout`; helper trong `src/lib/business-date.ts`.
+- **Progress**: card lịch sử uống nước (7/30/90 ngày) và lịch sử giấc ngủ (phân trang, xoá);
+  sửa ghi chú UTC cũ.
+- **Workout**: tự tải plan đã lưu, 404 là trạng thái rỗng; nhập/lưu giới hạn sức khỏe +
+  dụng cụ, prefill từ hồ sơ; hiển thị input của plan đã lưu.
+- **Workout nâng cao**: giới hạn sức khỏe chọn nhanh + nhập tự do (tối đa 8 mục/50 ký tự);
+  mỗi buổi hiển thị 1–3 bài (chính + phụ) với thời lượng/cường độ; AI ưu tiên bài theo goal
+  (tăng cơ → tập tạ, giảm cân → cardio).
+- **Hồ sơ**: thêm checkbox "Đau hoặc tổn thương khớp".
+- **Meal-plan**: bỏ UI fallback; request generate timeout 150 giây; đổi sang WeekPicker.
+- **Meal-plan (tiếp)**: bỏ tách Đã lưu/Tạo mới; một màn plan, tạo mới qua dialog.
+- **Workout card**: ngày là tiêu đề chính; bài tập/thời lượng dùng màu foreground, chỉ metadata phụ mới muted.
+- **Trang `/today`**: daily hub tổng hợp ăn uống, nước, nhịn ăn, giấc ngủ, bài tập hôm nay, cân nặng/streak và thói quen; quick actions ghi bữa ăn/thêm nước.
+- **Xác minh**: `tsc` 0 lỗi; 221 test pass; lint 0 error; build thành công.
+
+---
+
+## [2026-11-09] Đợt UI fixes + giờ Việt Nam + lịch sử nhịn ăn
+
+- **Điều hướng**: bỏ "Hỏi sách" khỏi sub-nav Dinh dưỡng; bỏ "Gợi ý AI" khỏi navbar chính; đổi tên "Gợi ý bữa ăn".
+- **Targets**: desktop 30% gợi ý AI / 70% form; mobile form trước AI.
+- **Hỏi sách**: bỏ tiêu đề/mô tả; khung chat cao cố định + scroll riêng + auto-scroll; mở hội thoại cũ và gửi tiếp đúng hội thoại.
+- **Meal plan**: 2 tab Đã lưu / Tạo mới; chọn ngày tự chuẩn hoá thứ Hai; hiện lý do fallback theo ngày.
+- **Fasting**: thêm card lịch sử phân trang (`GET /progress/fasting/history`).
+- **Giờ Việt Nam (ADR006)**: helper `src/lib/business-date.ts`; các trang dùng ngày local thay UTC; `progress-date` đổi sang ngày nghiệp vụ; test cập nhật theo +7.
+- **Favicon**: `app/icon.svg` + `apple-icon.png` + `favicon.ico` mô phỏng heart-pulse xanh của header, bỏ `logo-mark.png` veggie.
+- **Kiểm chứng**: `tsc` 0 lỗi; 216 test pass; lint 0 error; build thành công.
+
+---
+
+## [2026-11-09] Phase 4 — AI diễn giải mẹo trường thọ & gợi ý mục tiêu dinh dưỡng
+
+- **BE**:
+  - Prompt `LongevityTip`: `MealSelector` diễn giải đoạn sách thành 1–2 câu tiếng Việt thay vì trả raw chunk; fallback câu curate sẵn, citation vẫn giữ đoạn gốc.
+  - gRPC `SuggestNutritionTargets` + `StructuredResponseKind.NutritionTargetSuggestion`: calo tính bằng Mifflin-St Jeor/TDEE, AI chỉ tinh chỉnh protein/fat trong khoảng an toàn; ngoài khoảng → công thức (`source=formula`).
+  - Diet `POST /targets/me/suggest` (không ghi DB) dùng hồ sơ + cân nặng mới nhất.
+  - Test: Recommendation unit 387, Recommendation integration 66, Diet integration 47.
+- **FE**:
+  - `/diet/targets`: khối "Gợi ý bằng AI" (mô tả + mục tiêu), hiển thị rationale markdown, nhãn nguồn (AI/công thức), cảnh báo chưa lưu; điền form, người dùng bấm "Lưu thủ công" mới ghi DB.
+  - DTO/model/mapper/API/query cho suggest targets; test mapper source fallback.
+- **Kiểm chứng**: `make lint` PASS; `npx tsc --noEmit` 0 lỗi; 24 file / 217 test; `npm run build` thành công.
+
+---
+
+## [2026-11-09] Phase 3 — Hỏi sách dạng chat: SSE + lịch sử hội thoại
+
+- **BE**:
+  - gRPC mới `AskLongevityQuestionStream` (server streaming) + `ConversationTurn history`; Gemini stream token qua `IChatStreamModel`.
+  - Use case chat: chào hỏi/cảm ơn trả lời cố định không gọi AI; truy xuất + stream câu trả lời grounded; gắn 3 citation từ đoạn sách; câu follow-up ngắn dùng ngữ cảnh lượt trước.
+  - Diet: `POST /knowledge/ask/stream` (SSE: delta/citation/done/error), GET/DELETE `/knowledge/conversations`; lưu hội thoại ở `diet_db` (migration `AddKnowledgeConversations`).
+  - Nginx: location riêng cho SSE, tắt `proxy_buffering`.
+  - Test: Recommendation unit 383 (thêm 5 test stream), Diet unit 19, Diet integration 47, Recommendation integration 66.
+- **FE**:
+  - BFF route `/api/knowledge/ask/stream` đọc cookie `lv_at` và proxy `ReadableStream` (không buffer).
+  - Hook `useKnowledgeChat`: parse SSE theo buffer, ghép delta, gắn citation, đồng bộ id hội thoại; huỷ khi đổi phiên.
+  - UI chat: sidebar hội thoại (mới/xoá/chọn), bong bóng tin nhắn, markdown, citation chip, caret streaming, Enter gửi/Shift+Enter xuống dòng.
+  - Test: 24 file, 216 test pass.
+- **Kiểm chứng thật**: gọi SSE qua nginx với JWT thật → nhận chuỗi `delta` từ Gemini, `citation`, `done`; `GET /conversations` trả `messageCount=2`.
+- **Sửa lỗi phát hiện khi verify**: EF đánh dấu message mới là `Modified` khi thêm qua navigation (concurrency 0 rows) → thêm `AddMessage` tường minh vào repository + test hồi quy hai lần SaveChanges.
+
+---
+
+## [2026-11-09] Phase 2 — lý do fallback AI, nhãn tập luyện tiếng Việt, fasting 204
+
+- **BE**:
+  - `fasting/current` trả **204** khi chưa có phiên (trước đây 200 body rỗng).
+  - Thêm `usedFallbackReason` cho meal plan & workout plan (proto additive + DTO Diet/Progress).
+  - Thêm `activityLabel` (tiếng Việt) cho từng ngày tập.
+  - Viết lại `rationale`: bỏ từ "caller", dùng nhãn hoạt động tiếng Việt; meal rationale gọn hơn.
+  - Test: Recommendation unit 378, Recommendation integration 66, Progress integration 152, Diet integration 46.
+- **FE**:
+  - DTO/model/mapper nhận `usedFallbackReason` + `activityLabel`; tương thích response cũ (null).
+  - Banner fallback hiển thị đúng nguyên nhân, chỉ hiện nút "Thử tạo lại" khi có thể thử lại.
+  - Tiêu đề ngày tập ưu tiên `activityLabel` từ BE.
+  - Test: 23 file, 212 test pass.
+- **Kiểm chứng**: `make lint` PASS (0 warning); `npx tsc --noEmit` 0 lỗi; `npm run build` thành công.
+
+---
+
+## [2026-11-09] Phase 1 UI/UX: markdown, citation chip, sub-nav Dinh dưỡng, sửa lỗi trạng thái
+
+- **Vấn đề**:
+  - `/knowledge` là trang mồ côi (không header/footer), tiêu đề "Tri thức" khó hiểu.
+  - Trích dẫn hiện inline dài dòng kèm "đã xác minh / chưa kiểm chứng" ở 5 màn hình; nội dung sách/AI không render markdown.
+  - `/diet` tự render cụm nút điều hướng, các trang con chỉ có "Về nhật ký" nên phải quay lại `/diet` mới đổi trang.
+  - `/progress/fasting` báo "sự cố kết nối" khi chưa có phiên nhịn ăn: API trả 204/body rỗng, mapper coi là dữ liệu sai.
+  - `/progress/longevity` và `/progress/workout` lộ key tiếng Anh (`fasting`, `walking`…).
+  - Cảnh báo thiếu chất xơ của meal plan bị dồn lên đầu trang thay vì nằm trong ngày tương ứng.
+- **Đã thực hiện**:
+  - Component dùng chung: `MarkdownText` (react-markdown + remark-gfm + remark-breaks, chặn HTML thô), `CitationChip`/`CitationChipList` (icon + popover hover, bấm mở được), `InfoTooltip`.
+  - `diet-subnav.tsx` + gắn vào `diet/layout.tsx`; bỏ cụm nút ở `/diet` và nút "Về nhật ký" ở 5 trang con.
+  - `knowledge/layout.tsx` (header/footer), đổi tiêu đề/nhãn menu thành "Hỏi sách"; trả lời + tra cứu render markdown; tra cứu sort theo chương/trang và dedupe.
+  - `/diet/targets`: thêm tooltip giải thích BMR, TDEE, calo, P/C/F.
+  - `/diet/suggestions`: tooltip P/C/F, citation chip; `/diet/meal-plan`: cảnh báo gắn theo ngày (`partitionWarnings`), markdown rationale/suggestion.
+  - `/progress/workout`, `/progress/longevity`: nhãn tiếng Việt qua `progress-labels.ts`, citation chip.
+  - Fasting: mapper coi `''`/204 là "không có phiên".
+  - Sửa lỗi lint có sẵn: đổi `session()` → `useProgressAiSession()` trong `progress-ai.queries.ts`.
+- **Kiểm chứng**:
+  - `npx tsc --noEmit`: 0 lỗi.
+  - `npm test`: 20 file, **205/205** test pass (thêm test markdown, citation order, partitionWarnings, nhãn tiếng Việt, fasting rỗng).
+  - `npm run lint`: 0 error.
+  - `npm run build`: 22 route thành công.
+- **Chưa làm (phase sau)**: chat + SSE, AI diễn giải mẹo trường thọ, AI gợi ý mục tiêu, viết lại rationale workout phía BE, lý do fallback meal plan.
+
+---
+
+## [2026-11-09] Hoàn thiện các màn AI: meal plan, vi chất, tri thức, workout, longevity, digest
+
+- **Đã thêm**:
+  - `/diet/meal-plan`, `/diet/nutrients`, `/knowledge`.
+  - `/progress/workout`, `/progress/longevity`.
+  - `/profile` toggle nhận báo cáo tuần.
+  - API/query/mapper cho meal plan, nutrient gaps, knowledge, workout, longevity.
+  - Nút xoá custom food trong `/diet/foods`.
+  - Navbar thêm mục “Tri thức”; giữ logic active path dài nhất.
+- **Kiểm chứng**:
+  - `npx tsc --noEmit`: 0 lỗi.
+  - `npm test`: 16 file, 188 test pass.
+  - `npm run build`: 27 route thành công.
+- **Chưa làm**: FE sửa custom food, Playwright E2E.
+
+---
+
+
+- **Vấn đề**: `SiteHeader` dùng `pathname.startsWith(item.href)`, nên `/diet/suggestions` khớp cả `/diet` và `/diet/suggestions`; bấm “Gợi ý AI” thì “Dinh dưỡng” cũng sáng.
+- **Đã thực hiện**:
+  - Thêm `src/components/layout/nav-active.ts` với `getActiveNavHref(pathname, hrefs)`: khớp exact hoặc `href + '/'`, chọn href dài nhất; bỏ query/hash và trailing slash.
+  - `site-header.tsx`: tính một `activeHref` và dùng cho cả desktop nav lẫn mobile drawer.
+  - Thêm `nav-active.test.ts` với 7 case: `/`, `/diet`, `/diet/`, `/diet/foods`, `/diet/suggestions`, `/progress/metrics`, `/dietary`, `/login`, query/hash.
+- **Kiểm chứng**:
+  - `npx vitest run src/components/layout/nav-active.test.ts`: 7/7 pass.
+  - `npx tsc --noEmit`: 0 lỗi.
+  - `npm test`: 16 file, **188/188** test pass.
+  - `npm run lint`: 0 error (119 warning có sẵn).
+  - `npm run build`: 22 route thành công.
+
+---
+
 ## [2026-11-08] Thông báo lỗi thân thiện với người dùng
 
 - **Bảng thông báo dùng chung** `src/lib/error-messages.ts`: mỗi mã lỗi BE (identity/diet/progress/validation/system) có câu tiếng Việt dễ hiểu và, khi có cách khắc phục, nút dẫn tới trang phù hợp (Cập nhật hồ sơ, Ghi cân nặng, Thiết lập mục tiêu, Thêm món ăn, Đăng nhập…).

@@ -246,12 +246,12 @@ function WaterTrackerInner() {
           </div>
         </form>
 
-        {/* Ghi chú chu kỳ UTC */}
+        {/* Ghi chú chu kỳ ngày nghiệp vụ */}
         <div className="flex items-start gap-1.5 px-3 py-2 rounded-lg bg-muted/40 border border-border/40 text-[11px] text-muted-foreground">
           <Info className="size-3.5 shrink-0 text-muted-foreground mt-0.5" />
           <p className="text-pretty">
-            Lượng nước trong ngày được tính toán lại từ mốc 00:00 UTC (tức 07:00 giờ sáng theo giờ
-            Việt Nam) theo quy định chuẩn của hệ thống Longevia.
+            Lượng nước trong ngày được tính lại từ 00:00 giờ Việt Nam (Asia/Ho_Chi_Minh) theo quy
+            định chuẩn của hệ thống Longevia.
           </p>
         </div>
       </CardContent>

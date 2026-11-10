@@ -6,6 +6,7 @@ import { ArrowLeft, Sparkles, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { WaterTracker } from '@/features/progress/components/water-tracker';
+import { WaterHistory } from '@/features/progress/components/water-history';
 
 export default function WaterPage() {
   const tips = [
@@ -81,6 +82,8 @@ export default function WaterPage() {
           </Card>
         </div>
       </div>
+
+      <WaterHistory />
     </div>
   );
 }

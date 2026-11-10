@@ -8,12 +8,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { getApiErrorAction, getApiErrorCode, getApiErrorMessage } from '@/lib/api-error';
 import type { ErrorAction } from '@/lib/error-messages';
+import { InfoTooltip } from '@/components/shared/info-tooltip';
+import { MarkdownText } from '@/components/shared/markdown-text';
 import { targetSchema, type TargetFormValues } from '@/features/diet/schemas/diet.schema';
+import type { SuggestedTargetsModel } from '@/features/diet/types/diet.model';
 import {
-  useCalculateTargetMutation,
   useSaveTargetMutation,
+  useSuggestTargetsMutation,
   useTargetQuery,
 } from '@/features/diet/queries/diet.queries';
 
@@ -35,11 +39,20 @@ const labels = {
   targetCarbsGrams: 'Carbohydrate (g)',
   targetFatGrams: 'Chất béo (g)',
 };
+const hints = {
+  targetCalories: 'Tổng năng lượng bạn muốn ăn mỗi ngày.',
+  targetProteinGrams: 'Đạm giúp giữ và xây cơ; 1 g protein ≈ 4 kcal.',
+  targetCarbsGrams: 'Tinh bột là nguồn năng lượng chính; 1 g carb ≈ 4 kcal.',
+  targetFatGrams: 'Chất béo cần cho hormone và hấp thu vitamin; 1 g chất béo ≈ 9 kcal.',
+};
 
 export default function TargetsPage() {
   const query = useTargetQuery();
   const save = useSaveTargetMutation();
-  const calculate = useCalculateTargetMutation();
+  const suggest = useSuggestTargetsMutation();
+  const [goal, setGoal] = React.useState('Maintain');
+  const [description, setDescription] = React.useState('');
+  const [suggestion, setSuggestion] = React.useState<SuggestedTargetsModel | null>(null);
   const form = useForm<TargetFormValues>({
     resolver: zodResolver(targetSchema),
     defaultValues: defaults,
@@ -59,7 +72,29 @@ export default function TargetsPage() {
     });
   }, [form, query.data]);
 
-  const submit = (mode: 'manual' | 'calculate') =>
+  const onSuggest = async () => {
+    setFormError('');
+    setFormAction(undefined);
+    try {
+      const { data: result } = await suggest.mutateAsync({ description, goal });
+      setSuggestion(result);
+      form.reset({
+        targetCalories: String(result.targetCalories),
+        targetProteinGrams: String(result.targetProteinGrams),
+        targetCarbsGrams: String(result.targetCarbsGrams),
+        targetFatGrams: String(result.targetFatGrams),
+      });
+    } catch (error) {
+      setFormError(
+        getApiErrorMessage(
+          error,
+          'Chưa gợi ý được mục tiêu. Bạn kiểm tra hồ sơ/cân nặng rồi thử lại nhé.'
+        )
+      );
+    }
+  };
+
+  const submit = () =>
     form.handleSubmit(async (values) => {
       setFormError('');
       setFormAction(undefined);
@@ -75,8 +110,7 @@ export default function TargetsPage() {
         return;
       }
       try {
-        if (mode === 'manual') await save.mutateAsync(values);
-        else await calculate.mutateAsync(values);
+        await save.mutateAsync(values);
         // Không gọi query.refetch() ở đây: mutation đã invalidate query mục tiêu, gọi thêm
         // sẽ huỷ request đang chạy (và trước đây sinh toast "mất kết nối" giả).
       } catch (error) {
@@ -91,121 +125,191 @@ export default function TargetsPage() {
     });
 
   return (
-    <div className="container mx-auto max-w-3xl px-4 py-8 sm:px-6">
+    <div className="container mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <div className="mb-6">
-        <Button variant="outline" asChild>
-          <Link href="/diet">Về nhật ký</Link>
-        </Button>
+        <p className="text-sm text-muted-foreground">
+          Chỉ số dưới đây là mục tiêu mỗi ngày; bạn có thể để Longevia tính giúp hoặc tự nhập.
+        </p>
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>Mục tiêu dinh dưỡng</CardTitle>
-          <CardDescription>
-            Tự nhập mục tiêu, hoặc để Longevia tính từ hồ sơ và cân nặng gần nhất. BMR là năng lượng
-            cơ thể cần khi nghỉ ngơi; TDEE là tổng năng lượng bạn tiêu hao mỗi ngày.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {query.isLoading ? (
-            <p>Đang tải mục tiêu…</p>
-          ) : query.isError && !missing ? (
-            <div className="space-y-3">
-              <p role="alert">
-                {getApiErrorMessage(
-                  query.error,
-                  'Chưa tải được mục tiêu của bạn. Bạn thử lại giúp mình nhé.'
-                )}
-              </p>
-              <Button variant="outline" onClick={() => void query.refetch()}>
-                Thử lại
-              </Button>
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)] lg:items-start">
+        <Card className="order-2 lg:order-1">
+          <CardHeader>
+            <CardTitle className="text-base">Gợi ý bằng AI</CardTitle>
+            <CardDescription>
+              Mô tả mục tiêu hiện tại của bạn; Longevia sẽ đề xuất calo và macro.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="suggest-description">Mô tả mong muốn</Label>
+                <Textarea
+                  id="suggest-description"
+                  value={description}
+                  maxLength={500}
+                  onChange={(event) => setDescription(event.target.value)}
+                  placeholder="Ví dụ: mình 32 tuổi, tập gym 3 buổi/tuần, muốn giảm mỡ bụng nhưng vẫn đủ sức tập."
+                  className="min-h-20"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="suggest-goal">Mục tiêu</Label>
+                <select
+                  id="suggest-goal"
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={goal}
+                  onChange={(event) => setGoal(event.target.value)}
+                >
+                  <option value="LoseWeight">Giảm cân</option>
+                  <option value="Maintain">Duy trì</option>
+                  <option value="BuildMuscle">Tăng cơ</option>
+                  <option value="Longevity">Trường thọ</option>
+                </select>
+              </div>
             </div>
-          ) : (
-            <>
-              {missing && (
-                <div className="mb-5 rounded-lg border border-primary/30 bg-primary/5 p-4 text-sm">
-                  <p className="font-medium">Bạn chưa có mục tiêu dinh dưỡng.</p>
-                  <p className="mt-1 text-muted-foreground">
-                    Bấm <strong>Tính tự động</strong> để Longevia đề xuất dựa trên hồ sơ và cân nặng
-                    gần nhất của bạn, hoặc tự nhập các con số bên dưới rồi bấm{' '}
-                    <strong>Lưu thủ công</strong>.
-                  </p>
+            <Button
+              onClick={() => void onSuggest()}
+              disabled={suggest.isPending}
+              variant="outline"
+              className="gap-1.5"
+            >
+              {suggest.isPending ? 'Đang gợi ý…' : 'Gợi ý bằng AI'}
+            </Button>
+
+            {suggestion && (
+              <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-4">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">
+                    {suggestion.source === 'ai' ? 'AI đề xuất' : 'Công thức chuẩn'}
+                  </span>
+                  <span>Chưa lưu — kiểm tra rồi bấm “Lưu mục tiêu”.</span>
                 </div>
-              )}
-              {query.data && (
-                <div className="mb-5 grid gap-3 rounded-lg bg-muted/60 p-4 sm:grid-cols-2">
-                  <p>
-                    BMR:{' '}
-                    <strong>
-                      {query.data.bmr === null ? 'Chưa tính' : `${query.data.bmr} kcal`}
-                    </strong>
-                  </p>
-                  <p>
-                    TDEE:{' '}
-                    <strong>
-                      {query.data.tdee === null ? 'Chưa tính' : `${query.data.tdee} kcal`}
-                    </strong>
-                  </p>
-                </div>
-              )}
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void submit('manual')(event);
-                }}
-                className="space-y-4"
-                noValidate
-              >
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {fields.map((field) => (
-                    <div key={field} className="space-y-2">
-                      <Label htmlFor={field}>{labels[field]}</Label>
-                      <Input
-                        id={field}
-                        type="number"
-                        min="0"
-                        step="0.001"
-                        {...form.register(field)}
-                      />
-                      {form.formState.errors[field] && (
-                        <p className="text-sm text-destructive">
-                          {form.formState.errors[field]?.message}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                {formError && (
-                  <div
-                    role="alert"
-                    className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive"
-                  >
-                    {formError}
-                    {formAction && (
-                      <Link href={formAction.href} className="ml-1 font-medium underline">
-                        {formAction.label}
-                      </Link>
-                    )}
+                <MarkdownText content={suggestion.rationale} compact />
+                <p className="text-xs text-muted-foreground">{suggestion.safetyNote}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="order-1 lg:order-2">
+          <CardHeader>
+            <CardTitle>Mục tiêu dinh dưỡng</CardTitle>
+            <CardDescription>
+              Mục tiêu calo và macro bạn muốn duy trì mỗi ngày. Bạn có thể dùng Gợi ý bằng AI hoặc
+              tự nhập, rồi bấm “Lưu mục tiêu”.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {query.isLoading ? (
+              <p>Đang tải mục tiêu…</p>
+            ) : query.isError && !missing ? (
+              <div className="space-y-3">
+                <p role="alert">
+                  {getApiErrorMessage(
+                    query.error,
+                    'Chưa tải được mục tiêu của bạn. Bạn thử lại giúp mình nhé.'
+                  )}
+                </p>
+                <Button variant="outline" onClick={() => void query.refetch()}>
+                  Thử lại
+                </Button>
+              </div>
+            ) : (
+              <>
+                {missing && (
+                  <div className="mb-5 rounded-lg border border-primary/30 bg-primary/5 p-4 text-sm">
+                    <p className="font-medium">Bạn chưa có mục tiêu dinh dưỡng.</p>
+                    <p className="mt-1 text-muted-foreground">
+                      Dùng <strong>Gợi ý bằng AI</strong> để Longevia đề xuất dựa trên hồ sơ và cân
+                      nặng gần nhất, hoặc tự nhập các con số bên dưới rồi bấm{' '}
+                      <strong>Lưu mục tiêu</strong>.
+                    </p>
                   </div>
                 )}
-                <div className="flex flex-wrap gap-2">
-                  <Button type="submit" disabled={save.isPending || calculate.isPending}>
-                    {save.isPending ? 'Đang lưu…' : 'Lưu thủ công'}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={save.isPending || calculate.isPending}
-                    onClick={() => void submit('calculate')()}
-                  >
-                    {calculate.isPending ? 'Đang tính…' : 'Tính tự động'}
-                  </Button>
-                </div>
-              </form>
-            </>
-          )}
-        </CardContent>
-      </Card>
+                {query.data && (
+                  <div className="mb-5 rounded-lg bg-muted/60 p-4">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <p className="flex items-center gap-1.5">
+                        BMR:
+                        <InfoTooltip
+                          label="BMR là gì?"
+                          content="BMR (Basal Metabolic Rate) là năng lượng cơ thể dùng khi nghỉ hoàn toàn — chỉ để duy trì tim đập, hô hấp, nhiệt độ."
+                        />
+                        <strong>
+                          {query.data.bmr === null ? 'Chưa có dữ liệu' : `${query.data.bmr} kcal`}
+                        </strong>
+                      </p>
+                      <p className="flex items-center gap-1.5">
+                        TDEE:
+                        <InfoTooltip
+                          label="TDEE là gì?"
+                          content="TDEE (Total Daily Energy Expenditure) là tổng năng lượng bạn tiêu hao mỗi ngày, gồm BMR cộng vận động và tiêu hóa."
+                        />
+                        <strong>
+                          {query.data.tdee === null ? 'Chưa có dữ liệu' : `${query.data.tdee} kcal`}
+                        </strong>
+                      </p>
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Tính từ hồ sơ và cân nặng gần nhất khi bạn lưu mục tiêu.
+                    </p>
+                  </div>
+                )}
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void submit()(event);
+                  }}
+                  className="space-y-4"
+                  noValidate
+                >
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {fields.map((field) => (
+                      <div key={field} className="space-y-2">
+                        <div className="flex items-center gap-1.5">
+                          <Label htmlFor={field}>{labels[field]}</Label>
+                          <InfoTooltip label={hints[field]} content={hints[field]} />
+                        </div>
+                        <Input
+                          id={field}
+                          type="number"
+                          min="0"
+                          step="0.001"
+                          {...form.register(field)}
+                        />
+                        {form.formState.errors[field] && (
+                          <p className="text-sm text-destructive">
+                            {form.formState.errors[field]?.message}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {formError && (
+                    <div
+                      role="alert"
+                      className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive"
+                    >
+                      {formError}
+                      {formAction && (
+                        <Link href={formAction.href} className="ml-1 font-medium underline">
+                          {formAction.label}
+                        </Link>
+                      )}
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="submit" disabled={save.isPending}>
+                      {save.isPending ? 'Đang lưu…' : 'Lưu mục tiêu'}
+                    </Button>
+                  </div>
+                </form>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

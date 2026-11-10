@@ -6,6 +6,7 @@ import { Clock, ShieldCheck, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FastingPanel } from '@/features/progress/components/fasting-panel';
+import { FastingHistory } from '@/features/progress/components/fasting-history';
 
 export default function FastingPage() {
   const fastingStages = [
@@ -117,6 +118,8 @@ export default function FastingPage() {
           </Card>
         </div>
       </div>
+
+      <FastingHistory />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { LogMealDialog } from '@/features/diet/components/log-meal-dialog';
+import { getBusinessTodayDateString } from '@/lib/business-date';
 import { useDailySummaryQuery } from '@/features/diet/queries/diet.queries';
 
 function Macro({
@@ -33,7 +34,7 @@ function Macro({
 }
 
 export default function DietPage() {
-  const [date, setDate] = React.useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = React.useState(() => getBusinessTodayDateString());
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const query = useDailySummaryQuery(date);
   const summary = query.data;
@@ -49,15 +50,6 @@ export default function DietPage() {
           <p className="mt-1 text-muted-foreground">Theo dõi những gì bạn ăn mỗi ngày.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/diet/foods">Danh mục món</Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/diet/targets">Mục tiêu</Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/diet/suggestions">Gợi ý AI</Link>
-          </Button>
           <Button onClick={() => setDialogOpen(true)}>Ghi bữa ăn</Button>
         </div>
       </div>

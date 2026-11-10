@@ -12,12 +12,15 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { progressApi } from '../api/progress.api';
 import {
   CurrentFastingSession,
+  FastingHistoryPageModel,
   DashboardSummary,
   EndFastingResult,
   FastingSessionResult,
   GetMetricsHistoryFilters,
   MetricsHistory,
+  SleepHistoryPage,
   SleepRecord,
+  WaterHistory,
   WaterSummary,
   BodyMetricRecord,
 } from '../types/progress.model';
@@ -54,9 +57,17 @@ export const progressKeys = {
   dashboard: (userId: string) => [...progressKeys.user(userId), 'dashboard'] as const,
   fasting: (userId: string) => [...progressKeys.user(userId), 'fasting'] as const,
   fastingCurrent: (userId: string) => [...progressKeys.fasting(userId), 'current'] as const,
+  fastingHistory: (userId: string, page: number, pageSize: number) =>
+    [...progressKeys.fasting(userId), 'history', page, pageSize] as const,
   water: (userId: string) => [...progressKeys.user(userId), 'water'] as const,
   waterToday: (userId: string, utcDate?: string) =>
     [...progressKeys.water(userId), 'today', utcDate ?? getUtcTodayDateString()] as const,
+  waterHistory: (userId: string, days: number) =>
+    [...progressKeys.water(userId), 'history', days] as const,
+  sleep: (userId: string) => [...progressKeys.user(userId), 'sleep'] as const,
+  sleepToday: (userId: string) => [...progressKeys.sleep(userId), 'today'] as const,
+  sleepHistory: (userId: string, page: number, pageSize: number) =>
+    [...progressKeys.sleep(userId), 'history', page, pageSize] as const,
   metrics: (userId: string) => [...progressKeys.user(userId), 'metrics'] as const,
   metricsHistory: (userId: string, filters?: GetMetricsHistoryFilters) =>
     [...progressKeys.metrics(userId), 'history', filters ?? {}] as const,
@@ -130,6 +141,19 @@ export function useCurrentFastingQuery(customUserId?: string) {
   });
 }
 
+export function useFastingHistoryQuery(page: number, pageSize = 10, customUserId?: string) {
+  const { userId, isEnabled } = useProgressAuth(customUserId);
+
+  return useQuery<FastingHistoryPageModel>({
+    queryKey: progressKeys.fastingHistory(userId, page, pageSize),
+    queryFn: ({ signal }) => progressApi.getFastingHistory(page, pageSize, signal),
+    enabled: isEnabled,
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+    placeholderData: (previous) => previous,
+  });
+}
+
 export function useWaterTodayQuery(utcDate?: string, customUserId?: string) {
   const { userId, isEnabled } = useProgressAuth(customUserId);
 
@@ -139,6 +163,54 @@ export function useWaterTodayQuery(utcDate?: string, customUserId?: string) {
     enabled: isEnabled,
     staleTime: 30 * 1000,
     gcTime: 5 * 60 * 1000,
+  });
+}
+
+export function useWaterHistoryQuery(days = 30, customUserId?: string) {
+  const { userId, isEnabled } = useProgressAuth(customUserId);
+
+  return useQuery<WaterHistory>({
+    queryKey: progressKeys.waterHistory(userId, days),
+    queryFn: ({ signal }) => progressApi.getWaterHistory(days, signal),
+    enabled: isEnabled,
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+  });
+}
+
+export function useSleepTodayQuery(customUserId?: string) {
+  const { userId, isEnabled } = useProgressAuth(customUserId);
+
+  return useQuery<SleepRecord | null>({
+    queryKey: progressKeys.sleepToday(userId),
+    queryFn: ({ signal }) => progressApi.getSleepToday(signal),
+    enabled: isEnabled,
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+  });
+}
+
+export function useSleepHistoryQuery(page: number, pageSize = 10, customUserId?: string) {
+  const { userId, isEnabled } = useProgressAuth(customUserId);
+
+  return useQuery<SleepHistoryPage>({
+    queryKey: progressKeys.sleepHistory(userId, page, pageSize),
+    queryFn: ({ signal }) => progressApi.getSleepHistory(page, pageSize, signal),
+    enabled: isEnabled,
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useDeleteSleepMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => progressApi.deleteSleepLog(id),
+    onSuccess: () => {
+      toast.success('Đã xoá bản ghi giấc ngủ.');
+      void client.invalidateQueries({ queryKey: progressKeys.all });
+    },
   });
 }
 
@@ -531,6 +603,9 @@ export function useLogSleepMutation() {
         return;
       }
       toast.success(`Đã ghi nhận giấc ngủ (${record.formattedDuration}) thành công!`);
+      queryClient.invalidateQueries({
+        queryKey: progressKeys.sleep(context.initiatingUserId),
+      });
       queryClient.invalidateQueries({
         queryKey: progressKeys.dashboard(context.initiatingUserId),
       });

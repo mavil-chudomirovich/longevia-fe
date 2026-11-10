@@ -43,4 +43,20 @@ describe('DietMapper', () => {
       recommendedMeals: [{ citations: [{ chapterNumber: 3, verified: false }] }],
     });
   });
+
+  it('maps AI target suggestion and normalizes unknown source to formula', () => {
+    const ai = dietMapper.toSuggestedTargets({
+      targetCalories: 2600,
+      targetProteinGrams: 140,
+      targetCarbsGrams: 300,
+      targetFatGrams: 72,
+      rationale: '### Cách chia',
+      source: 'ai',
+      safetyNote: 'Tham khảo bác sĩ.',
+    });
+    expect(ai).toMatchObject({ targetCalories: 2600, source: 'ai' });
+
+    const fallback = dietMapper.toSuggestedTargets({ source: 'something' });
+    expect(fallback.source).toBe('formula');
+  });
 });

@@ -1,12 +1,23 @@
-import { BaseMapper, pickField, safeNumber, safeString, safeArray } from '@/lib/mapper';
+import {
+  BaseMapper,
+  pickField,
+  safeBoolean,
+  safeNumber,
+  safeString,
+  safeArray,
+} from '@/lib/mapper';
 import {
   BodyMetricResponseDto,
   CurrentFastingResponseDto,
   DashboardSummaryResponseDto,
   EndFastingResponseDto,
+  FastingHistoryItemDto,
+  FastingHistoryPageDto,
   FastingSessionResponseDto,
   MetricsHistoryResponseDto,
   SleepResponseDto,
+  SleepHistoryPageDto,
+  WaterHistoryResponseDto,
   WaterSummaryResponseDto,
 } from '../types/progress.dto';
 import {
@@ -15,11 +26,14 @@ import {
   CurrentFastingSession,
   DashboardSummary,
   EndFastingResult,
+  FastingHistoryPageModel,
   FastingSessionResult,
   FastingStatusEnum,
   MetricsHistory,
+  SleepHistoryPage,
   SleepQualityEnum,
   SleepRecord,
+  WaterHistory,
   WaterSummary,
 } from '../types/progress.model';
 import {
@@ -137,12 +151,19 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
    * - dto = null hoặc undefined: trả về null (trạng thái hợp lệ: không có phiên nhịn ăn nào).
    * - dto là object nhưng thiếu sessionId hoặc timestamp không hợp lệ: ném ProgressDataIntegrityError (không ngụy tạo thành null).
    */
-  toCurrentFastingSession(dto?: CurrentFastingResponseDto | null): CurrentFastingSession | null {
+  /**
+   * `GET /fasting/current` trả 204/body rỗng khi người dùng chưa có phiên nào —
+   * đó là trạng thái hợp lệ (chưa bắt đầu), không phải lỗi dữ liệu.
+   */
+  toCurrentFastingSession(dto?: unknown): CurrentFastingSession | null {
     if (dto === null || dto === undefined) {
       return null;
     }
 
-    if (typeof dto !== 'object') {
+    if (typeof dto === 'string') {
+      if (dto.trim().length === 0) {
+        return null;
+      }
       throw new ProgressDataIntegrityError(
         'dto',
         'PROGRESS_DATA_INTEGRITY_VIOLATION',
@@ -150,7 +171,16 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
       );
     }
 
-    const sessionId = safeString(dto.sessionId).trim();
+    if (typeof dto !== 'object' || Array.isArray(dto)) {
+      throw new ProgressDataIntegrityError(
+        'dto',
+        'PROGRESS_DATA_INTEGRITY_VIOLATION',
+        'CurrentFasting'
+      );
+    }
+
+    const session = dto as CurrentFastingResponseDto;
+    const sessionId = safeString(session.sessionId).trim();
     if (!sessionId) {
       throw new ProgressDataIntegrityError(
         'sessionId',
@@ -160,23 +190,23 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
       );
     }
 
-    const startedAt = parseRequiredInstant(dto.startedAt, 'startedAt', 'CurrentFasting');
+    const startedAt = parseRequiredInstant(session.startedAt, 'startedAt', 'CurrentFasting');
     const targetEndedAt = parseRequiredInstant(
-      dto.targetEndedAt,
+      session.targetEndedAt,
       'targetEndedAt',
       'CurrentFasting'
     );
 
-    const targetHours = safeNumber(dto.targetHours, 16);
-    const elapsedHours = Math.max(0, safeNumber(dto.elapsedHours, 0));
-    const remainingHours = Math.max(0, safeNumber(dto.remainingHours, 0));
+    const targetHours = safeNumber(session.targetHours, 16);
+    const elapsedHours = Math.max(0, safeNumber(session.elapsedHours, 0));
+    const remainingHours = Math.max(0, safeNumber(session.remainingHours, 0));
 
     const progressPercent = targetHours > 0 ? Math.round((elapsedHours / targetHours) * 100) : 0;
     const visualPercent = Math.min(100, Math.max(0, progressPercent));
 
     return {
       sessionId,
-      protocol: safeString(dto.protocol, '16:8'),
+      protocol: safeString(session.protocol, '16:8'),
       startedAt,
       targetEndedAt,
       targetHours,
@@ -187,6 +217,26 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
       isGoalReached: elapsedHours >= targetHours,
       status: FastingStatusEnum.IN_PROGRESS,
       statusLabel: 'Đang nhịn ăn',
+    };
+  }
+
+  toFastingHistoryPage(dto: FastingHistoryPageDto | null | undefined): FastingHistoryPageModel {
+    const items = safeArray<FastingHistoryItemDto>(dto?.items ?? []).map((item) => ({
+      sessionId: safeString(pickField(item, ['sessionId'], '')),
+      protocol: safeString(pickField(item, ['protocol'], '')),
+      startedAt: parseRequiredInstant(item.startedAt, 'startedAt', 'FastingHistory'),
+      endedAt: parseRequiredInstant(item.endedAt, 'endedAt', 'FastingHistory'),
+      targetHours: safeNumber(pickField(item, ['targetHours'], 0)),
+      actualHours: safeNumber(pickField(item, ['actualHours'], 0)),
+      isGoalReached: safeBoolean(pickField(item, ['isGoalReached'], false)),
+      status: safeString(pickField(item, ['status'], 'Completed')),
+    }));
+
+    return {
+      page: safeNumber(pickField(dto, ['page'], 1)),
+      pageSize: safeNumber(pickField(dto, ['pageSize'], 20)),
+      totalCount: safeNumber(pickField(dto, ['totalCount'], items.length)),
+      items,
     };
   }
 
@@ -267,6 +317,59 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
       percentComplete,
       visualPercent,
       remainingMl,
+    };
+  }
+
+  toWaterHistory(dto?: WaterHistoryResponseDto | null): WaterHistory {
+    const targetMl = safeNumber(pickField(dto, ['targetMl', 'target_ml'], 2500), 2500);
+    const items = safeArray<NonNullable<WaterHistoryResponseDto['items']>[number]>(
+      dto?.items ?? []
+    ).map((item) => {
+      const consumedMl = safeNumber(pickField(item, ['consumedMl', 'consumed_ml'], 0), 0);
+      const itemTarget = safeNumber(pickField(item, ['targetMl', 'target_ml'], targetMl), targetMl);
+      const rawPercent = pickField<number | null>(
+        item,
+        ['percentComplete', 'percent_complete'],
+        null
+      );
+      const percentComplete =
+        rawPercent !== null && rawPercent !== undefined
+          ? Math.round(Number(rawPercent) * 10) / 10
+          : itemTarget > 0
+            ? Math.round((consumedMl / itemTarget) * 1000) / 10
+            : 0;
+
+      return {
+        date: safeString(pickField(item, ['date'], '')),
+        consumedMl,
+        targetMl: itemTarget,
+        percentComplete,
+        visualPercent: Math.min(100, Math.max(0, percentComplete)),
+        goalReached: safeBoolean(
+          pickField(item, ['goalReached', 'goal_reached'], consumedMl >= itemTarget)
+        ),
+      };
+    });
+
+    return {
+      days: safeNumber(pickField(dto, ['days'], items.length), items.length),
+      targetMl,
+      items,
+    };
+  }
+
+  toSleepHistoryPage(dto?: SleepHistoryPageDto | null): SleepHistoryPage {
+    const items = safeArray<SleepResponseDto>(dto?.items ?? []).map((item) =>
+      this.toSleepRecord(item)
+    );
+    return {
+      page: safeNumber(pickField(dto, ['page'], 1), 1),
+      pageSize: safeNumber(pickField(dto, ['pageSize', 'page_size'], 10), 10),
+      totalCount: safeNumber(
+        pickField(dto, ['totalCount', 'total_count'], items.length),
+        items.length
+      ),
+      items,
     };
   }
 

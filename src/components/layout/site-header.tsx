@@ -3,7 +3,17 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, X, User as UserIcon, LogOut, Sparkles, Apple, LineChart, House } from 'lucide-react';
+import {
+  Menu,
+  X,
+  User as UserIcon,
+  LogOut,
+  Apple,
+  LineChart,
+  House,
+  BookOpen,
+  CalendarDays,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BrandLogo } from '@/components/layout/brand-logo';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
@@ -18,17 +28,23 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { getActiveNavHref } from '@/components/layout/nav-active';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
   { label: 'Trang chủ', href: '/', icon: House },
+  { label: 'Hôm nay', href: '/today', icon: CalendarDays },
   { label: 'Dinh dưỡng', href: '/diet', icon: Apple },
-  { label: 'Gợi ý AI', href: '/diet/suggestions', icon: Sparkles },
   { label: 'Tiến trình', href: '/progress', icon: LineChart },
+  { label: 'Hỏi sách', href: '/knowledge', icon: BookOpen },
 ];
 
 export function SiteHeader() {
   const pathname = usePathname();
+  const activeHref = getActiveNavHref(
+    pathname,
+    NAV_ITEMS.map((item) => item.href)
+  );
   const { user, isAuthenticated } = useAuthStore();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
@@ -47,8 +63,7 @@ export function SiteHeader() {
           {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-1 lg:gap-2">
             {NAV_ITEMS.map((item) => {
-              const isActive =
-                item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
+              const isActive = item.href === activeHref;
               return (
                 <Link
                   key={item.href}
@@ -147,7 +162,7 @@ export function SiteHeader() {
               onClick={() => setMobileMenuOpen(false)}
               className={cn(
                 'flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                pathname.startsWith(item.href)
+                item.href === activeHref
                   ? 'bg-primary/10 text-primary font-semibold'
                   : 'text-muted-foreground hover:bg-accent'
               )}

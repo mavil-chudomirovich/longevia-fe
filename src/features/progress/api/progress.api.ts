@@ -7,13 +7,16 @@ import {
   EndFastingRequestDto,
   EndFastingResponseDto,
   FastingSessionResponseDto,
+  FastingHistoryPageDto,
   GetMetricsHistoryParamsDto,
   LogBodyMetricRequestDto,
   LogSleepRequestDto,
   LogWaterRequestDto,
   MetricsHistoryResponseDto,
   SleepResponseDto,
+  SleepHistoryPageDto,
   StartFastingRequestDto,
+  WaterHistoryResponseDto,
   WaterSummaryResponseDto,
 } from '../types/progress.dto';
 import {
@@ -21,10 +24,13 @@ import {
   CurrentFastingSession,
   DashboardSummary,
   EndFastingResult,
+  FastingHistoryPageModel,
   FastingSessionResult,
   GetMetricsHistoryFilters,
   MetricsHistory,
   SleepRecord,
+  SleepHistoryPage,
+  WaterHistory,
   WaterSummary,
 } from '../types/progress.model';
 import {
@@ -60,6 +66,19 @@ export const progressApi = {
       { signal }
     );
     return progressMapper.toCurrentFastingSession(res.data);
+  },
+
+  getFastingHistory: async (
+    page: number,
+    pageSize: number,
+    signal?: AbortSignal
+  ): Promise<FastingHistoryPageModel> => {
+    const res = await api.get<FastingHistoryPageDto>(API_ENDPOINTS.PROGRESS.FASTING_HISTORY, {
+      params: { page, pageSize },
+      signal,
+      silent: true,
+    });
+    return progressMapper.toFastingHistoryPage(res.data);
   },
 
   /**
@@ -117,6 +136,19 @@ export const progressApi = {
   },
 
   /**
+   * Lấy lịch sử uống nước theo ngày
+   * GET /api/progress/water/history
+   */
+  getWaterHistory: async (days: number, signal?: AbortSignal): Promise<WaterHistory> => {
+    const res = await api.get<WaterHistoryResponseDto>(API_ENDPOINTS.PROGRESS.WATER_HISTORY, {
+      params: { days },
+      signal,
+      silent: true,
+    });
+    return progressMapper.toWaterHistory(res.data);
+  },
+
+  /**
    * Ghi nhận lượng nước uống
    * POST /api/progress/water/log
    */
@@ -150,6 +182,31 @@ export const progressApi = {
       signal,
     });
     return progressMapper.toSleepRecord(res.data);
+  },
+
+  getSleepToday: async (signal?: AbortSignal): Promise<SleepRecord | null> => {
+    const res = await api.get<SleepResponseDto | null>(API_ENDPOINTS.PROGRESS.SLEEP_TODAY, {
+      signal,
+      silent: true,
+    });
+    return res.data ? progressMapper.toSleepRecord(res.data) : null;
+  },
+
+  getSleepHistory: async (
+    page: number,
+    pageSize: number,
+    signal?: AbortSignal
+  ): Promise<SleepHistoryPage> => {
+    const res = await api.get<SleepHistoryPageDto>(API_ENDPOINTS.PROGRESS.SLEEP_HISTORY, {
+      params: { page, pageSize },
+      signal,
+      silent: true,
+    });
+    return progressMapper.toSleepHistoryPage(res.data);
+  },
+
+  deleteSleepLog: async (id: string, signal?: AbortSignal): Promise<void> => {
+    await api.delete(`${API_ENDPOINTS.PROGRESS.SLEEP_DELETE}/${id}`, { signal, silent: true });
   },
 
   /**

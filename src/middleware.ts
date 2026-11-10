@@ -51,6 +51,7 @@ export const config = {
     '/progress/:path*',
     '/diet/:path*',
     '/profile/:path*',
+    '/knowledge/:path*',
     '/onboarding',
     '/login',
     '/forgot-password',

@@ -1,6 +1,8 @@
 import api from '@/lib/axios';
 import { API_ENDPOINTS } from '@/common/constants/api-endpoints';
 import { dietMapper } from '../mappers/diet.mapper';
+import { mealPlanMapper } from '../mappers/meal-plan.mapper';
+import { nutritionMapper } from '../mappers/nutrition.mapper';
 import type {
   CreateFoodDto,
   DailySummaryDto,
@@ -8,16 +10,22 @@ import type {
   FoodDto,
   LogMealDto,
   RecommendationsDto,
+  SuggestedTargetsDto,
   TargetDto,
 } from '../types/diet.dto';
+import type { MealPlanDto, GenerateMealPlanDto } from '../types/meal-plan.dto';
+import type { NutrientGapDto } from '../types/nutrition.dto';
 import type { CreateFoodValues, TargetFormValues } from '../schemas/diet.schema';
 import type {
   DailySummaryModel,
   FoodModel,
   FoodPageModel,
   RecommendationsModel,
+  SuggestedTargetsModel,
   TargetModel,
 } from '../types/diet.model';
+import type { MealPlanModel } from '../types/meal-plan.model';
+import type { NutrientGapModel } from '../types/nutrition.model';
 
 export const dietApi = {
   getFoods: async (
@@ -34,6 +42,21 @@ export const dietApi = {
       { signal, silent: true }
     );
     return dietMapper.toModel(response.data);
+  },
+  updateFood: async (
+    id: string,
+    values: CreateFoodValues,
+    signal: AbortSignal
+  ): Promise<FoodModel> => {
+    const response = await api.put<FoodDto>(
+      `${API_ENDPOINTS.DIET.FOODS}/${id}`,
+      dietMapper.toCreateFoodDto(values),
+      { signal, silent: true }
+    );
+    return dietMapper.toModel(response.data);
+  },
+  deleteFood: async (id: string, signal: AbortSignal): Promise<void> => {
+    await api.delete(`${API_ENDPOINTS.DIET.FOODS}/${id}`, { signal, silent: true });
   },
   getTarget: async (signal?: AbortSignal): Promise<TargetModel> => {
     const response = await api.get<TargetDto>(API_ENDPOINTS.DIET.TARGETS_ME, { signal });
@@ -54,6 +77,17 @@ export const dietApi = {
       { signal, silent: true }
     );
     return dietMapper.toTarget(response.data);
+  },
+  suggestTargets: async (
+    input: { description: string; goal: string },
+    signal: AbortSignal
+  ): Promise<SuggestedTargetsModel> => {
+    const response = await api.post<SuggestedTargetsDto>(
+      API_ENDPOINTS.DIET.SUGGEST_TARGETS,
+      input,
+      { signal, silent: true }
+    );
+    return dietMapper.toSuggestedTargets(response.data);
   },
   getDailySummary: async (date: string, signal?: AbortSignal): Promise<DailySummaryModel> => {
     const response = await api.get<DailySummaryDto>(API_ENDPOINTS.DIET.DAILY_SUMMARY, {
@@ -76,5 +110,37 @@ export const dietApi = {
       silent: true,
     });
     return dietMapper.toRecommendations(response.data);
+  },
+  getMealPlan: async (weekStartDate: string, signal?: AbortSignal): Promise<MealPlanModel> => {
+    const response = await api.get<MealPlanDto>(
+      `${API_ENDPOINTS.DIET.MEAL_PLANS}/${weekStartDate}`,
+      {
+        signal,
+        silent: true,
+      }
+    );
+    return mealPlanMapper.toModel(response.data);
+  },
+  generateMealPlan: async (
+    weekStartDate: string,
+    days: number,
+    mealsPerDay: number,
+    signal: AbortSignal
+  ): Promise<MealPlanModel> => {
+    const payload: GenerateMealPlanDto = mealPlanMapper.toRequest(weekStartDate, days, mealsPerDay);
+    const response = await api.post<MealPlanDto>(API_ENDPOINTS.DIET.MEAL_PLANS, payload, {
+      signal,
+      silent: true,
+      timeout: 150_000,
+    });
+    return mealPlanMapper.toModel(response.data);
+  },
+  getNutrientGaps: async (days: number, signal?: AbortSignal): Promise<NutrientGapModel> => {
+    const response = await api.get<NutrientGapDto>(API_ENDPOINTS.DIET.NUTRIENT_GAPS, {
+      params: { days },
+      signal,
+      silent: true,
+    });
+    return nutritionMapper.toModel(response.data);
   },
 };

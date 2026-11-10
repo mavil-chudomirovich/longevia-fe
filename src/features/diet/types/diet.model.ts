@@ -36,13 +36,30 @@ export interface MacroProgressModel {
   target: number;
   remaining: number;
 }
+export interface MealItemModel {
+  foodId: string;
+  name: string;
+  servingUnit: string;
+  quantity: number;
+  calories: number;
+  proteinGrams: number;
+  carbsGrams: number;
+  fatGrams: number;
+  fiberGrams: number;
+}
+
 export interface DailySummaryModel {
   date: string;
   targetCalories: number;
   consumedCalories: number;
   remainingCalories: number;
   macros: { protein: MacroProgressModel; carbs: MacroProgressModel; fat: MacroProgressModel };
-  meals: { mealType: string; totalCalories: number; itemsCount: number }[];
+  meals: {
+    mealType: string;
+    totalCalories: number;
+    itemsCount: number;
+    items: MealItemModel[];
+  }[];
 }
 export interface MealCitationModel {
   chapterNumber: number;
@@ -73,5 +90,15 @@ export interface RecommendationsModel {
   tipCitations: MealCitationModel[];
   disclaimer: string;
   calorieCapReached: boolean;
+  safetyNote: string;
+}
+
+export interface SuggestedTargetsModel {
+  targetCalories: number;
+  targetProteinGrams: number;
+  targetCarbsGrams: number;
+  targetFatGrams: number;
+  rationale: string;
+  source: 'ai' | 'formula';
   safetyNote: string;
 }

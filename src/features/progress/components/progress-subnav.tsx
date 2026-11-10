@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Activity, Flame, Droplets, Moon, Scale } from 'lucide-react';
+import { Activity, Flame, Droplets, Moon, Scale, Dumbbell, HeartPulse } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface ProgressNavItem {
@@ -37,6 +37,16 @@ export const PROGRESS_NAV_ITEMS: ProgressNavItem[] = [
     title: 'Chỉ số & Lịch sử',
     href: '/progress/metrics',
     icon: Scale,
+  },
+  {
+    title: 'Kế hoạch tập',
+    href: '/progress/workout',
+    icon: Dumbbell,
+  },
+  {
+    title: 'Trường thọ',
+    href: '/progress/longevity',
+    icon: HeartPulse,
   },
 ];
 

@@ -58,6 +58,24 @@ export interface CurrentFastingResponseDto {
   status: string;
 }
 
+export interface FastingHistoryItemDto {
+  sessionId?: string;
+  protocol?: string;
+  startedAt?: string;
+  endedAt?: string;
+  targetHours?: number;
+  actualHours?: number;
+  isGoalReached?: boolean;
+  status?: string;
+}
+
+export interface FastingHistoryPageDto {
+  page?: number;
+  pageSize?: number;
+  totalCount?: number;
+  items?: FastingHistoryItemDto[] | null;
+}
+
 // 3. Water
 export interface LogWaterRequestDto {
   amountMl: number;
@@ -68,6 +86,20 @@ export interface WaterSummaryResponseDto {
   consumedMl: number;
   targetMl: number;
   percentComplete: number;
+}
+
+export interface WaterHistoryItemDto {
+  date?: string;
+  consumedMl?: number;
+  targetMl?: number;
+  percentComplete?: number;
+  goalReached?: boolean;
+}
+
+export interface WaterHistoryResponseDto {
+  days?: number;
+  targetMl?: number;
+  items?: WaterHistoryItemDto[] | null;
 }
 
 // 4. Sleep
@@ -84,6 +116,13 @@ export interface SleepResponseDto {
   sleepQuality: string;
   durationHours: number;
   date: string; // DateOnly YYYY-MM-DD
+}
+
+export interface SleepHistoryPageDto {
+  page?: number;
+  pageSize?: number;
+  totalCount?: number;
+  items?: SleepResponseDto[] | null;
 }
 
 // 5. Body Metrics

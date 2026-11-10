@@ -7,6 +7,7 @@ export interface UpdateProfileDto {
   activityLevel: string;
   dietaryPreference: string;
   allergies: string[];
+  healthLimitations: string[];
 }
 
 export type ProfileResponseDto = ProfileDto;

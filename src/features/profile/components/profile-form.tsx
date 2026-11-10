@@ -4,9 +4,11 @@ import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { ProfileModel } from '@/features/auth/types/auth.model';
+import { getBusinessTodayDateString } from '@/lib/business-date';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { HealthLimitationsPicker } from '@/components/shared/health-limitations-picker';
 import { profileSchema, type ProfileFormValues } from '../schemas/profile.schema';
 import { useUpdateProfileMutation } from '../queries/profile.queries';
 import { getApiErrorFields, toastFriendlyError } from '@/lib/api-error';
@@ -18,6 +20,7 @@ const emptyProfile: ProfileFormValues = {
   activityLevel: 'Sedentary',
   dietaryPreference: 'None',
   allergies: [],
+  healthLimitations: [],
 };
 
 export function ProfileForm({
@@ -43,6 +46,7 @@ export function ProfileForm({
       activityLevel: initialProfile.activityLevel as ProfileFormValues['activityLevel'],
       dietaryPreference: initialProfile.dietaryPreference as ProfileFormValues['dietaryPreference'],
       allergies: initialProfile.allergies,
+      healthLimitations: initialProfile.healthLimitations as ProfileFormValues['healthLimitations'],
     });
   }, [form, initialProfile]);
 
@@ -84,7 +88,7 @@ export function ProfileForm({
           <Input
             id="birthDate"
             type="date"
-            max={new Date().toISOString().slice(0, 10)}
+            max={getBusinessTodayDateString()}
             {...form.register('birthDate')}
           />
           {form.formState.errors.birthDate && (
@@ -194,6 +198,18 @@ export function ProfileForm({
         {form.formState.errors.allergies && (
           <p role="alert" className="text-sm text-destructive">
             {form.formState.errors.allergies.message}
+          </p>
+        )}
+      </div>
+      <div className="space-y-2">
+        <Label>Giới hạn sức khỏe</Label>
+        <HealthLimitationsPicker
+          value={form.watch('healthLimitations')}
+          onChange={(next) => form.setValue('healthLimitations', next, { shouldValidate: true })}
+        />
+        {form.formState.errors.healthLimitations && (
+          <p role="alert" className="text-sm text-destructive">
+            {form.formState.errors.healthLimitations.message}
           </p>
         )}
       </div>
