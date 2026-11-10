@@ -15,6 +15,7 @@ import type {
   FoodPageDto,
   MacroProgressDto,
   MealCitationDto,
+  MealItemDto,
   MealSummaryDto,
   MealSuggestionDto,
   RecommendationsDto,
@@ -27,6 +28,7 @@ import type {
   FoodPageModel,
   MacroProgressModel,
   MealCitationModel,
+  MealItemModel,
   MealSuggestionModel,
   RecommendationsModel,
   SuggestedTargetsModel,
@@ -128,6 +130,17 @@ export class DietMapper extends BaseMapper<FoodDto, FoodModel> {
           mealType: safeString(pickField(item, ['mealType'], '')),
           totalCalories: safeNumber(pickField(item, ['totalCalories'], 0)),
           itemsCount: safeNumber(pickField(item, ['itemsCount'], 0)),
+          items: safeArray<MealItemDto, MealItemModel>(pickField(item, ['items'], []), (entry) => ({
+            foodId: safeString(pickField(entry, ['foodId'], '')),
+            name: safeString(pickField(entry, ['name'], '')),
+            servingUnit: safeString(pickField(entry, ['servingUnit'], '')),
+            quantity: safeNumber(pickField(entry, ['quantity'], 0)),
+            calories: safeNumber(pickField(entry, ['calories'], 0)),
+            proteinGrams: safeNumber(pickField(entry, ['proteinGrams'], 0)),
+            carbsGrams: safeNumber(pickField(entry, ['carbsGrams'], 0)),
+            fatGrams: safeNumber(pickField(entry, ['fatGrams'], 0)),
+            fiberGrams: safeNumber(pickField(entry, ['fiberGrams'], 0)),
+          })),
         })
       ),
     };

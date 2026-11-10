@@ -184,6 +184,14 @@ export const progressApi = {
     return progressMapper.toSleepRecord(res.data);
   },
 
+  getSleepToday: async (signal?: AbortSignal): Promise<SleepRecord | null> => {
+    const res = await api.get<SleepResponseDto | null>(API_ENDPOINTS.PROGRESS.SLEEP_TODAY, {
+      signal,
+      silent: true,
+    });
+    return res.data ? progressMapper.toSleepRecord(res.data) : null;
+  },
+
   getSleepHistory: async (
     page: number,
     pageSize: number,

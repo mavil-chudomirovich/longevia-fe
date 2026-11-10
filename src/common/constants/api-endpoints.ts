@@ -40,6 +40,7 @@ export const API_ENDPOINTS = {
     WATER_LOG: '/progress/water/log',
     WATER_HISTORY: '/progress/water/history',
     SLEEP_LOG: '/progress/sleep/log',
+    SLEEP_TODAY: '/progress/sleep/today',
     SLEEP_HISTORY: '/progress/sleep/history',
     SLEEP_DELETE: '/progress/sleep',
     METRICS: '/progress/metrics',

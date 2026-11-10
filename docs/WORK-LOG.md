@@ -20,6 +20,9 @@
   (tăng cơ → tập tạ, giảm cân → cardio).
 - **Hồ sơ**: thêm checkbox "Đau hoặc tổn thương khớp".
 - **Meal-plan**: bỏ UI fallback; request generate timeout 150 giây; đổi sang WeekPicker.
+- **Meal-plan (tiếp)**: bỏ tách Đã lưu/Tạo mới; một màn plan, tạo mới qua dialog.
+- **Workout card**: ngày là tiêu đề chính; bài tập/thời lượng dùng màu foreground, chỉ metadata phụ mới muted.
+- **Trang `/today`**: daily hub tổng hợp ăn uống, nước, nhịn ăn, giấc ngủ, bài tập hôm nay, cân nặng/streak và thói quen; quick actions ghi bữa ăn/thêm nước.
 - **Xác minh**: `tsc` 0 lỗi; 221 test pass; lint 0 error; build thành công.
 
 ---

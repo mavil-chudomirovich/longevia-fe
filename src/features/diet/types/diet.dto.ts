@@ -52,10 +52,23 @@ export interface MacroProgressDto {
   target?: number;
   remaining?: number;
 }
+export interface MealItemDto {
+  foodId?: string;
+  name?: string;
+  servingUnit?: string;
+  quantity?: number;
+  calories?: number;
+  proteinGrams?: number;
+  carbsGrams?: number;
+  fatGrams?: number;
+  fiberGrams?: number;
+}
+
 export interface MealSummaryDto {
   mealType?: string;
   totalCalories?: number;
   itemsCount?: number;
+  items?: MealItemDto[] | null;
 }
 export interface DailySummaryDto {
   date?: string;

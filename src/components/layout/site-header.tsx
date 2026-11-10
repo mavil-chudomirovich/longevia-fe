@@ -3,7 +3,17 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, X, User as UserIcon, LogOut, Apple, LineChart, House, BookOpen } from 'lucide-react';
+import {
+  Menu,
+  X,
+  User as UserIcon,
+  LogOut,
+  Apple,
+  LineChart,
+  House,
+  BookOpen,
+  CalendarDays,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BrandLogo } from '@/components/layout/brand-logo';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
@@ -23,6 +33,7 @@ import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
   { label: 'Trang chủ', href: '/', icon: House },
+  { label: 'Hôm nay', href: '/today', icon: CalendarDays },
   { label: 'Dinh dưỡng', href: '/diet', icon: Apple },
   { label: 'Tiến trình', href: '/progress', icon: LineChart },
   { label: 'Hỏi sách', href: '/knowledge', icon: BookOpen },

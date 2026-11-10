@@ -65,6 +65,7 @@ export const progressKeys = {
   waterHistory: (userId: string, days: number) =>
     [...progressKeys.water(userId), 'history', days] as const,
   sleep: (userId: string) => [...progressKeys.user(userId), 'sleep'] as const,
+  sleepToday: (userId: string) => [...progressKeys.sleep(userId), 'today'] as const,
   sleepHistory: (userId: string, page: number, pageSize: number) =>
     [...progressKeys.sleep(userId), 'history', page, pageSize] as const,
   metrics: (userId: string) => [...progressKeys.user(userId), 'metrics'] as const,
@@ -171,6 +172,18 @@ export function useWaterHistoryQuery(days = 30, customUserId?: string) {
   return useQuery<WaterHistory>({
     queryKey: progressKeys.waterHistory(userId, days),
     queryFn: ({ signal }) => progressApi.getWaterHistory(days, signal),
+    enabled: isEnabled,
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+  });
+}
+
+export function useSleepTodayQuery(customUserId?: string) {
+  const { userId, isEnabled } = useProgressAuth(customUserId);
+
+  return useQuery<SleepRecord | null>({
+    queryKey: progressKeys.sleepToday(userId),
+    queryFn: ({ signal }) => progressApi.getSleepToday(signal),
     enabled: isEnabled,
     staleTime: 30 * 1000,
     gcTime: 5 * 60 * 1000,

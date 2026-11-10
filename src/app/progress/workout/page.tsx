@@ -25,6 +25,16 @@ import {
   useWorkoutPlanQuery,
 } from '@/features/progress/queries/progress-ai.queries';
 
+function formatDayTitle(date: string): string {
+  const parsed = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return date;
+  const weekday = new Intl.DateTimeFormat('vi-VN', { weekday: 'long' }).format(parsed);
+  const short = `${String(parsed.getDate()).padStart(2, '0')}/${String(
+    parsed.getMonth() + 1
+  ).padStart(2, '0')}`;
+  return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)} · ${short}`;
+}
+
 export default function WorkoutPage() {
   const [weekStart, setWeekStart] = React.useState(() =>
     getBusinessWeekStart(getBusinessTodayDateString())
@@ -309,16 +319,11 @@ export default function WorkoutPage() {
                 {plan.days.map((day) => (
                   <Card key={day.date}>
                     <CardHeader>
-                      <CardTitle className="text-base">
-                        {day.restDay
-                          ? 'Ngày nghỉ'
-                          : day.activities.length > 1
-                            ? `${day.activities[0].activityLabel || workoutActivityLabel(day.activities[0].activity)} + ${day.activities.length - 1} bài phụ`
-                            : day.activityLabel || workoutActivityLabel(day.activity)}
+                      <CardTitle className="text-base font-semibold text-foreground">
+                        {formatDayTitle(day.date)}
                       </CardTitle>
                       <CardDescription>
-                        {day.date}
-                        {day.restDay ? ' · nghỉ hồi phục' : ` · ${day.durationMinutes} phút`}
+                        {day.restDay ? 'Nghỉ hồi phục' : `Buổi tập · ${day.durationMinutes} phút`}
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm">
@@ -327,15 +332,28 @@ export default function WorkoutPage() {
                           {day.activities.map((activity, index) => (
                             <li
                               key={`${activity.activity}-${index}`}
-                              className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 rounded bg-muted/60 px-2.5 py-1.5"
+                              className="flex items-start justify-between gap-3 rounded bg-muted/40 px-2.5 py-2"
                             >
-                              <span className="font-medium">
-                                {index === 0 ? 'Chính: ' : 'Phụ: '}
-                                {activity.activityLabel || workoutActivityLabel(activity.activity)}
-                              </span>
-                              <span className="text-xs text-muted-foreground">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5">
+                                  {index === 0 && (
+                                    <span className="rounded border border-primary/40 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
+                                      Chính
+                                    </span>
+                                  )}
+                                  <span className="font-semibold text-foreground">
+                                    {activity.activityLabel ||
+                                      workoutActivityLabel(activity.activity)}
+                                  </span>
+                                </div>
+                                {activity.intensity && (
+                                  <p className="mt-0.5 text-xs text-muted-foreground">
+                                    Cường độ: {activity.intensity}
+                                  </p>
+                                )}
+                              </div>
+                              <span className="shrink-0 text-sm font-medium tabular-nums text-foreground">
                                 {activity.durationMinutes} phút
-                                {activity.intensity ? ` · ${activity.intensity}` : ''}
                               </span>
                             </li>
                           ))}
@@ -349,7 +367,9 @@ export default function WorkoutPage() {
                         />
                       )}
                       {day.equipmentUsed.length > 0 && (
-                        <p>Dụng cụ: {day.equipmentUsed.join(', ')}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Dụng cụ: {day.equipmentUsed.join(', ')}
+                        </p>
                       )}
                       <CitationChipList citations={day.citations} />
                     </CardContent>

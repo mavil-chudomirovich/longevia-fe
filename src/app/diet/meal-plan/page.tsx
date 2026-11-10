@@ -3,6 +3,14 @@
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { CitationChipList } from '@/components/shared/citation-chip';
 import { MarkdownText } from '@/components/shared/markdown-text';
@@ -13,14 +21,11 @@ import {
   getBusinessTodayDateString,
   getBusinessWeekStart,
 } from '@/lib/business-date';
-import { cn } from '@/lib/utils';
 import {
   useGenerateMealPlanMutation,
   useMealPlanQuery,
 } from '@/features/diet/queries/diet.queries';
 import { partitionWarnings } from '@/features/diet/utils/meal-plan-warnings';
-
-type Mode = 'saved' | 'new';
 
 export default function MealPlanPage() {
   const [weekStart, setWeekStart] = React.useState(() =>
@@ -28,7 +33,7 @@ export default function MealPlanPage() {
   );
   const [days, setDays] = React.useState(7);
   const [mealsPerDay, setMealsPerDay] = React.useState(4);
-  const [mode, setMode] = React.useState<Mode>('saved');
+  const [createOpen, setCreateOpen] = React.useState(false);
   const query = useMealPlanQuery(weekStart, true);
   const generate = useGenerateMealPlanMutation();
   const plan = query.data;
@@ -42,9 +47,11 @@ export default function MealPlanPage() {
   const onCreate = async () => {
     try {
       await generate.mutateAsync({ weekStartDate: weekStart, days, mealsPerDay });
+      return true;
     } catch {
       // Có thể server đã lưu xong dù client timeout; thử đọc lại bản đã lưu.
       await query.refetch();
+      return false;
     }
   };
 
@@ -66,30 +73,6 @@ export default function MealPlanPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
-              {(
-                [
-                  ['saved', 'Đã lưu'],
-                  ['new', 'Tạo mới'],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setMode(value)}
-                  aria-pressed={mode === value}
-                  className={cn(
-                    'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                    mode === value
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
             <div className="space-y-2">
               <label htmlFor="meal-plan-week" className="text-sm font-medium">
                 Tuần
@@ -102,11 +85,14 @@ export default function MealPlanPage() {
               />
             </div>
 
-            {mode === 'saved' ? (
-              <div className="space-y-3">
-                <p className="text-xs text-muted-foreground">
-                  Tự động tải bản đã lưu của tuần, không gọi AI và không ghi đè.
-                </p>
+            <p className="text-xs text-muted-foreground">
+              {plan
+                ? 'Tuần này đã có kế hoạch. Tải lại hoặc tạo lại nếu bạn muốn thay đổi.'
+                : 'Tuần này chưa có kế hoạch. Tạo mới để AI lập thực đơn.'}
+            </p>
+
+            {plan ? (
+              <div className="space-y-2">
                 <Button
                   variant="outline"
                   className="w-full"
@@ -115,48 +101,23 @@ export default function MealPlanPage() {
                 >
                   {query.isFetching ? 'Đang tải…' : 'Tải lại kế hoạch'}
                 </Button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <label htmlFor="days" className="text-sm font-medium">
-                      Số ngày
-                    </label>
-                    <Input
-                      id="days"
-                      type="number"
-                      min={1}
-                      max={7}
-                      value={days}
-                      onChange={(event) => setDays(Number(event.target.value))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label htmlFor="meals" className="text-sm font-medium">
-                      Bữa/ngày
-                    </label>
-                    <Input
-                      id="meals"
-                      type="number"
-                      min={1}
-                      max={4}
-                      value={mealsPerDay}
-                      onChange={(event) => setMealsPerDay(Number(event.target.value))}
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  AI sinh kế hoạch cho tuần đang chọn. Tuần đã có kế hoạch sẽ bị ghi đè.
-                </p>
                 <Button
+                  variant="ghost"
                   className="w-full"
-                  onClick={() => void onCreate()}
+                  onClick={() => setCreateOpen(true)}
                   disabled={generate.isPending}
                 >
-                  {generate.isPending ? 'Đang tạo…' : 'Tạo kế hoạch'}
+                  Tạo lại tuần này
                 </Button>
               </div>
+            ) : (
+              <Button
+                className="w-full"
+                onClick={() => setCreateOpen(true)}
+                disabled={generate.isPending}
+              >
+                Tạo kế hoạch
+              </Button>
             )}
           </CardContent>
         </Card>
@@ -192,13 +153,7 @@ export default function MealPlanPage() {
                   <Button variant="outline" onClick={() => void query.refetch()}>
                     Thử tải lại
                   </Button>
-                  <Button
-                    onClick={() => {
-                      setMode('new');
-                      void onCreate();
-                    }}
-                    disabled={generate.isPending}
-                  >
+                  <Button onClick={() => setCreateOpen(true)} disabled={generate.isPending}>
                     Tạo kế hoạch mới
                   </Button>
                 </div>
@@ -274,11 +229,72 @@ export default function MealPlanPage() {
             </>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Tuần này chưa có kế hoạch. Chuyển sang “Tạo mới” ở cột bên trái để lập kế hoạch.
+              Tuần này chưa có kế hoạch. Bấm “Tạo kế hoạch” ở cột bên trái để lập kế hoạch.
             </p>
           )}
         </div>
       </div>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Tạo kế hoạch tuần</DialogTitle>
+            <DialogDescription>{formatBusinessWeekRange(weekStart)}</DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <label htmlFor="dialog-days" className="text-sm font-medium">
+                Số ngày
+              </label>
+              <Input
+                id="dialog-days"
+                type="number"
+                min={1}
+                max={7}
+                value={days}
+                onChange={(event) => setDays(Number(event.target.value))}
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="dialog-meals" className="text-sm font-medium">
+                Bữa/ngày
+              </label>
+              <Input
+                id="dialog-meals"
+                type="number"
+                min={1}
+                max={4}
+                value={mealsPerDay}
+                onChange={(event) => setMealsPerDay(Number(event.target.value))}
+              />
+            </div>
+          </div>
+
+          {plan && (
+            <p className="text-xs text-muted-foreground">
+              Tuần này đã có kế hoạch; tạo mới sẽ ghi đè bản đã lưu.
+            </p>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+              Huỷ
+            </Button>
+            <Button
+              disabled={generate.isPending}
+              onClick={async () => {
+                const ok = await onCreate();
+                if (ok) {
+                  setCreateOpen(false);
+                }
+              }}
+            >
+              {generate.isPending ? 'Đang tạo…' : 'Tạo kế hoạch'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -37,7 +37,7 @@ Mọi route dưới đây đi qua `/api/diet` và cần Bearer JWT.
 | GET / PUT | `/targets/me` | READY | `diet.target_not_found` mở trạng thái chưa thiết lập; PUT tự đính kèm `bmr`/`tdee` khi có hồ sơ + cân nặng; target thủ công kiểm tra 4P+4C+9F lệch calo tối đa ±5% |
 | POST | `/targets/me/calculate` | READY (legacy) | Client cũ; UI mới không dùng, vì `PUT` đã đính kèm BMR/TDEE |
 | POST | `/meals` | READY | Ghi ngày UTC, meal type và tối đa 100 món; không tự retry mutation |
-| GET | `/meals/daily-summary?date=YYYY-MM-DD` | READY | Summary theo ngày; calo còn lại có thể âm |
+| GET | `/meals/daily-summary?date=YYYY-MM-DD` | READY | Summary theo ngày; `meals[].items[]` có tên món/khẩu phần/calo; calo còn lại có thể âm |
 | GET | `/meals/ai-recommendations?mealType=...&goal=...` | READY | Luôn hiện `disclaimer`/`safetyNote`; citation `verified=false` được ghi rõ; chỉ ghi log khi người dùng bấm |
 
 Các mã lỗi được trình bày bằng UI: `diet.weight_not_found` → `/progress/metrics`; `diet.profile_not_found`/`diet.profile_incomplete` → `/profile`; `diet.no_safe_candidate` giải thích dữ liệu dị ứng và dẫn `/diet/foods`; `diet.ai_timeout`/`diet.ai_unavailable` cho phép thử lại; `diet.food_not_found` báo món không còn tồn tại. `400 validation.failed` gắn lỗi vào trường tương ứng. Seed hiện có 43 món dùng chung, tất cả đã khai báo dị ứng; AI vẫn có thể trả danh sách rỗng nếu mọi ứng viên đều trùng dị ứng trong hồ sơ.
@@ -58,6 +58,7 @@ Các route dưới `/api/progress` cần Bearer JWT. FE đã nối đủ 9 busin
 | POST | `/water/log` | READY |
 | POST | `/sleep/log` | READY |
 | GET | `/sleep/history?page&pageSize` | READY; mới nhất trước, `pageSize` 1..50 |
+| GET | `/sleep/today` | READY; giấc ngủ đêm qua, 204 nếu chưa ghi |
 | DELETE | `/sleep/{id}` | READY; xoá bản ghi của owner |
 | POST | `/metrics` | READY |
 | GET | `/metrics/history` | READY; phân trang không trả `hasPreviousPage`/`hasNextPage` |
