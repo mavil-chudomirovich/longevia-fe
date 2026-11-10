@@ -38,6 +38,9 @@ export interface WorkoutPlanModel {
   warnings: WorkoutWarningModel[];
   days: WorkoutPlanDayModel[];
   generatedAt: Date | null;
+  activityPreference: string[];
+  equipmentAvailable: string[];
+  limitations: string[];
 }
 
 export interface LongevityComponentModel {

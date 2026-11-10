@@ -9,6 +9,7 @@ export interface ProfileModel {
   activityLevel: string;
   dietaryPreference: string;
   allergies: string[];
+  healthLimitations: string[];
   updatedAt: Date | null;
 }
 

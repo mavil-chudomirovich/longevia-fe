@@ -13,6 +13,7 @@ export interface ProfileDto {
   activityLevel?: string;
   dietaryPreference?: string;
   allergies?: string[] | null;
+  healthLimitations?: string[] | null;
   updatedAt?: string;
 }
 

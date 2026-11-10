@@ -12,10 +12,16 @@ describe('ProfileMapper', () => {
       activityLevel: 'LightlyActive',
       dietaryPreference: 'Vegan',
       allergies: ['Soy'],
+      healthLimitations: ['joint_pain'],
       updatedAt: '2026-11-01T10:00:00Z',
     });
 
-    expect(profile).toMatchObject({ id: 'profile-1', heightCm: 165.5, allergies: ['Soy'] });
+    expect(profile).toMatchObject({
+      id: 'profile-1',
+      heightCm: 165.5,
+      allergies: ['Soy'],
+      healthLimitations: ['joint_pain'],
+    });
     expect(profile.updatedAt).toBeInstanceOf(Date);
   });
 
@@ -28,6 +34,7 @@ describe('ProfileMapper', () => {
         activityLevel: 'LightlyActive',
         dietaryPreference: 'Vegan',
         allergies: [' Soy '],
+        healthLimitations: ['joint_pain'],
       })
     );
 
@@ -38,6 +45,7 @@ describe('ProfileMapper', () => {
       activityLevel: 'LightlyActive',
       dietaryPreference: 'Vegan',
       allergies: ['Soy'],
+      healthLimitations: ['joint_pain'],
     });
   });
 });

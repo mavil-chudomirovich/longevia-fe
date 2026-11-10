@@ -21,6 +21,8 @@ export const progressAiApi = {
     days: number,
     sessionsPerWeek: number,
     minutesPerSession: number,
+    limitations: string[],
+    equipmentAvailable: string[],
     signal: AbortSignal
   ): Promise<WorkoutPlanModel> => {
     const response = await api.post<WorkoutPlanDto>(
@@ -30,9 +32,11 @@ export const progressAiApi = {
         goal,
         days,
         sessionsPerWeek,
-        minutesPerSession
+        minutesPerSession,
+        limitations,
+        equipmentAvailable
       ),
-      { signal, silent: true }
+      { signal, silent: true, timeout: 150_000 }
     );
     return progressAiMapper.toWorkoutPlan(response.data);
   },

@@ -21,7 +21,7 @@ API service routes dưới `/api/identity`:
 | POST | `/auth/forgot-password` | Gửi email; luôn nhận `202`, không tiết lộ email có tài khoản hay không |
 | POST | `/auth/reset-password` | Gửi mã 64-hex và `newPassword`; thành công `204` |
 | GET | `/users/me` | Đọc `id`, `email`, `fullName`, `status`, `createdAt`, `profile` |
-| PUT | `/users/me/profile` | Gửi hồ sơ sức khỏe; thành công trả `ProfileResponse` |
+| PUT | `/users/me/profile` | Gửi hồ sơ sức khỏe, gồm `healthLimitations` (hiện chỉ `joint_pain`); thành công trả `ProfileResponse` |
 
 Next BFF routes: `/api/auth/login`, `/api/auth/register`, `/api/auth/refresh-token`, `/api/auth/logout`. Cookie `lv_rt` là HttpOnly, giới hạn path `/api/auth`, sống 7 ngày; `lv_at` là HttpOnly ở path `/` theo thời hạn access token. `lv_session_hint` là cookie không HttpOnly, không chứa token, để middleware và client biết nên thử silent refresh; API vẫn yêu cầu Bearer JWT. Access token cho API chỉ nằm trong memory của client. JWT access token hết hạn sau 15 phút; `lv_rt` cho phép silent refresh. Identity không phát role claim.
 
@@ -34,8 +34,8 @@ Mọi route dưới đây đi qua `/api/diet` và cần Bearer JWT.
 | Method | Path | Trạng thái FE | Ghi chú |
 | --- | --- | --- | --- |
 | GET / POST | `/foods` | READY | Danh sách có tìm kiếm, lọc, phân trang; tạo món cá nhân |
-| GET / PUT | `/targets/me` | READY | `diet.target_not_found` mở trạng thái chưa thiết lập; target thủ công kiểm tra 4P+4C+9F lệch calo tối đa ±5% |
-| POST | `/targets/me/calculate` | READY | Backend tính từ hồ sơ và cân nặng; `bmr`/`tdee` null được giữ là null |
+| GET / PUT | `/targets/me` | READY | `diet.target_not_found` mở trạng thái chưa thiết lập; PUT tự đính kèm `bmr`/`tdee` khi có hồ sơ + cân nặng; target thủ công kiểm tra 4P+4C+9F lệch calo tối đa ±5% |
+| POST | `/targets/me/calculate` | READY (legacy) | Client cũ; UI mới không dùng, vì `PUT` đã đính kèm BMR/TDEE |
 | POST | `/meals` | READY | Ghi ngày UTC, meal type và tối đa 100 món; không tự retry mutation |
 | GET | `/meals/daily-summary?date=YYYY-MM-DD` | READY | Summary theo ngày; calo còn lại có thể âm |
 | GET | `/meals/ai-recommendations?mealType=...&goal=...` | READY | Luôn hiện `disclaimer`/`safetyNote`; citation `verified=false` được ghi rõ; chỉ ghi log khi người dùng bấm |
@@ -54,12 +54,15 @@ Các route dưới `/api/progress` cần Bearer JWT. FE đã nối đủ 9 busin
 | POST | `/fasting/start` | READY |
 | POST | `/fasting/end` | READY |
 | GET | `/water/today` | READY |
+| GET | `/water/history?days=30` | READY; tổng theo ngày, `days` 1..90, cũ → mới |
 | POST | `/water/log` | READY |
 | POST | `/sleep/log` | READY |
+| GET | `/sleep/history?page&pageSize` | READY; mới nhất trước, `pageSize` 1..50 |
+| DELETE | `/sleep/{id}` | READY; xoá bản ghi của owner |
 | POST | `/metrics` | READY |
 | GET | `/metrics/history` | READY; phân trang không trả `hasPreviousPage`/`hasNextPage` |
 
-Lỗi được phân nhánh theo mã: `progress.fasting_active_conflict`, `progress.fasting_not_found`, `progress.fasting_no_active`, `progress.sleep_overlap`, `progress.height_unavailable`, `progress.identity_unavailable`, `progress.identity_integration_failure`. Metrics cần chiều cao hồ sơ từ Identity. Ngày hôm nay, water, và khoảng tuần dùng lịch UTC; ngày lịch sử người dùng chọn được giữ nguyên.
+Lỗi được phân nhánh theo mã: `progress.fasting_active_conflict`, `progress.fasting_not_found`, `progress.fasting_no_active`, `progress.sleep_overlap`, `progress.height_unavailable`, `progress.identity_unavailable`, `progress.identity_integration_failure`. Metrics cần chiều cao hồ sơ từ Identity. Ngày hôm nay, water và khoảng tuần dùng **ngày nghiệp vụ ADR006** (mặc định giờ Việt Nam); ngày lịch sử người dùng chọn được giữ nguyên.
 
 § 4b. **Hỏi sách chat & AI mục tiêu (duck-004/005)**
 
@@ -76,13 +79,17 @@ Lỗi được phân nhánh theo mã: `progress.fasting_active_conflict`, `progr
 
 READY. Body `{ description?, goal? }`; trả `{ targetCalories, targetProteinGrams,
 targetCarbsGrams, targetFatGrams, rationale, source, safetyNote }`. **Không ghi DB** —
-FE điền form, người dùng bấm "Lưu thủ công" (`PUT /targets/me`) mới persist.
+FE điền form, người dùng bấm "Lưu mục tiêu" (`PUT /targets/me`) mới persist.
 `source=formula` khi AI lỗi hoặc trả macro ngoài khoảng an toàn.
 
 ### Trường additive
 
-- Meal plan & workout plan: `usedFallbackReason` (`provider_timeout`,
+- Meal plan: **không còn fallback**; lỗi AI trả 503 `recommendation.plan_generation_failed`
+  (FE hiện nút thử lại). `warnings` chỉ còn corpus/dinh dưỡng/rule 105%.
+  Generate có thể mất 30–90 giây nên request đặt timeout 150 giây.
+- Workout plan: vẫn có `usedFallbackReason` (`provider_timeout`,
   `provider_unavailable`, `invalid_model_output`, `corpus_missing`, `no_safe_activity`).
+  Request nhận `activityPreference`, `equipmentAvailable`, `limitations`; response echo lại.
 - Workout day: `activityLabel` (tiếng Việt); ngày nghỉ để rỗng.
 - Fasting current: 204 thay vì 200 body rỗng.
 - **Ngày nghiệp vụ (ADR006)**: water/dashboard/meal summary/longevity/digest reset

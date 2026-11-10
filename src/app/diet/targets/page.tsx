@@ -16,7 +16,6 @@ import { MarkdownText } from '@/components/shared/markdown-text';
 import { targetSchema, type TargetFormValues } from '@/features/diet/schemas/diet.schema';
 import type { SuggestedTargetsModel } from '@/features/diet/types/diet.model';
 import {
-  useCalculateTargetMutation,
   useSaveTargetMutation,
   useSuggestTargetsMutation,
   useTargetQuery,
@@ -50,7 +49,6 @@ const hints = {
 export default function TargetsPage() {
   const query = useTargetQuery();
   const save = useSaveTargetMutation();
-  const calculate = useCalculateTargetMutation();
   const suggest = useSuggestTargetsMutation();
   const [goal, setGoal] = React.useState('Maintain');
   const [description, setDescription] = React.useState('');
@@ -96,7 +94,7 @@ export default function TargetsPage() {
     }
   };
 
-  const submit = (mode: 'manual' | 'calculate') =>
+  const submit = () =>
     form.handleSubmit(async (values) => {
       setFormError('');
       setFormAction(undefined);
@@ -112,8 +110,7 @@ export default function TargetsPage() {
         return;
       }
       try {
-        if (mode === 'manual') await save.mutateAsync(values);
-        else await calculate.mutateAsync(values);
+        await save.mutateAsync(values);
         // Không gọi query.refetch() ở đây: mutation đã invalidate query mục tiêu, gọi thêm
         // sẽ huỷ request đang chạy (và trước đây sinh toast "mất kết nối" giả).
       } catch (error) {
@@ -140,8 +137,7 @@ export default function TargetsPage() {
           <CardHeader>
             <CardTitle className="text-base">Gợi ý bằng AI</CardTitle>
             <CardDescription>
-              Mô tả mục tiêu hiện tại của bạn; Longevia sẽ đề xuất calo và macro, bạn xem lại rồi
-              mới bấm “Lưu thủ công”.
+              Mô tả mục tiêu hiện tại của bạn; Longevia sẽ đề xuất calo và macro.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -187,7 +183,7 @@ export default function TargetsPage() {
                   <span className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">
                     {suggestion.source === 'ai' ? 'AI đề xuất' : 'Công thức chuẩn'}
                   </span>
-                  <span>Chưa lưu — kiểm tra rồi bấm “Lưu thủ công”.</span>
+                  <span>Chưa lưu — kiểm tra rồi bấm “Lưu mục tiêu”.</span>
                 </div>
                 <MarkdownText content={suggestion.rationale} compact />
                 <p className="text-xs text-muted-foreground">{suggestion.safetyNote}</p>
@@ -200,8 +196,8 @@ export default function TargetsPage() {
           <CardHeader>
             <CardTitle>Mục tiêu dinh dưỡng</CardTitle>
             <CardDescription>
-              Mục tiêu calo và macro bạn muốn duy trì mỗi ngày. Bấm “Tính tự động” để Longevia đề
-              xuất từ hồ sơ, hoặc tự nhập rồi bấm “Lưu thủ công”.
+              Mục tiêu calo và macro bạn muốn duy trì mỗi ngày. Bạn có thể dùng Gợi ý bằng AI hoặc
+              tự nhập, rồi bấm “Lưu mục tiêu”.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -225,40 +221,45 @@ export default function TargetsPage() {
                   <div className="mb-5 rounded-lg border border-primary/30 bg-primary/5 p-4 text-sm">
                     <p className="font-medium">Bạn chưa có mục tiêu dinh dưỡng.</p>
                     <p className="mt-1 text-muted-foreground">
-                      Bấm <strong>Tính tự động</strong> để Longevia đề xuất dựa trên hồ sơ và cân
-                      nặng gần nhất của bạn, hoặc tự nhập các con số bên dưới rồi bấm{' '}
-                      <strong>Lưu thủ công</strong>.
+                      Dùng <strong>Gợi ý bằng AI</strong> để Longevia đề xuất dựa trên hồ sơ và cân
+                      nặng gần nhất, hoặc tự nhập các con số bên dưới rồi bấm{' '}
+                      <strong>Lưu mục tiêu</strong>.
                     </p>
                   </div>
                 )}
                 {query.data && (
-                  <div className="mb-5 grid gap-3 rounded-lg bg-muted/60 p-4 sm:grid-cols-2">
-                    <p className="flex items-center gap-1.5">
-                      BMR:
-                      <InfoTooltip
-                        label="BMR là gì?"
-                        content="BMR (Basal Metabolic Rate) là năng lượng cơ thể dùng khi nghỉ hoàn toàn — chỉ để duy trì tim đập, hô hấp, nhiệt độ."
-                      />
-                      <strong>
-                        {query.data.bmr === null ? 'Chưa tính' : `${query.data.bmr} kcal`}
-                      </strong>
-                    </p>
-                    <p className="flex items-center gap-1.5">
-                      TDEE:
-                      <InfoTooltip
-                        label="TDEE là gì?"
-                        content="TDEE (Total Daily Energy Expenditure) là tổng năng lượng bạn tiêu hao mỗi ngày, gồm BMR cộng vận động và tiêu hóa."
-                      />
-                      <strong>
-                        {query.data.tdee === null ? 'Chưa tính' : `${query.data.tdee} kcal`}
-                      </strong>
+                  <div className="mb-5 rounded-lg bg-muted/60 p-4">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <p className="flex items-center gap-1.5">
+                        BMR:
+                        <InfoTooltip
+                          label="BMR là gì?"
+                          content="BMR (Basal Metabolic Rate) là năng lượng cơ thể dùng khi nghỉ hoàn toàn — chỉ để duy trì tim đập, hô hấp, nhiệt độ."
+                        />
+                        <strong>
+                          {query.data.bmr === null ? 'Chưa có dữ liệu' : `${query.data.bmr} kcal`}
+                        </strong>
+                      </p>
+                      <p className="flex items-center gap-1.5">
+                        TDEE:
+                        <InfoTooltip
+                          label="TDEE là gì?"
+                          content="TDEE (Total Daily Energy Expenditure) là tổng năng lượng bạn tiêu hao mỗi ngày, gồm BMR cộng vận động và tiêu hóa."
+                        />
+                        <strong>
+                          {query.data.tdee === null ? 'Chưa có dữ liệu' : `${query.data.tdee} kcal`}
+                        </strong>
+                      </p>
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Tính từ hồ sơ và cân nặng gần nhất khi bạn lưu mục tiêu.
                     </p>
                   </div>
                 )}
                 <form
                   onSubmit={(event) => {
                     event.preventDefault();
-                    void submit('manual')(event);
+                    void submit()(event);
                   }}
                   className="space-y-4"
                   noValidate
@@ -299,16 +300,8 @@ export default function TargetsPage() {
                     </div>
                   )}
                   <div className="flex flex-wrap gap-2">
-                    <Button type="submit" disabled={save.isPending || calculate.isPending}>
-                      {save.isPending ? 'Đang lưu…' : 'Lưu thủ công'}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={save.isPending || calculate.isPending}
-                      onClick={() => void submit('calculate')()}
-                    >
-                      {calculate.isPending ? 'Đang tính…' : 'Tính tự động'}
+                    <Button type="submit" disabled={save.isPending}>
+                      {save.isPending ? 'Đang lưu…' : 'Lưu mục tiêu'}
                     </Button>
                   </div>
                 </form>

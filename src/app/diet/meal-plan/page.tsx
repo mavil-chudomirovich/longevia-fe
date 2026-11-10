@@ -7,72 +7,40 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CitationChipList } from '@/components/shared/citation-chip';
 import { MarkdownText } from '@/components/shared/markdown-text';
-import { getApiErrorMessage } from '@/lib/api-error';
-import { describeAiFallback } from '@/lib/ai-fallback';
+import { WeekPicker } from '@/components/shared/week-picker';
+import { getApiErrorCode, getApiErrorMessage } from '@/lib/api-error';
+import { getBusinessTodayDateString, getBusinessWeekStart } from '@/lib/business-date';
 import {
   useGenerateMealPlanMutation,
   useMealPlanQuery,
 } from '@/features/diet/queries/diet.queries';
 import { partitionWarnings } from '@/features/diet/utils/meal-plan-warnings';
 
-/** Ngày local YYYY-MM-DD, tránh lệch ngày do toISOString (UTC). */
-function toLocalDateString(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function today(): string {
-  return toLocalDateString(new Date());
-}
-
-/** Chọn một ngày bất kỳ, trả về thứ Hai của tuần chứa ngày đó. */
-function mondayOf(dateString: string): string {
-  if (!dateString) return '';
-  const date = new Date(`${dateString}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return '';
-  const offset = (date.getDay() + 6) % 7;
-  date.setDate(date.getDate() - offset);
-  return toLocalDateString(date);
-}
-
-function formatWeek(weekStart: string): string {
-  if (!weekStart) return '';
-  const start = new Date(`${weekStart}T00:00:00`);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 6);
-  const fmt = new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit' });
-  return `Tuần ${fmt.format(start)} – ${fmt.format(end)}/${end.getFullYear()}`;
-}
-
 export default function MealPlanPage() {
-  const [selectedDate, setSelectedDate] = React.useState<string>(today);
+  const [weekStart, setWeekStart] = React.useState(() =>
+    getBusinessWeekStart(getBusinessTodayDateString())
+  );
   const [days, setDays] = React.useState(7);
   const [mealsPerDay, setMealsPerDay] = React.useState(4);
-  const [loaded, setLoaded] = React.useState(false);
-  const weekStart = mondayOf(selectedDate);
-  const query = useMealPlanQuery(weekStart, loaded);
+  const query = useMealPlanQuery(weekStart, true);
   const generate = useGenerateMealPlanMutation();
   const plan = query.data;
+  const notFound = getApiErrorCode(query.error) === 'diet.meal_plan_not_found';
   const warnings = React.useMemo(
     () => partitionWarnings(plan?.warnings ?? [], plan?.days.map((day) => day.date) ?? []),
     [plan]
   );
-  const error = query.error ?? generate.error;
-  const fallbackInfo = plan ? describeAiFallback(plan.usedFallbackReason) : null;
-
-  const loadSaved = () => {
-    setLoaded(true);
-    void query.refetch();
-  };
+  const error = plan ? null : notFound ? null : (query.error ?? generate.error);
 
   const onCreate = async () => {
-    setLoaded(true);
     try {
       await generate.mutateAsync({ weekStartDate: weekStart, days, mealsPerDay });
     } catch {
-      // Trang hiển thị lỗi tại chỗ.
+      // Có thể server đã lưu xong dù client timeout; thử đọc lại bản đã lưu.
+      const saved = await query.refetch();
+      if (!saved.data) {
+        // Trang hiển thị lỗi tại chỗ.
+      }
     }
   };
 
@@ -82,8 +50,16 @@ export default function MealPlanPage() {
         <div>
           <h1 className="text-3xl font-bold">Kế hoạch ăn uống theo tuần</h1>
           <p className="mt-1 text-muted-foreground">
-            Chọn ngày bất kỳ trong tuần — Longevia tự xác định tuần bắt đầu từ thứ Hai.
+            Chọn tuần — Longevia tự lập kế hoạch cho thứ Hai đến Chủ nhật.
           </p>
+        </div>
+        <div className="w-full sm:w-auto">
+          <WeekPicker
+            id="meal-plan-week"
+            value={weekStart}
+            onChange={setWeekStart}
+            disabled={generate.isPending}
+          />
         </div>
       </div>
 
@@ -96,35 +72,18 @@ export default function MealPlanPage() {
         <TabsContent value="saved" className="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Mở kế hoạch đã lưu</CardTitle>
+              <CardTitle className="text-base">Kế hoạch của tuần đang chọn</CardTitle>
               <CardDescription>
-                Chỉ đọc bản đã lưu của tuần, không gọi AI và không ghi đè.
+                Tự động tải bản đã lưu, không gọi AI và không ghi đè.
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-3 pt-2 sm:grid-cols-[1fr_auto] sm:items-end">
-              <div className="space-y-2">
-                <label htmlFor="saved-date" className="text-sm font-medium">
-                  Chọn một ngày trong tuần
-                </label>
-                <Input
-                  id="saved-date"
-                  type="date"
-                  value={selectedDate}
-                  onChange={(event) => {
-                    setSelectedDate(event.target.value);
-                    setLoaded(false);
-                  }}
-                />
-                {weekStart && (
-                  <p className="text-xs text-muted-foreground">{formatWeek(weekStart)}</p>
-                )}
-              </div>
+            <CardContent className="pt-2">
               <Button
-                onClick={loadSaved}
-                disabled={!weekStart || query.isFetching}
                 variant="outline"
+                onClick={() => void query.refetch()}
+                disabled={query.isFetching}
               >
-                {query.isFetching && loaded ? 'Đang tải…' : 'Tải kế hoạch'}
+                {query.isFetching ? 'Đang tải…' : 'Tải lại'}
               </Button>
             </CardContent>
           </Card>
@@ -135,27 +94,11 @@ export default function MealPlanPage() {
             <CardHeader>
               <CardTitle className="text-base">Tạo kế hoạch mới</CardTitle>
               <CardDescription>
-                AI sinh kế hoạch theo từng ngày. Tuần đã có kế hoạch sẽ bị ghi đè khi bạn tạo mới.
+                AI sinh kế hoạch cho tuần đang chọn. Tuần đã có kế hoạch sẽ bị ghi đè khi bạn tạo
+                mới.
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-3 pt-2 sm:grid-cols-[1fr_100px_100px_auto] sm:items-end">
-              <div className="space-y-2">
-                <label htmlFor="new-date" className="text-sm font-medium">
-                  Chọn một ngày trong tuần
-                </label>
-                <Input
-                  id="new-date"
-                  type="date"
-                  value={selectedDate}
-                  onChange={(event) => {
-                    setSelectedDate(event.target.value);
-                    setLoaded(false);
-                  }}
-                />
-                {weekStart && (
-                  <p className="text-xs text-muted-foreground">{formatWeek(weekStart)}</p>
-                )}
-              </div>
+            <CardContent className="grid gap-3 pt-2 sm:grid-cols-[120px_120px_auto] sm:items-end">
               <div className="space-y-2">
                 <label htmlFor="days" className="text-sm font-medium">
                   Số ngày
@@ -182,9 +125,11 @@ export default function MealPlanPage() {
                   onChange={(event) => setMealsPerDay(Number(event.target.value))}
                 />
               </div>
-              <Button onClick={() => void onCreate()} disabled={!weekStart || generate.isPending}>
-                {generate.isPending ? 'Đang tạo…' : 'Tạo kế hoạch'}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => void onCreate()} disabled={generate.isPending}>
+                  {generate.isPending ? 'Đang tạo…' : 'Tạo kế hoạch'}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -192,11 +137,11 @@ export default function MealPlanPage() {
 
       {generate.isPending ? (
         <p className="py-8 text-muted-foreground">
-          Đang lập kế hoạch tuần theo từng ngày — có thể mất 30–60 giây…
+          Đang lập kế hoạch bằng AI cho tuần đã chọn — có thể mất 30–90 giây…
         </p>
-      ) : loaded && query.isLoading ? (
+      ) : query.isLoading ? (
         <p className="py-8 text-muted-foreground">Đang tải kế hoạch…</p>
-      ) : loaded && error ? (
+      ) : error ? (
         <Card className="mt-6">
           <CardContent className="space-y-3 py-6">
             <p role="alert">{getApiErrorMessage(error, 'Chưa tải được kế hoạch lúc này.')}</p>
@@ -210,23 +155,8 @@ export default function MealPlanPage() {
             </div>
           </CardContent>
         </Card>
-      ) : loaded && plan ? (
+      ) : plan ? (
         <div className="mt-6 space-y-4">
-          {plan.usedFallback && fallbackInfo && (
-            <div className="space-y-2 rounded border border-amber-500/30 bg-amber-500/10 p-3">
-              <p className="text-sm">{fallbackInfo.message}</p>
-              {fallbackInfo.retryable && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void onCreate()}
-                  disabled={generate.isPending}
-                >
-                  Thử tạo lại
-                </Button>
-              )}
-            </div>
-          )}
           {warnings.global.map((warning) => (
             <p
               key={`${warning.code}-${warning.scope}`}
@@ -295,7 +225,7 @@ export default function MealPlanPage() {
         </div>
       ) : (
         <p className="mt-6 text-sm text-muted-foreground">
-          Chọn tab phù hợp: mở bản đã lưu hoặc tạo kế hoạch mới.
+          Tuần này chưa có kế hoạch. Chuyển sang tab “Tạo kế hoạch mới” để lập kế hoạch.
         </p>
       )}
     </div>

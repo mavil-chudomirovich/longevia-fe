@@ -102,6 +102,28 @@ export interface WaterSummary {
   remainingMl: number; // Số ml còn thiếu để đạt mục tiêu (tối thiểu 0)
 }
 
+export interface WaterHistoryDay {
+  date: string;
+  consumedMl: number;
+  targetMl: number;
+  percentComplete: number;
+  visualPercent: number;
+  goalReached: boolean;
+}
+
+export interface WaterHistory {
+  days: number;
+  targetMl: number;
+  items: WaterHistoryDay[];
+}
+
+export interface SleepHistoryPage {
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  items: SleepRecord[];
+}
+
 export interface SleepRecord {
   id: string;
   sleptAt: Date;

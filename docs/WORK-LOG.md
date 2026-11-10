@@ -4,6 +4,23 @@
 
 ---
 
+## [2026-11-10] Targets BMR/TDEE, WeekPicker, lịch sử nước/ngủ, AI-only meal-plan
+
+- **Navbar**: đổi thứ tự Trang chủ → Dinh dưỡng → Tiến trình → Hỏi sách.
+- **Targets**: bỏ nút "Tính tự động", chỉ còn "Lưu mục tiêu"; BMR/TDEE do PUT tự đính kèm,
+  có chú thích nguồn; bỏ câu mô tả đã yêu cầu.
+- **WeekPicker**: component dùng chung (lùi/tới tuần + lịch tháng + "Tuần này") cho
+  `/diet/meal-plan` và `/progress/workout`; helper trong `src/lib/business-date.ts`.
+- **Progress**: card lịch sử uống nước (7/30/90 ngày) và lịch sử giấc ngủ (phân trang, xoá);
+  sửa ghi chú UTC cũ.
+- **Workout**: tự tải plan đã lưu, 404 là trạng thái rỗng; nhập/lưu giới hạn sức khỏe +
+  dụng cụ, prefill từ hồ sơ; hiển thị input của plan đã lưu.
+- **Hồ sơ**: thêm checkbox "Đau hoặc tổn thương khớp".
+- **Meal-plan**: bỏ UI fallback; request generate timeout 150 giây; đổi sang WeekPicker.
+- **Xác minh**: `tsc` 0 lỗi; 221 test pass; lint 0 error; build thành công.
+
+---
+
 ## [2026-11-09] Đợt UI fixes + giờ Việt Nam + lịch sử nhịn ăn
 
 - **Điều hướng**: bỏ "Hỏi sách" khỏi sub-nav Dinh dưỡng; bỏ "Gợi ý AI" khỏi navbar chính; đổi tên "Gợi ý bữa ăn".

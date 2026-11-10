@@ -88,6 +88,20 @@ export interface WaterSummaryResponseDto {
   percentComplete: number;
 }
 
+export interface WaterHistoryItemDto {
+  date?: string;
+  consumedMl?: number;
+  targetMl?: number;
+  percentComplete?: number;
+  goalReached?: boolean;
+}
+
+export interface WaterHistoryResponseDto {
+  days?: number;
+  targetMl?: number;
+  items?: WaterHistoryItemDto[] | null;
+}
+
 // 4. Sleep
 export interface LogSleepRequestDto {
   sleptAt: string; // ISO 8601 instant
@@ -102,6 +116,13 @@ export interface SleepResponseDto {
   sleepQuality: string;
   durationHours: number;
   date: string; // DateOnly YYYY-MM-DD
+}
+
+export interface SleepHistoryPageDto {
+  page?: number;
+  pageSize?: number;
+  totalCount?: number;
+  items?: SleepResponseDto[] | null;
 }
 
 // 5. Body Metrics

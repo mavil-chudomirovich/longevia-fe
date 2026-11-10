@@ -131,6 +131,7 @@ export const dietApi = {
     const response = await api.post<MealPlanDto>(API_ENDPOINTS.DIET.MEAL_PLANS, payload, {
       signal,
       silent: true,
+      timeout: 150_000,
     });
     return mealPlanMapper.toModel(response.data);
   },

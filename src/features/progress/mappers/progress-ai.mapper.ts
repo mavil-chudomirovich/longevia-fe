@@ -78,6 +78,9 @@ export const progressAiMapper = {
       warnings: safeArray<WorkoutWarningDto>(dto?.warnings ?? []).map(workoutWarning),
       days: safeArray<WorkoutPlanDayDto>(dto?.days ?? []).map(workoutDay),
       generatedAt: safeDate(pickField(dto, ['generatedAt'], null)),
+      activityPreference: safeArray<string>(dto?.activityPreference ?? []),
+      equipmentAvailable: safeArray<string>(dto?.equipmentAvailable ?? []),
+      limitations: safeArray<string>(dto?.limitations ?? []),
     };
   },
   toWorkoutRequest(
@@ -85,9 +88,19 @@ export const progressAiMapper = {
     goal: string,
     days: number,
     sessionsPerWeek: number,
-    minutesPerSession: number
+    minutesPerSession: number,
+    limitations: string[] = [],
+    equipmentAvailable: string[] = []
   ): GenerateWorkoutPlanDto {
-    return { weekStartDate, goal, days, sessionsPerWeek, minutesPerSession };
+    return {
+      weekStartDate,
+      goal,
+      days,
+      sessionsPerWeek,
+      minutesPerSession,
+      limitations,
+      equipmentAvailable,
+    };
   },
   toLongevity(dto: LongevityHabitsDto | null | undefined): LongevityHabitsModel {
     return {

@@ -38,6 +38,9 @@ export interface WorkoutPlanDto {
   warnings?: WorkoutWarningDto[] | null;
   days?: WorkoutPlanDayDto[] | null;
   generatedAt?: string;
+  activityPreference?: string[] | null;
+  equipmentAvailable?: string[] | null;
+  limitations?: string[] | null;
 }
 
 export interface GenerateWorkoutPlanDto {
@@ -46,6 +49,9 @@ export interface GenerateWorkoutPlanDto {
   days: number;
   sessionsPerWeek: number;
   minutesPerSession: number;
+  activityPreference?: string[];
+  equipmentAvailable?: string[];
+  limitations?: string[];
 }
 
 export interface LongevityComponentDto {

@@ -24,8 +24,8 @@ import { cn } from '@/lib/utils';
 const NAV_ITEMS = [
   { label: 'Trang chủ', href: '/', icon: House },
   { label: 'Dinh dưỡng', href: '/diet', icon: Apple },
-  { label: 'Hỏi sách', href: '/knowledge', icon: BookOpen },
   { label: 'Tiến trình', href: '/progress', icon: LineChart },
+  { label: 'Hỏi sách', href: '/knowledge', icon: BookOpen },
 ];
 
 export function SiteHeader() {

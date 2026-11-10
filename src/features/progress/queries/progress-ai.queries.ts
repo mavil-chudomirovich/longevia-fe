@@ -36,6 +36,8 @@ export function useGenerateWorkoutPlanMutation() {
       days: number;
       sessionsPerWeek: number;
       minutesPerSession: number;
+      limitations: string[];
+      equipmentAvailable: string[];
     }) => {
       const controller = new AbortController();
       return progressAiApi.generateWorkoutPlan(
@@ -44,6 +46,8 @@ export function useGenerateWorkoutPlanMutation() {
         input.days,
         input.sessionsPerWeek,
         input.minutesPerSession,
+        input.limitations,
+        input.equipmentAvailable,
         controller.signal
       );
     },

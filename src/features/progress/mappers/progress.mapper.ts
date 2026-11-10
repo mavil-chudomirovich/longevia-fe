@@ -16,6 +16,8 @@ import {
   FastingSessionResponseDto,
   MetricsHistoryResponseDto,
   SleepResponseDto,
+  SleepHistoryPageDto,
+  WaterHistoryResponseDto,
   WaterSummaryResponseDto,
 } from '../types/progress.dto';
 import {
@@ -28,8 +30,10 @@ import {
   FastingSessionResult,
   FastingStatusEnum,
   MetricsHistory,
+  SleepHistoryPage,
   SleepQualityEnum,
   SleepRecord,
+  WaterHistory,
   WaterSummary,
 } from '../types/progress.model';
 import {
@@ -313,6 +317,59 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
       percentComplete,
       visualPercent,
       remainingMl,
+    };
+  }
+
+  toWaterHistory(dto?: WaterHistoryResponseDto | null): WaterHistory {
+    const targetMl = safeNumber(pickField(dto, ['targetMl', 'target_ml'], 2500), 2500);
+    const items = safeArray<NonNullable<WaterHistoryResponseDto['items']>[number]>(
+      dto?.items ?? []
+    ).map((item) => {
+      const consumedMl = safeNumber(pickField(item, ['consumedMl', 'consumed_ml'], 0), 0);
+      const itemTarget = safeNumber(pickField(item, ['targetMl', 'target_ml'], targetMl), targetMl);
+      const rawPercent = pickField<number | null>(
+        item,
+        ['percentComplete', 'percent_complete'],
+        null
+      );
+      const percentComplete =
+        rawPercent !== null && rawPercent !== undefined
+          ? Math.round(Number(rawPercent) * 10) / 10
+          : itemTarget > 0
+            ? Math.round((consumedMl / itemTarget) * 1000) / 10
+            : 0;
+
+      return {
+        date: safeString(pickField(item, ['date'], '')),
+        consumedMl,
+        targetMl: itemTarget,
+        percentComplete,
+        visualPercent: Math.min(100, Math.max(0, percentComplete)),
+        goalReached: safeBoolean(
+          pickField(item, ['goalReached', 'goal_reached'], consumedMl >= itemTarget)
+        ),
+      };
+    });
+
+    return {
+      days: safeNumber(pickField(dto, ['days'], items.length), items.length),
+      targetMl,
+      items,
+    };
+  }
+
+  toSleepHistoryPage(dto?: SleepHistoryPageDto | null): SleepHistoryPage {
+    const items = safeArray<SleepResponseDto>(dto?.items ?? []).map((item) =>
+      this.toSleepRecord(item)
+    );
+    return {
+      page: safeNumber(pickField(dto, ['page'], 1), 1),
+      pageSize: safeNumber(pickField(dto, ['pageSize', 'page_size'], 10), 10),
+      totalCount: safeNumber(
+        pickField(dto, ['totalCount', 'total_count'], items.length),
+        items.length
+      ),
+      items,
     };
   }
 

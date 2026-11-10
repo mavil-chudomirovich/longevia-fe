@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import type { ProfileModel } from '@/features/auth/types/auth.model';
 import { getBusinessTodayDateString } from '@/lib/business-date';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { profileSchema, type ProfileFormValues } from '../schemas/profile.schema';
@@ -19,6 +20,7 @@ const emptyProfile: ProfileFormValues = {
   activityLevel: 'Sedentary',
   dietaryPreference: 'None',
   allergies: [],
+  healthLimitations: [],
 };
 
 export function ProfileForm({
@@ -44,6 +46,7 @@ export function ProfileForm({
       activityLevel: initialProfile.activityLevel as ProfileFormValues['activityLevel'],
       dietaryPreference: initialProfile.dietaryPreference as ProfileFormValues['dietaryPreference'],
       allergies: initialProfile.allergies,
+      healthLimitations: initialProfile.healthLimitations as ProfileFormValues['healthLimitations'],
     });
   }, [form, initialProfile]);
 
@@ -195,6 +198,38 @@ export function ProfileForm({
         {form.formState.errors.allergies && (
           <p role="alert" className="text-sm text-destructive">
             {form.formState.errors.allergies.message}
+          </p>
+        )}
+      </div>
+      <div className="space-y-2">
+        <Label>Giới hạn sức khỏe</Label>
+        <label htmlFor="limitation-joint-pain" className="flex items-start gap-2 text-sm">
+          <Checkbox
+            id="limitation-joint-pain"
+            checked={form.watch('healthLimitations').includes('joint_pain')}
+            onCheckedChange={(checked) => {
+              const current = form.getValues('healthLimitations');
+              form.setValue(
+                'healthLimitations',
+                checked === true
+                  ? (Array.from(
+                      new Set([...current, 'joint_pain'])
+                    ) as ProfileFormValues['healthLimitations'])
+                  : current.filter((item) => item !== 'joint_pain'),
+                { shouldValidate: true }
+              );
+            }}
+          />
+          <span>
+            Đau hoặc tổn thương khớp
+            <span className="block text-xs text-muted-foreground">
+              Lịch tập sẽ tránh hoạt động tác động mạnh lên khớp.
+            </span>
+          </span>
+        </label>
+        {form.formState.errors.healthLimitations && (
+          <p role="alert" className="text-sm text-destructive">
+            {form.formState.errors.healthLimitations.message}
           </p>
         )}
       </div>

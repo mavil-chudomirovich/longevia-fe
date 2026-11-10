@@ -19,6 +19,43 @@ export function getBusinessWeekStart(dateString: string): string {
   return getBusinessTodayDateString(date);
 }
 
+/** Cộng/trừ số tuần, luôn trả về thứ Hai. */
+export function addBusinessWeeks(weekStart: string, delta: number): string {
+  const date = new Date(`${weekStart}T00:00:00`);
+  date.setDate(date.getDate() + delta * 7);
+  return getBusinessWeekStart(getBusinessTodayDateString(date));
+}
+
+/** Bảy ngày (YYYY-MM-DD) của tuần, bắt đầu từ thứ Hai. */
+export function getBusinessWeekDays(weekStart: string): string[] {
+  const monday = getBusinessWeekStart(weekStart);
+  return Array.from({ length: 7 }, (_, index) => shiftDays(monday, index));
+}
+
+/** Nhãn tuần: "Tuần 10/11 – 16/11/2026". */
+export function formatBusinessWeekRange(weekStart: string): string {
+  const monday = getBusinessWeekStart(weekStart);
+  const start = new Date(`${monday}T00:00:00`);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  const short = (date: Date) =>
+    `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`;
+  return `Tuần ${short(start)} – ${short(end)}/${end.getFullYear()}`;
+}
+
+/** Tuần truyền vào có phải tuần hiện tại không. */
+export function isCurrentBusinessWeek(weekStart: string, reference?: Date): boolean {
+  return (
+    getBusinessWeekStart(weekStart) === getBusinessWeekStart(getBusinessTodayDateString(reference))
+  );
+}
+
+function shiftDays(dateString: string, days: number): string {
+  const date = new Date(`${dateString}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  return getBusinessTodayDateString(date);
+}
+
 /** Số mili giây tới nửa đêm local kế tiếp. */
 export function getMsUntilNextBusinessMidnight(referenceDate?: Date): number {
   const now = referenceDate ?? new Date();
