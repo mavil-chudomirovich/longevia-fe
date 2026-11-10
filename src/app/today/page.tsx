@@ -79,6 +79,11 @@ export default function TodayPage() {
   const noWorkoutPlan = getApiErrorCode(workoutPlan.error) === 'progress.workout_plan_not_found';
   const planDay = mealPlan.data?.days.find((day) => day.date === today);
   const workoutDay = workoutPlan.data?.days.find((day) => day.date === today);
+  const mealSlots = ['Breakfast', 'Lunch', 'Dinner', 'Snack'].map((slot) => ({
+    slot,
+    logged: summary.data?.meals.find((meal) => meal.mealType.toUpperCase() === slot.toUpperCase()),
+    planned: planDay?.meals.find((meal) => meal.mealType.toUpperCase() === slot.toUpperCase()),
+  }));
   const calories = summary.data?.consumedCalories ?? 0;
   const targetCalories = summary.data?.targetCalories ?? 0;
   const caloriePercent = targetCalories > 0 ? Math.min(100, (calories / targetCalories) * 100) : 0;
@@ -167,26 +172,37 @@ export default function TodayPage() {
               <p className="text-sm text-muted-foreground">
                 Chưa tải được nhật ký. Bạn cần thiết lập mục tiêu dinh dưỡng trước.
               </p>
-            ) : summary.data && summary.data.meals.length > 0 ? (
+            ) : summary.data ? (
               <ul className="space-y-3">
-                {summary.data.meals.map((meal) => (
-                  <li key={meal.mealType} className="space-y-1">
+                {mealSlots.map(({ slot, logged, planned }) => (
+                  <li key={slot} className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-semibold text-foreground">
-                        {mealLabel(meal.mealType)}
-                      </span>
-                      <span className="font-medium text-foreground">
-                        {Math.round(meal.totalCalories)} kcal
+                      <span className="font-semibold text-foreground">{mealLabel(slot)}</span>
+                      <span
+                        className={cn(
+                          'font-medium',
+                          logged ? 'text-foreground' : 'text-muted-foreground'
+                        )}
+                      >
+                        {logged ? `${Math.round(logged.totalCalories)} kcal` : 'Chưa ghi'}
                       </span>
                     </div>
-                    <ul className="space-y-0.5 text-xs text-muted-foreground">
-                      {meal.items.map((item) => (
-                        <li key={`${meal.mealType}-${item.foodId}`}>
-                          {item.name} · {item.quantity}
-                          {item.servingUnit} · {Math.round(item.calories)} kcal
-                        </li>
-                      ))}
-                    </ul>
+                    {logged && logged.items.length > 0 && (
+                      <ul className="space-y-0.5 text-xs text-muted-foreground">
+                        {logged.items.map((item) => (
+                          <li key={`${slot}-${item.foodId}`}>
+                            {item.name} · {item.quantity}
+                            {item.servingUnit} · {Math.round(item.calories)} kcal
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {planned && planned.foods.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground">Kế hoạch:</span>{' '}
+                        {planned.foods.map((food) => food.name).join(', ')}
+                      </p>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -194,32 +210,14 @@ export default function TodayPage() {
               <p className="text-sm text-muted-foreground">Hôm nay chưa ghi bữa ăn nào.</p>
             )}
 
-            <div className="rounded-lg bg-muted/50 p-3">
-              <p className="text-sm font-medium">Kế hoạch bữa hôm nay</p>
-              {planDay && planDay.meals.length > 0 ? (
-                <ul className="mt-1.5 space-y-1 text-xs text-muted-foreground">
-                  {planDay.meals.map((meal) => (
-                    <li key={meal.mealType}>
-                      <span className="font-medium text-foreground">
-                        {mealLabel(meal.mealType)}:
-                      </span>{' '}
-                      {meal.foods.map((food) => food.name).join(', ')}
-                    </li>
-                  ))}
-                </ul>
-              ) : noMealPlan ? (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Tuần này chưa có kế hoạch.{' '}
-                  <Link href="/diet/meal-plan" className="font-medium text-primary underline">
-                    Tạo kế hoạch
-                  </Link>
-                </p>
-              ) : (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Hôm nay là ngày nghỉ hoặc chưa có bữa.
-                </p>
-              )}
-            </div>
+            {noMealPlan && (
+              <p className="text-xs text-muted-foreground">
+                Tuần này chưa có kế hoạch bữa ăn.{' '}
+                <Link href="/diet/meal-plan" className="font-medium text-primary underline">
+                  Tạo kế hoạch
+                </Link>
+              </p>
+            )}
 
             <Button variant="outline" className="w-full" onClick={() => setMealOpen(true)}>
               Ghi bữa ăn

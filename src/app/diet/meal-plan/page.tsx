@@ -91,26 +91,7 @@ export default function MealPlanPage() {
                 : 'Tuần này chưa có kế hoạch. Tạo mới để AI lập thực đơn.'}
             </p>
 
-            {plan ? (
-              <div className="space-y-2">
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => void query.refetch()}
-                  disabled={query.isFetching}
-                >
-                  {query.isFetching ? 'Đang tải…' : 'Tải lại kế hoạch'}
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full"
-                  onClick={() => setCreateOpen(true)}
-                  disabled={generate.isPending}
-                >
-                  Tạo lại tuần này
-                </Button>
-              </div>
-            ) : (
+            <div className="space-y-2">
               <Button
                 className="w-full"
                 onClick={() => setCreateOpen(true)}
@@ -118,7 +99,15 @@ export default function MealPlanPage() {
               >
                 Tạo kế hoạch
               </Button>
-            )}
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => void query.refetch()}
+                disabled={query.isFetching}
+              >
+                {query.isFetching ? 'Đang tải…' : 'Tải lại'}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
