@@ -2,11 +2,16 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { getApiErrorCode, getApiErrorMessage } from '@/lib/api-error';
-import { getBusinessTodayDateString, getBusinessWeekStart } from '@/lib/business-date';
+import {
+  formatBusinessWeekRange,
+  getBusinessTodayDateString,
+  getBusinessWeekStart,
+} from '@/lib/business-date';
 import { CitationChipList } from '@/components/shared/citation-chip';
 import { MarkdownText } from '@/components/shared/markdown-text';
 import { WeekPicker } from '@/components/shared/week-picker';
@@ -14,6 +19,7 @@ import { HealthLimitationsPicker } from '@/components/shared/health-limitations-
 import { workoutActivityLabel } from '@/features/progress/mappers/progress-labels';
 import { useProfileQuery } from '@/features/profile/queries/profile.queries';
 import { describeAiFallback } from '@/lib/ai-fallback';
+import { cn } from '@/lib/utils';
 import {
   useGenerateWorkoutPlanMutation,
   useWorkoutPlanQuery,
@@ -36,6 +42,7 @@ export default function WorkoutPage() {
   const [equipmentEdit, setEquipmentEdit] = React.useState<{ key: string; value: string } | null>(
     null
   );
+  const [showAdvanced, setShowAdvanced] = React.useState(true);
   const profile = useProfileQuery();
   const query = useWorkoutPlanQuery(weekStart, true);
   const generate = useGenerateWorkoutPlanMutation();
@@ -73,13 +80,27 @@ export default function WorkoutPage() {
     (warning) => warning.code !== 'no_limitations_assumed'
   );
 
+  const onCreate = () => {
+    void generate
+      .mutateAsync({
+        weekStartDate: weekStart,
+        goal,
+        days,
+        sessionsPerWeek: sessions,
+        minutesPerSession: minutes,
+        limitations,
+        equipmentAvailable,
+      })
+      .catch(() => undefined);
+  };
+
   return (
     <div className="container mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold">Kế hoạch tập luyện theo tuần</h1>
           <p className="mt-1 text-muted-foreground">
-            Lịch tập dựa trên hồ sơ, mục tiêu và giới hạn sức khỏe của bạn.
+            Thiết lập ở cột bên trái — lịch tập hiển thị ngay bên cạnh.
           </p>
         </div>
         <Button variant="outline" asChild>
@@ -87,10 +108,16 @@ export default function WorkoutPage() {
         </Button>
       </div>
 
-      <Card className="mt-6">
-        <CardContent className="space-y-4 pt-6">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:items-end">
-            <div className="space-y-1 lg:col-span-2">
+      <div className="mt-6 grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start">
+        <Card className="lg:sticky lg:top-20">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Thiết lập buổi tập</CardTitle>
+            <CardDescription className="text-xs">
+              {formatBusinessWeekRange(weekStart)}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
               <label htmlFor="workout-week" className="text-sm font-medium">
                 Tuần
               </label>
@@ -101,7 +128,8 @@ export default function WorkoutPage() {
                 disabled={generate.isPending}
               />
             </div>
-            <div className="space-y-1">
+
+            <div className="space-y-2">
               <label htmlFor="workout-goal" className="text-sm font-medium">
                 Mục tiêu
               </label>
@@ -117,7 +145,41 @@ export default function WorkoutPage() {
                 <option value="Longevity">Trường thọ</option>
               </select>
             </div>
-            <div className="space-y-1">
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label htmlFor="workout-days" className="text-sm font-medium">
+                  Số ngày
+                </label>
+                <Input
+                  id="workout-days"
+                  type="number"
+                  min={1}
+                  max={7}
+                  value={days}
+                  onChange={(event) =>
+                    setDaysEdit({ key: planKey, value: Number(event.target.value) })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="workout-sessions" className="text-sm font-medium">
+                  Buổi/tuần
+                </label>
+                <Input
+                  id="workout-sessions"
+                  type="number"
+                  min={1}
+                  max={7}
+                  value={sessions}
+                  onChange={(event) =>
+                    setSessionsEdit({ key: planKey, value: Number(event.target.value) })
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
               <label htmlFor="workout-minutes" className="text-sm font-medium">
                 Phút/buổi
               </label>
@@ -132,37 +194,8 @@ export default function WorkoutPage() {
                 }
               />
             </div>
-            <div className="space-y-1">
-              <label htmlFor="workout-days" className="text-sm font-medium">
-                Số ngày
-              </label>
-              <Input
-                id="workout-days"
-                type="number"
-                min={1}
-                max={7}
-                value={days}
-                onChange={(event) =>
-                  setDaysEdit({ key: planKey, value: Number(event.target.value) })
-                }
-              />
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="workout-sessions" className="text-sm font-medium">
-                Buổi/tuần
-              </label>
-              <Input
-                id="workout-sessions"
-                type="number"
-                min={1}
-                max={7}
-                value={sessions}
-                onChange={(event) =>
-                  setSessionsEdit({ key: planKey, value: Number(event.target.value) })
-                }
-              />
-            </div>
-            <div className="space-y-1 sm:col-span-2">
+
+            <div className="space-y-2">
               <label htmlFor="workout-equipment" className="text-sm font-medium">
                 Dụng cụ sẵn có
               </label>
@@ -170,141 +203,168 @@ export default function WorkoutPage() {
                 id="workout-equipment"
                 value={equipmentText}
                 onChange={(event) => setEquipmentEdit({ key: planKey, value: event.target.value })}
-                placeholder="Ví dụ: tạ đơn, thảm yoga (cách nhau dấu phẩy)"
+                placeholder="Ví dụ: tạ đơn, thảm yoga"
               />
             </div>
-            <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-2">
-              <Button
-                onClick={() => {
-                  void generate
-                    .mutateAsync({
-                      weekStartDate: weekStart,
-                      goal,
-                      days,
-                      sessionsPerWeek: sessions,
-                      minutesPerSession: minutes,
-                      limitations,
-                      equipmentAvailable,
-                    })
-                    .catch(() => undefined);
-                }}
-                disabled={generate.isPending}
+
+            <div className="space-y-2 border-t pt-3">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between text-sm font-medium"
+                onClick={() => setShowAdvanced((value) => !value)}
+                aria-expanded={showAdvanced}
               >
+                <span>
+                  Giới hạn sức khỏe
+                  {limitations.length > 0 && (
+                    <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[11px] text-primary">
+                      {limitations.length}
+                    </span>
+                  )}
+                </span>
+                <ChevronDown
+                  className={cn('size-4 transition-transform', showAdvanced && 'rotate-180')}
+                  aria-hidden="true"
+                />
+              </button>
+              {showAdvanced && (
+                <HealthLimitationsPicker
+                  value={limitations}
+                  onChange={(next) => setLimitationsEdit({ key: planKey, value: next })}
+                  disabled={generate.isPending}
+                />
+              )}
+            </div>
+
+            <div className="space-y-2 border-t pt-3">
+              <Button className="w-full" onClick={onCreate} disabled={generate.isPending}>
                 {generate.isPending ? 'Đang tạo…' : 'Tạo kế hoạch'}
               </Button>
               <Button
                 variant="outline"
+                className="w-full"
                 onClick={() => void query.refetch()}
                 disabled={query.isFetching}
               >
                 {query.isFetching ? 'Đang tải…' : 'Tải lại'}
               </Button>
             </div>
-          </div>
-
-          <div className="space-y-2 border-t pt-3">
-            <p className="text-sm font-medium">Giới hạn sức khỏe</p>
-            <HealthLimitationsPicker
-              value={limitations}
-              onChange={(next) => setLimitationsEdit({ key: planKey, value: next })}
-              disabled={generate.isPending}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {generate.isPending || query.isLoading ? (
-        <p className="py-8 text-muted-foreground">Đang lập lịch tập…</p>
-      ) : error ? (
-        <Card className="mt-6">
-          <CardContent className="space-y-3 py-6">
-            <p role="alert">{getApiErrorMessage(error, 'Chưa tạo được kế hoạch tập.')}</p>
-            <Button variant="outline" onClick={() => void query.refetch()}>
-              Thử lại
-            </Button>
           </CardContent>
         </Card>
-      ) : plan ? (
-        <div className="mt-6 space-y-4">
-          {plan.usedFallback && fallbackInfo && (
-            <div className="space-y-2 rounded border border-amber-500/30 bg-amber-500/10 p-3">
-              <p className="text-sm">{fallbackInfo.message}</p>
-              {fallbackInfo.retryable && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void query.refetch()}
-                  disabled={generate.isPending}
-                >
-                  Thử tạo lại
-                </Button>
-              )}
+
+        <div className="min-w-0 space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-2 border-b pb-3">
+            <div>
+              <p className="text-sm font-medium">{formatBusinessWeekRange(weekStart)}</p>
+              <p className="text-xs text-muted-foreground">
+                {plan
+                  ? `${plan.sessionsScheduled} buổi · ${plan.minutesPerSession} phút/buổi`
+                  : 'Chưa có kế hoạch cho tuần này'}
+              </p>
             </div>
-          )}
-          {visibleWarnings.map((warning) => (
-            <p
-              key={`${warning.code}-${warning.scope}`}
-              className="rounded bg-amber-500/10 p-3 text-sm"
-            >
-              {warning.message}
-            </p>
-          ))}
-          <div className="grid gap-4 md:grid-cols-2">
-            {plan.days.map((day) => (
-              <Card key={day.date}>
-                <CardHeader>
-                  <CardTitle className="text-base">
-                    {day.restDay
-                      ? 'Ngày nghỉ'
-                      : day.activities.length > 1
-                        ? `${day.activities[0].activityLabel || workoutActivityLabel(day.activities[0].activity)} + ${day.activities.length - 1} bài phụ`
-                        : day.activityLabel || workoutActivityLabel(day.activity)}
-                  </CardTitle>
-                  <CardDescription>
-                    {day.date}
-                    {day.restDay ? ' · nghỉ hồi phục' : ` · ${day.durationMinutes} phút`}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm">
-                  {!day.restDay && day.activities.length > 0 && (
-                    <ul className="space-y-1.5">
-                      {day.activities.map((activity, index) => (
-                        <li
-                          key={`${activity.activity}-${index}`}
-                          className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 rounded bg-muted/60 px-2.5 py-1.5"
-                        >
-                          <span className="font-medium">
-                            {index === 0 ? 'Chính: ' : 'Phụ: '}
-                            {activity.activityLabel || workoutActivityLabel(activity.activity)}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {activity.durationMinutes} phút
-                            {activity.intensity ? ` · ${activity.intensity}` : ''}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {!day.restDay && day.rationale && (
-                    <MarkdownText
-                      content={day.rationale}
-                      compact
-                      className="text-muted-foreground"
-                    />
-                  )}
-                  {day.equipmentUsed.length > 0 && <p>Dụng cụ: {day.equipmentUsed.join(', ')}</p>}
-                  <CitationChipList citations={day.citations} />
-                </CardContent>
-              </Card>
-            ))}
+            {plan?.generatedAt && (
+              <p className="text-xs text-muted-foreground">
+                Tạo lúc {plan.generatedAt.toLocaleString('vi-VN')}
+              </p>
+            )}
           </div>
-          <p className="text-sm text-muted-foreground">{plan.disclaimer}</p>
+
+          {generate.isPending || query.isLoading ? (
+            <p className="py-8 text-muted-foreground">Đang lập lịch tập…</p>
+          ) : error ? (
+            <Card>
+              <CardContent className="space-y-3 py-6">
+                <p role="alert">{getApiErrorMessage(error, 'Chưa tạo được kế hoạch tập.')}</p>
+                <Button variant="outline" onClick={() => void query.refetch()}>
+                  Thử lại
+                </Button>
+              </CardContent>
+            </Card>
+          ) : plan ? (
+            <>
+              {plan.usedFallback && fallbackInfo && (
+                <div className="space-y-2 rounded border border-amber-500/30 bg-amber-500/10 p-3">
+                  <p className="text-sm">{fallbackInfo.message}</p>
+                  {fallbackInfo.retryable && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void query.refetch()}
+                      disabled={generate.isPending}
+                    >
+                      Thử tạo lại
+                    </Button>
+                  )}
+                </div>
+              )}
+              {visibleWarnings.map((warning) => (
+                <p
+                  key={`${warning.code}-${warning.scope}`}
+                  className="rounded bg-amber-500/10 p-3 text-sm"
+                >
+                  {warning.message}
+                </p>
+              ))}
+              <div className="grid gap-4 xl:grid-cols-2">
+                {plan.days.map((day) => (
+                  <Card key={day.date}>
+                    <CardHeader>
+                      <CardTitle className="text-base">
+                        {day.restDay
+                          ? 'Ngày nghỉ'
+                          : day.activities.length > 1
+                            ? `${day.activities[0].activityLabel || workoutActivityLabel(day.activities[0].activity)} + ${day.activities.length - 1} bài phụ`
+                            : day.activityLabel || workoutActivityLabel(day.activity)}
+                      </CardTitle>
+                      <CardDescription>
+                        {day.date}
+                        {day.restDay ? ' · nghỉ hồi phục' : ` · ${day.durationMinutes} phút`}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      {!day.restDay && day.activities.length > 0 && (
+                        <ul className="space-y-1.5">
+                          {day.activities.map((activity, index) => (
+                            <li
+                              key={`${activity.activity}-${index}`}
+                              className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 rounded bg-muted/60 px-2.5 py-1.5"
+                            >
+                              <span className="font-medium">
+                                {index === 0 ? 'Chính: ' : 'Phụ: '}
+                                {activity.activityLabel || workoutActivityLabel(activity.activity)}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {activity.durationMinutes} phút
+                                {activity.intensity ? ` · ${activity.intensity}` : ''}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {!day.restDay && day.rationale && (
+                        <MarkdownText
+                          content={day.rationale}
+                          compact
+                          className="text-muted-foreground"
+                        />
+                      )}
+                      {day.equipmentUsed.length > 0 && (
+                        <p>Dụng cụ: {day.equipmentUsed.join(', ')}</p>
+                      )}
+                      <CitationChipList citations={day.citations} />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground">{plan.disclaimer}</p>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Tuần này chưa có kế hoạch. Chọn thông số ở cột bên trái rồi bấm “Tạo kế hoạch”.
+            </p>
+          )}
         </div>
-      ) : (
-        <p className="mt-6 text-sm text-muted-foreground">
-          Tuần này chưa có kế hoạch. Chọn thông số rồi bấm “Tạo kế hoạch”.
-        </p>
-      )}
+      </div>
     </div>
   );
 }
