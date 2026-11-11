@@ -147,6 +147,10 @@ export const FRIENDLY_ERRORS: Record<string, FriendlyError> = {
   'progress.fasting_not_found': {
     message: 'Không tìm thấy phiên nhịn ăn này. Bạn tải lại trang giúp mình nhé.',
   },
+  'progress.water_log_not_found': {
+    message:
+      'Lần ghi nước này không còn tồn tại (có thể đã được hoàn tác ở thiết bị khác). Bạn tải lại trang để xem số liệu mới nhất nhé.',
+  },
   'progress.fasting_end_conflict': {
     message:
       'Phiên nhịn ăn này đã được kết thúc trước đó. Bạn tải lại trang để xem kết quả mới nhất.',

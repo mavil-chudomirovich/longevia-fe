@@ -41,6 +41,7 @@ export const API_ENDPOINTS = {
     FASTING_START: '/progress/fasting/start',
     FASTING_END: '/progress/fasting/end',
     WATER_TODAY: '/progress/water/today',
+    WATER: '/progress/water',
     WATER_LOG: '/progress/water/log',
     WATER_HISTORY: '/progress/water/history',
     SLEEP_LOG: '/progress/sleep/log',

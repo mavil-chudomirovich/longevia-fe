@@ -8,6 +8,7 @@ vi.mock('@/lib/axios', () => {
     default: {
       get: vi.fn(),
       post: vi.fn(),
+      delete: vi.fn(),
     },
   };
 });
@@ -111,6 +112,27 @@ describe('progressApi Unit Tests', () => {
     );
     expect(result.consumedMl).toBe(500);
     expect(result.remainingMl).toBe(2000);
+  });
+
+  it('undoWater deletes by log id on the documented water endpoint', async () => {
+    vi.mocked(api.delete).mockResolvedValueOnce({
+      data: {
+        date: '2026-10-25',
+        consumedMl: 250,
+        targetMl: 2500,
+        percentComplete: 10.0,
+        latestLogId: 'log-1',
+      },
+    });
+
+    const result = await progressApi.undoWater('log-2');
+
+    expect(api.delete).toHaveBeenCalledWith(`${API_ENDPOINTS.PROGRESS.WATER}/log-2`, {
+      signal: undefined,
+      silent: true,
+    });
+    expect(result.consumedMl).toBe(250);
+    expect(result.latestLogId).toBe('log-1');
   });
 
   it('logSleep serializes instants to UTC and posts to sleep log endpoint', async () => {

@@ -140,10 +140,10 @@ export const progressApi = {
    * DELETE /api/progress/water/{id}
    */
   undoWater: async (id: string, signal?: AbortSignal): Promise<WaterSummary> => {
-    const res = await api.delete<WaterSummaryResponseDto>(
-      `${API_ENDPOINTS.PROGRESS.WATER_LOG}/${id}`,
-      { signal, silent: true }
-    );
+    const res = await api.delete<WaterSummaryResponseDto>(`${API_ENDPOINTS.PROGRESS.WATER}/${id}`, {
+      signal,
+      silent: true,
+    });
     return progressMapper.toWaterSummary(res.data);
   },
 

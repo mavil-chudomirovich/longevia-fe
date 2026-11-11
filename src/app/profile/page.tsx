@@ -131,21 +131,19 @@ function AccountCard({ user }: { user: UserModel | null }) {
           <label htmlFor="account-full-name" className="text-muted-foreground">
             Họ và tên
           </label>
-          <div className="flex gap-2">
-            <Input
-              id="account-full-name"
-              value={fullNameDraft}
-              maxLength={100}
-              onChange={(event) => setFullNameDraft(event.target.value)}
-              autoComplete="name"
-            />
-            <Button type="submit" variant="outline" disabled={!canSaveName}>
-              {updateName.isPending ? 'Đang lưu…' : 'Lưu'}
-            </Button>
-          </div>
+          <Input
+            id="account-full-name"
+            value={fullNameDraft}
+            maxLength={100}
+            onChange={(event) => setFullNameDraft(event.target.value)}
+            autoComplete="name"
+          />
           {trimmedName.length === 0 && (
             <p className="text-xs text-destructive">Họ tên không được để trống.</p>
           )}
+          <Button type="submit" variant="outline" className="sm:w-auto" disabled={!canSaveName}>
+            {updateName.isPending ? 'Đang lưu…' : 'Lưu'}
+          </Button>
         </form>
         <div className="space-y-2">
           <p className="text-muted-foreground">Email</p>

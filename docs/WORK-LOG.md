@@ -4,6 +4,22 @@
 
 ---
 
+## [2026-11-11] P6.1–P6.2 — Sửa nút Hoàn tác nước và bố cục nút Lưu họ tên
+
+- **Water undo**: log nginx/progress cho thấy `DELETE /api/progress/water/log/{id}` trả 404
+  ("middleware pipeline without handler") vì BE map `DELETE /water/{id}`. FE gọi thừa segment
+  `/log`. Sửa `undoWater` dùng `API_ENDPOINTS.PROGRESS.WATER` (`/progress/water`) + id; thêm
+  unit test khẳng định đúng URL bằng `api.delete`. Thêm `progress.water_log_not_found` vào
+  `FRIENDLY_ERRORS` để báo thân thiện khi log đã bị hoàn tác ở tab khác.
+- **Profile họ tên**: bỏ `Button` khỏi hàng flex cạnh `Input`, đưa nút "Lưu" xuống dưới ô nhập;
+  giữ nguyên `canSaveName`, trạng thái `Đang lưu…` và dòng lỗi "Họ tên không được để trống.".
+- **Gọn UI tiến độ**: xoá dòng ghi chú minh bạch chuỗi ngày (ADR006) dưới cụm thẻ tổng quan và
+  bỏ icon `Info` không còn dùng.
+- **Kiểm chứng**: `tsc` 0 lỗi; 235/235 test pass (thêm 1 test water undo); lint 0 error;
+  `npm run build` compiled successfully.
+
+---
+
 ## [2026-11-11] P5.5–P5.7 — Giới tính "Khác", tự tính mục tiêu, đổi email đầy đủ
 
 - **Giới tính "Khác"**: Identity thêm `BiologicalSex.Other`, hồ sơ/gRPC trả `Other`; Diet dùng
