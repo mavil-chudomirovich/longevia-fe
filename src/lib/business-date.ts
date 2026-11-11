@@ -56,6 +56,14 @@ function shiftDays(dateString: string, days: number): string {
   return getBusinessTodayDateString(date);
 }
 
+/** Hiển thị ngày YYYY-MM-DD sang định dạng quen thuộc Việt Nam: DD/MM/YYYY. */
+export function formatDateOnlyDisplay(dateString: string | null | undefined): string {
+  if (!dateString) return 'Chưa có';
+  const parts = dateString.split('-');
+  if (parts.length !== 3) return dateString;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
 /** Số mili giây tới nửa đêm local kế tiếp. */
 export function getMsUntilNextBusinessMidnight(referenceDate?: Date): number {
   const now = referenceDate ?? new Date();

@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LogMealDialog, type MealPrefillItem } from '@/features/diet/components/log-meal-dialog';
 import { getApiErrorCode } from '@/lib/api-error';
+import { mealTypeLabel } from '@/common/constants/meal-labels';
 import { getBusinessTodayDateString, getBusinessWeekStart } from '@/lib/business-date';
 import { cn } from '@/lib/utils';
 import { useDailySummaryQuery, useMealPlanQuery } from '@/features/diet/queries/diet.queries';
@@ -26,6 +27,7 @@ import {
   useCurrentFastingQuery,
   useSleepTodayQuery,
   useDashboardSummaryQuery,
+  useUndoWaterMutation,
 } from '@/features/progress/queries/progress.queries';
 import {
   useLongevityQuery,
@@ -36,20 +38,7 @@ import {
   formatDurationHours,
 } from '@/features/progress/utils/progress-date';
 
-const MEAL_LABELS: Record<string, string> = {
-  Breakfast: 'Bữa sáng',
-  Lunch: 'Bữa trưa',
-  Dinner: 'Bữa tối',
-  Snack: 'Bữa phụ',
-  BREAKFAST: 'Bữa sáng',
-  LUNCH: 'Bữa trưa',
-  DINNER: 'Bữa tối',
-  SNACK: 'Bữa phụ',
-};
-
-function mealLabel(value: string): string {
-  return MEAL_LABELS[value] ?? value;
-}
+const MEAL_SLOTS = ['Breakfast', 'Lunch', 'Dinner', 'Snack'] as const;
 
 function todayTitle(): string {
   const formatted = new Intl.DateTimeFormat('vi-VN', {
@@ -76,12 +65,13 @@ export default function TodayPage() {
   const workoutPlan = useWorkoutPlanQuery(weekStart, true);
   const longevity = useLongevityQuery(7);
   const logWater = useLogWaterMutation();
+  const undoWater = useUndoWaterMutation();
 
   const noMealPlan = getApiErrorCode(mealPlan.error) === 'diet.meal_plan_not_found';
   const noWorkoutPlan = getApiErrorCode(workoutPlan.error) === 'progress.workout_plan_not_found';
   const planDay = mealPlan.data?.days.find((day) => day.date === today);
   const workoutDay = workoutPlan.data?.days.find((day) => day.date === today);
-  const mealSlots = ['Breakfast', 'Lunch', 'Dinner', 'Snack'].map((slot) => ({
+  const mealSlots = MEAL_SLOTS.map((slot) => ({
     slot,
     logged: summary.data?.meals.find((meal) => meal.mealType.toUpperCase() === slot.toUpperCase()),
     planned: planDay?.meals.find((meal) => meal.mealType.toUpperCase() === slot.toUpperCase()),
@@ -200,7 +190,7 @@ export default function TodayPage() {
                       : 'text-muted-foreground hover:text-foreground'
                   )}
                 >
-                  {mealLabel(slot).replace('Bữa ', '')}
+                  {mealTypeLabel(slot).replace('Bữa ', '')}
                   {(logged || planned) && (
                     <span
                       className={cn(
@@ -230,7 +220,7 @@ export default function TodayPage() {
                     <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-semibold text-foreground">
-                          {mealLabel(activeMeal.slot)}
+                          {mealTypeLabel(activeMeal.slot)}
                         </span>
                         <span className="font-medium text-foreground">
                           {Math.round(plannedCalories)} kcal
@@ -258,7 +248,7 @@ export default function TodayPage() {
                     <div className="rounded-lg border p-3">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-semibold text-foreground">
-                          {mealLabel(activeMeal.slot)}
+                          {mealTypeLabel(activeMeal.slot)}
                         </span>
                         <span className="font-medium text-foreground">
                           {Math.round(activeMeal.logged.totalCalories)} kcal
@@ -373,11 +363,25 @@ export default function TodayPage() {
                       size="sm"
                       onClick={() => logWater.mutate({ amountMl: amount })}
                       disabled={logWater.isPending}
+                      aria-label={`Thêm ${amount} ml nước`}
                     >
                       +{amount} ml
                     </Button>
                   ))}
                 </div>
+                {water.data?.latestLogId && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-1 h-8 px-2 text-xs text-muted-foreground"
+                    disabled={undoWater.isPending}
+                    onClick={() => {
+                      if (water.data?.latestLogId) undoWater.mutate(water.data.latestLogId);
+                    }}
+                  >
+                    Hoàn tác lần ghi gần nhất
+                  </Button>
+                )}
               </div>
               <div className="grid gap-2 text-sm sm:grid-cols-2">
                 <p className="text-muted-foreground">

@@ -5,6 +5,7 @@ import {
   DEFAULT_ERROR_MESSAGE,
   FRIENDLY_ERRORS,
   NETWORK_ERROR_MESSAGE,
+  TIMEOUT_ERROR_MESSAGE,
   friendlyMessageForStatus,
   type ErrorAction,
 } from '@/lib/error-messages';
@@ -12,8 +13,20 @@ import {
 export const isAxiosError = (error: unknown): error is AxiosError<ProblemDetails> =>
   axios.isAxiosError<ProblemDetails>(error);
 
+/** Yêu cầu bị client huỷ vì quá thời gian chờ (máy chủ vẫn sống, chỉ chậm). */
+export const isTimeoutError = (error: unknown): boolean =>
+  isAxiosError(error) &&
+  !error.response &&
+  (error.code === 'ECONNABORTED' ||
+    error.code === 'ETIMEDOUT' ||
+    error.message?.toLowerCase().includes('timeout') === true);
+
 export const isNetworkError = (error: unknown): boolean =>
-  isAxiosError(error) && !error.response && !!error.request && error.code !== 'ERR_CANCELED';
+  isAxiosError(error) &&
+  !error.response &&
+  !!error.request &&
+  error.code !== 'ERR_CANCELED' &&
+  !isTimeoutError(error);
 
 export const getApiErrorStatus = (error: unknown): number | undefined =>
   isAxiosError(error) ? error.response?.status : undefined;
@@ -53,6 +66,7 @@ export const getApiErrorMessage = (
   const code = getApiErrorCode(error);
   const known = code ? FRIENDLY_ERRORS[code] : undefined;
   if (known) return known.message;
+  if (isTimeoutError(error)) return TIMEOUT_ERROR_MESSAGE;
   if (isNetworkError(error)) return NETWORK_ERROR_MESSAGE;
   if (isAxiosError(error)) {
     const status = getApiErrorStatus(error);

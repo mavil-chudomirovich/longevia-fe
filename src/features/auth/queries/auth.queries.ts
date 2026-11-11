@@ -38,6 +38,18 @@ export const useRegisterMutation = () => {
   };
 };
 
+export const useResendVerificationMutation = () => {
+  return useMutation({
+    mutationFn: (email: string) => authApi.resendVerification(email),
+    onSuccess: () => {
+      toast.success('Nếu email còn chờ xác minh, Longevia đã gửi lại hướng dẫn cho bạn.');
+    },
+    onError: () => {
+      toast.error('Chưa gửi lại được email xác minh. Bạn thử lại sau ít phút nhé.');
+    },
+  });
+};
+
 export const useLoginMutation = () => {
   const queryClient = useQueryClient();
   const setSession = useAuthStore((state) => state.setSession);

@@ -184,6 +184,19 @@ export function useCalculateTargetMutation() {
   );
 }
 
+export function useAutoTargetMutation() {
+  const client = useQueryClient();
+  return useDietMutation<string, Awaited<ReturnType<typeof dietApi.autoTarget>>>(
+    dietApi.autoTarget,
+    (_target, userId) => {
+      void client.invalidateQueries({ queryKey: dietKeys.target(userId) });
+      void client.invalidateQueries({ queryKey: [...dietKeys.user(userId), 'summary'] });
+      toast.success('Đã tính và lưu mục tiêu từ hồ sơ + mục tiêu sức khỏe.');
+    },
+    { toastOnError: false }
+  );
+}
+
 export function useSuggestTargetsMutation() {
   return useDietMutation<{ description: string; goal: string }, SuggestedTargetsModel>(
     dietApi.suggestTargets,
@@ -203,6 +216,28 @@ export function useLogMealMutation() {
     void client.invalidateQueries({ queryKey: [...dietKeys.user(userId), 'summary'] });
     toast.success('Đã ghi bữa ăn vào nhật ký.');
   });
+}
+
+export function useReplaceMealMutation() {
+  const client = useQueryClient();
+  return useDietMutation<
+    { date: string; mealType: string; items: { foodId: string; quantity: number }[] },
+    void
+  >(dietApi.replaceMeal, (_result, userId) => {
+    void client.invalidateQueries({ queryKey: [...dietKeys.user(userId), 'summary'] });
+    toast.success('Đã cập nhật bữa ăn.');
+  });
+}
+
+export function useDeleteMealMutation() {
+  const client = useQueryClient();
+  return useDietMutation<{ date: string; mealType: string }, void>(
+    ({ date, mealType }, signal) => dietApi.deleteMeal(date, mealType, signal),
+    (_result, userId) => {
+      void client.invalidateQueries({ queryKey: [...dietKeys.user(userId), 'summary'] });
+      toast.success('Đã xoá bữa ăn khỏi nhật ký.');
+    }
+  );
 }
 
 export function useGenerateMealPlanMutation() {

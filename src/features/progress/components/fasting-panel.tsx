@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Flame, Clock, Play, Square, CheckCircle2, AlertTriangle, RotateCcw } from 'lucide-react';
@@ -224,23 +225,31 @@ export function FastingPanel() {
                   Không thể tải trạng thái nhịn ăn
                 </CardTitle>
                 <CardDescription>
-                  Đã xảy ra sự cố khi kết nối với máy chủ. Vui lòng thử lại để kiểm tra phiên nhịn
-                  ăn hiện tại của bạn.
+                  Chưa tải được trạng thái phiên nhịn ăn hiện tại. Bạn có thể thử lại, hoặc mở trang
+                  nhịn ăn để bắt đầu một phiên mới.
                 </CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent className="pt-1">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetchCurrent()}
-              disabled={isFetchingCurrent}
-              className="gap-2"
-            >
-              <RotateCcw className={`size-4 ${isFetchingCurrent ? 'animate-spin' : ''}`} />
-              {isFetchingCurrent ? 'Đang thử lại...' : 'Thử lại'}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetchCurrent()}
+                disabled={isFetchingCurrent}
+                className="gap-2"
+              >
+                <RotateCcw className={`size-4 ${isFetchingCurrent ? 'animate-spin' : ''}`} />
+                {isFetchingCurrent ? 'Đang thử lại...' : 'Thử lại'}
+              </Button>
+              <Button size="sm" asChild className="gap-2">
+                <Link href="/progress/fasting">
+                  <Play className="size-4" />
+                  Bắt đầu nhịn ăn
+                </Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : currentSession ? (
@@ -362,7 +371,7 @@ export function FastingPanel() {
           </CardHeader>
 
           <CardContent>
-            <form onSubmit={form.handleSubmit(onStartSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onStartSubmit)} className="space-y-4" noValidate>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Chọn Protocol */}
                 <div className="space-y-2">

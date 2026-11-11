@@ -93,6 +93,7 @@ export function SiteHeader() {
                 <Button
                   variant="ghost"
                   className="relative h-9 w-9 rounded-full ring-1 ring-border"
+                  aria-label="Mở menu tài khoản"
                 >
                   <Avatar className="h-9 w-9">
                     <AvatarImage alt={user.fullName} />
@@ -145,7 +146,8 @@ export function SiteHeader() {
             size="icon"
             className="md:hidden"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Toggle Menu"
+            aria-label={mobileMenuOpen ? 'Đóng menu điều hướng' : 'Mở menu điều hướng'}
+            aria-expanded={mobileMenuOpen}
           >
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>

@@ -10,7 +10,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useWaterTodayQuery, useLogWaterMutation } from '../queries/progress.queries';
+import {
+  useWaterTodayQuery,
+  useLogWaterMutation,
+  useUndoWaterMutation,
+} from '../queries/progress.queries';
 import { logWaterSchema, LogWaterFormValues } from '../schemas/progress.schema';
 import {
   getProgressSessionContext,
@@ -35,6 +39,7 @@ export function WaterTracker() {
 function WaterTrackerInner() {
   const { data: waterToday, isLoading, isError, refetch, isFetching } = useWaterTodayQuery();
   const logMutation = useLogWaterMutation();
+  const undoMutation = useUndoWaterMutation();
 
   const form = useForm<LogWaterFormValues>({
     resolver: zodResolver(logWaterSchema),
@@ -145,7 +150,8 @@ function WaterTrackerInner() {
             <div>
               <CardTitle className="text-lg sm:text-xl">Lượng nước uống trong ngày</CardTitle>
               <CardDescription>
-                Mục tiêu tiêu chuẩn MVP: 2.500 ml mỗi ngày theo chu kỳ UTC.
+                Mục tiêu hiện tại: {targetMl.toLocaleString('vi-VN')} ml mỗi ngày, tính theo cân
+                nặng gần nhất và ngày nghiệp vụ (giờ Việt Nam).
               </CardDescription>
             </div>
           </div>
@@ -184,6 +190,24 @@ function WaterTrackerInner() {
           </div>
 
           <Progress value={visualPercent} className="h-3 bg-muted/60" />
+
+          {waterToday?.latestLogId && (
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-muted-foreground"
+                disabled={undoMutation.isPending}
+                onClick={() => {
+                  if (waterToday.latestLogId) undoMutation.mutate(waterToday.latestLogId);
+                }}
+              >
+                <RotateCcw className="size-3.5" aria-hidden="true" />
+                {undoMutation.isPending ? 'Đang hoàn tác…' : 'Hoàn tác lần ghi gần nhất'}
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Nút bấm thêm nhanh */}
@@ -199,12 +223,15 @@ function WaterTrackerInner() {
                 variant="outline"
                 onClick={() => handleQuickAdd(item.amount)}
                 disabled={logMutation.isPending}
+                aria-label={`Thêm ${item.amount} ml nước — ${item.desc}`}
                 className="h-auto py-2.5 px-3 flex flex-col items-center justify-center gap-1 border-border/70 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all"
               >
                 <div className="flex items-center gap-1 font-bold text-sm tabular-nums text-foreground">
-                  <CupSoda className="size-3.5 text-blue-500" />+{item.label}
+                  <CupSoda className="size-3.5 text-blue-500" aria-hidden="true" />+{item.label}
                 </div>
-                <span className="text-[11px] text-muted-foreground">{item.desc}</span>
+                <span className="text-[11px] text-muted-foreground" aria-hidden="true">
+                  {item.desc}
+                </span>
               </Button>
             ))}
           </div>
@@ -214,6 +241,7 @@ function WaterTrackerInner() {
         <form
           onSubmit={form.handleSubmit(onCustomSubmit)}
           className="pt-2 border-t border-border/40"
+          noValidate
         >
           <div className="flex items-end gap-3 flex-wrap sm:flex-nowrap">
             <div className="space-y-1.5 grow">

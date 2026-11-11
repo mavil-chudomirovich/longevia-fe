@@ -16,6 +16,7 @@ export class ProfileMapper extends BaseMapper<ProfileDto, ProfileModel> {
         heightCm: 0,
         activityLevel: '',
         dietaryPreference: '',
+        goal: 'Maintain',
         allergies: [],
         healthLimitations: [],
         updatedAt: null,
@@ -30,6 +31,7 @@ export class ProfileMapper extends BaseMapper<ProfileDto, ProfileModel> {
       heightCm: safeNumber(values.heightCm),
       activityLevel: values.activityLevel,
       dietaryPreference: values.dietaryPreference,
+      goal: values.goal,
       allergies: safeArray<string>(values.allergies)
         .map((item) => safeString(item).trim())
         .filter(Boolean),

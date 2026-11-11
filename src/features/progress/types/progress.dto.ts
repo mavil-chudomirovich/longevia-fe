@@ -86,6 +86,7 @@ export interface WaterSummaryResponseDto {
   consumedMl: number;
   targetMl: number;
   percentComplete: number;
+  latestLogId?: string | null;
 }
 
 export interface WaterHistoryItemDto {

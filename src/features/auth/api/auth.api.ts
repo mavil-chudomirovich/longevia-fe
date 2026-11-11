@@ -4,6 +4,7 @@ import { authMapper } from '../mappers/auth.mapper';
 import type {
   AuthTokenDto,
   ChangePasswordRequestDto,
+  ConfirmEmailChangeRequestDto,
   ForgotPasswordRequestDto,
   RegisterRequestDto,
   ResetPasswordRequestDto,
@@ -45,6 +46,10 @@ export const authApi = {
     await api.get(API_ENDPOINTS.IDENTITY.AUTH.VERIFY, { params: { token }, silent: true });
   },
 
+  resendVerification: async (email: string): Promise<void> => {
+    await api.post(API_ENDPOINTS.IDENTITY.AUTH.RESEND_VERIFICATION, { email }, { silent: true });
+  },
+
   forgotPassword: async (email: string): Promise<void> => {
     const payload: ForgotPasswordRequestDto = { email };
     await api.post(API_ENDPOINTS.IDENTITY.AUTH.FORGOT_PASSWORD, payload, { silent: true });
@@ -56,6 +61,11 @@ export const authApi = {
 
   changePassword: async (payload: ChangePasswordRequestDto): Promise<void> => {
     await api.post(API_ENDPOINTS.IDENTITY.AUTH.CHANGE_PASSWORD, payload, { silent: true });
+  },
+
+  confirmEmailChange: async (token: string): Promise<void> => {
+    const payload: ConfirmEmailChangeRequestDto = { token };
+    await api.post(API_ENDPOINTS.IDENTITY.AUTH.CONFIRM_EMAIL_CHANGE, payload, { silent: true });
   },
 
   logout: async (): Promise<void> => {

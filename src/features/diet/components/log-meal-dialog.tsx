@@ -1,11 +1,15 @@
 'use client';
 
 import * as React from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
-import { getBusinessTodayDateString } from '@/lib/business-date';
+import { getBusinessTodayDateString, formatDateOnlyDisplay } from '@/lib/business-date';
+import { mealTypeLabel } from '@/common/constants/meal-labels';
+import { useAuthStore } from '@/store/useAuthStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -13,7 +17,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useFoodsQuery, useLogMealMutation } from '../queries/diet.queries';
+import { toDisplayAllergens } from '@/common/constants/allergen-labels';
+import { useFoodsQuery, useLogMealMutation, useReplaceMealMutation } from '../queries/diet.queries';
+import { findConflictedAllergens, hasAllergenConflict } from '../utils/allergen-conflicts';
 import type { MealSuggestionModel } from '../types/diet.model';
 
 /**
@@ -28,6 +34,7 @@ type SelectedFood = {
   servingSize: number;
   servingUnit: string;
   calories: number;
+  allergens: string[] | null;
 };
 
 type FoodLike = {
@@ -35,6 +42,7 @@ type FoodLike = {
   servingSize: number;
   servingUnit: string;
   calories: number;
+  allergens?: string[] | null;
 };
 
 function toSelected(foodId: string, food: FoodLike): SelectedFood {
@@ -45,6 +53,7 @@ function toSelected(foodId: string, food: FoodLike): SelectedFood {
     servingSize: food.servingSize,
     servingUnit: food.servingUnit,
     calories: food.calories,
+    allergens: food.allergens ?? null,
   };
 }
 
@@ -60,6 +69,9 @@ type LogMealDialogProps = {
   suggested?: MealSuggestionModel;
   initialMealType?: string;
   initialItems?: MealPrefillItem[];
+  /** `replace`: thay thế bữa đã có thay vì ghi thêm (dùng ở nút Sửa). */
+  mode?: 'log' | 'replace';
+  initialDate?: string;
 };
 
 export type MealPrefillItem = {
@@ -77,7 +89,7 @@ function prefillKey(items?: MealPrefillItem[]): string {
 export function LogMealDialog(props: LogMealDialogProps) {
   return (
     <LogMealDialogContent
-      key={`${props.open}:${props.suggested?.foodId ?? ''}:${props.initialMealType ?? ''}:${prefillKey(props.initialItems)}`}
+      key={`${props.open}:${props.mode ?? 'log'}:${props.initialDate ?? ''}:${props.suggested?.foodId ?? ''}:${props.initialMealType ?? ''}:${prefillKey(props.initialItems)}`}
       {...props}
     />
   );
@@ -89,10 +101,13 @@ function LogMealDialogContent({
   suggested,
   initialMealType,
   initialItems,
+  mode = 'log',
+  initialDate,
 }: LogMealDialogProps) {
+  const replaceMode = mode === 'replace';
   const [search, setSearch] = React.useState(suggested?.name ?? '');
   const [mealType, setMealType] = React.useState(initialMealType ?? 'Breakfast');
-  const [date, setDate] = React.useState(() => getBusinessTodayDateString());
+  const [date, setDate] = React.useState(() => initialDate ?? getBusinessTodayDateString());
   const [selected, setSelected] = React.useState<SelectedFood[]>(
     initialItems?.length
       ? initialItems.map((item) => toSelected(item.foodId, item))
@@ -101,16 +116,34 @@ function LogMealDialogContent({
         : []
   );
   const [validationError, setValidationError] = React.useState('');
+  const [acknowledgedAllergens, setAcknowledgedAllergens] = React.useState(false);
+  const userAllergies = useAuthStore((state) => state.user?.profile?.allergies ?? []);
   const debouncedSearch = useDebounce(search, 300);
   const foods = useFoodsQuery({ search: debouncedSearch, pageNumber: 1, pageSize: 20 });
   const mutation = useLogMealMutation();
+  const replaceMutation = useReplaceMealMutation();
+  const isSaving = replaceMode ? replaceMutation.isPending : mutation.isPending;
 
-  const add = (foodId: string, food: FoodLike) =>
-    setSelected((items) =>
-      items.some((item) => item.foodId === foodId) || items.length >= 100
-        ? items
-        : [...items, toSelected(foodId, food)]
-    );
+  // Gom cảnh báo dị ứng của các món đã chọn (khớp tag canonical của BE với hồ sơ).
+  const allergenWarnings = React.useMemo(
+    () =>
+      selected.flatMap((item) =>
+        findConflictedAllergens(item.allergens, userAllergies).map((conflict) => ({
+          foodName: item.name,
+          foodId: item.foodId,
+          tag: conflict.tag,
+          allergy: conflict.allergy,
+        }))
+      ),
+    [selected, userAllergies]
+  );
+  const hasAllergenWarnings = allergenWarnings.length > 0;
+
+  const add = (foodId: string, food: FoodLike) => {
+    if (selected.some((item) => item.foodId === foodId) || selected.length >= 100) return;
+    setAcknowledgedAllergens(false);
+    setSelected((items) => [...items, toSelected(foodId, food)]);
+  };
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (
@@ -129,12 +162,23 @@ function LogMealDialogContent({
       return;
     }
     setValidationError('');
+    if (hasAllergenWarnings && !acknowledgedAllergens) {
+      setValidationError(
+        'Có món trùng với dị ứng trong hồ sơ của bạn. Hãy xác nhận “Tôi vẫn muốn ghi món này” hoặc bỏ món đó.'
+      );
+      return;
+    }
     try {
-      await mutation.mutateAsync({
+      const payload = {
         date,
         mealType,
         items: selected.map((item) => ({ foodId: item.foodId, quantity: Number(item.quantity) })),
-      });
+      };
+      if (replaceMode) {
+        await replaceMutation.mutateAsync(payload);
+      } else {
+        await mutation.mutateAsync(payload);
+      }
     } catch {
       // Lỗi đã được báo trong mutation; giữ dialog mở để người dùng sửa và gửi lại.
       return;
@@ -147,39 +191,47 @@ function LogMealDialogContent({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Ghi bữa ăn</DialogTitle>
+          <DialogTitle>{replaceMode ? 'Sửa bữa ăn' : 'Ghi bữa ăn'}</DialogTitle>
           <DialogDescription>
-            Chọn món và lượng ăn theo đơn vị của món (vd. gam). Mặc định điền sẵn 1 khẩu phần. Giá
-            trị dinh dưỡng được ghi lại đúng như lúc bạn lưu.
+            {replaceMode
+              ? 'Thay thế toàn bộ món của bữa này. Các bữa khác trong ngày không bị ảnh hưởng.'
+              : 'Chọn món và lượng ăn theo đơn vị của món (vd. gam). Mặc định điền sẵn 1 khẩu phần. Giá trị dinh dưỡng được ghi lại đúng như lúc bạn lưu.'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={(event) => void save(event)} className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="meal-date">Ngày</Label>
-              <Input
-                id="meal-date"
-                type="date"
-                required
-                value={date}
-                onChange={(event) => setDate(event.target.value)}
-              />
+          {replaceMode ? (
+            <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+              Đang sửa <strong>{mealTypeLabel(mealType)}</strong> ngày{' '}
+              <strong>{formatDateOnlyDisplay(date)}</strong>.
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="meal-type">Bữa</Label>
-              <select
-                id="meal-type"
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={mealType}
-                onChange={(event) => setMealType(event.target.value)}
-              >
-                <option value="Breakfast">Sáng</option>
-                <option value="Lunch">Trưa</option>
-                <option value="Dinner">Tối</option>
-                <option value="Snack">Bữa phụ</option>
-              </select>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="meal-date">Ngày</Label>
+                <Input
+                  id="meal-date"
+                  type="date"
+                  required
+                  value={date}
+                  onChange={(event) => setDate(event.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="meal-type">Bữa</Label>
+                <select
+                  id="meal-type"
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={mealType}
+                  onChange={(event) => setMealType(event.target.value)}
+                >
+                  <option value="Breakfast">Sáng</option>
+                  <option value="Lunch">Trưa</option>
+                  <option value="Dinner">Tối</option>
+                  <option value="Snack">Bữa phụ</option>
+                </select>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="space-y-2">
@@ -203,30 +255,46 @@ function LogMealDialogContent({
                 </div>
               ) : foods.data?.items.length ? (
                 <ul className="max-h-[42dvh] space-y-2 overflow-y-auto rounded-lg border p-2">
-                  {foods.data.items.map((food) => (
-                    <li
-                      key={food.id}
-                      className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 hover:bg-muted"
-                    >
-                      <span className="min-w-0 text-sm">
-                        <strong className="block truncate">{food.name}</strong>
-                        <span className="text-xs text-muted-foreground">
-                          {food.servingSize} {food.servingUnit} · {food.calories} kcal
-                        </span>
-                      </span>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={
-                          selected.length >= 100 || selected.some((item) => item.foodId === food.id)
-                        }
-                        onClick={() => add(food.id, food)}
+                  {foods.data.items.map((food) => {
+                    const conflict = hasAllergenConflict(food.allergens, userAllergies);
+                    return (
+                      <li
+                        key={food.id}
+                        className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 hover:bg-muted"
                       >
-                        Thêm
-                      </Button>
-                    </li>
-                  ))}
+                        <span className="min-w-0 text-sm">
+                          <strong className="flex items-center gap-1.5 truncate">
+                            {food.name}
+                            {conflict && (
+                              <Badge variant="destructive" className="shrink-0 text-[10px]">
+                                Dị ứng
+                              </Badge>
+                            )}
+                          </strong>
+                          <span className="text-xs text-muted-foreground">
+                            {food.servingSize} {food.servingUnit} · {food.calories} kcal
+                          </span>
+                          {conflict && (
+                            <span className="block text-[11px] text-destructive">
+                              Trùng dị ứng: {toDisplayAllergens(food.allergens).join(', ')}
+                            </span>
+                          )}
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={
+                            selected.length >= 100 ||
+                            selected.some((item) => item.foodId === food.id)
+                          }
+                          onClick={() => add(food.id, food)}
+                        >
+                          Thêm
+                        </Button>
+                      </li>
+                    );
+                  })}
                 </ul>
               ) : (
                 <p className="text-sm text-muted-foreground">
@@ -275,11 +343,12 @@ function LogMealDialogContent({
                             variant="ghost"
                             size="sm"
                             aria-label={`Xoá ${item.name}`}
-                            onClick={() =>
+                            onClick={() => {
+                              setAcknowledgedAllergens(false);
                               setSelected((items) =>
                                 items.filter((_, currentIndex) => currentIndex !== index)
-                              )
-                            }
+                              );
+                            }}
                           >
                             Xoá
                           </Button>
@@ -318,6 +387,38 @@ function LogMealDialogContent({
             </section>
           </div>
 
+          {hasAllergenWarnings && (
+            <div
+              role="alert"
+              className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm"
+            >
+              <p className="flex items-center gap-2 font-medium text-destructive">
+                <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />
+                Món đã chọn trùng với dị ứng trong hồ sơ
+              </p>
+              <ul className="list-disc space-y-0.5 pl-5 text-destructive">
+                {allergenWarnings.map((warning) => (
+                  <li key={`${warning.foodId}-${warning.tag}`}>
+                    {warning.foodName}: chứa “{warning.tag}”, bạn đã khai báo dị ứng “
+                    {warning.allergy}”.
+                  </li>
+                ))}
+              </ul>
+              <label className="flex items-start gap-2 text-xs text-foreground">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={acknowledgedAllergens}
+                  onChange={(event) => {
+                    setAcknowledgedAllergens(event.target.checked);
+                    if (event.target.checked) setValidationError('');
+                  }}
+                />
+                Tôi vẫn muốn ghi món này (đã hiểu nguy cơ dị ứng).
+              </label>
+            </div>
+          )}
+
           {validationError && (
             <p role="alert" className="text-sm text-destructive">
               {validationError}
@@ -325,8 +426,8 @@ function LogMealDialogContent({
           )}
 
           <div className="flex justify-end border-t pt-3">
-            <Button type="submit" disabled={mutation.isPending || !selected.length}>
-              {mutation.isPending ? 'Đang lưu…' : 'Lưu vào nhật ký'}
+            <Button type="submit" disabled={isSaving || !selected.length}>
+              {isSaving ? 'Đang lưu…' : replaceMode ? 'Lưu thay đổi' : 'Lưu vào nhật ký'}
             </Button>
           </div>
         </form>

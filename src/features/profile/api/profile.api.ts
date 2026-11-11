@@ -1,7 +1,7 @@
 import api from '@/lib/axios';
 import { API_ENDPOINTS } from '@/common/constants/api-endpoints';
 import { authMapper } from '@/features/auth/mappers/auth.mapper';
-import type { UserDto } from '@/features/auth/types/auth.dto';
+import type { RequestEmailChangeRequestDto, UserDto } from '@/features/auth/types/auth.dto';
 import type { UserModel } from '@/features/auth/types/auth.model';
 import type { ProfileFormValues } from '../schemas/profile.schema';
 import type { UpdateProfileDto } from '../types/profile.dto';
@@ -18,6 +18,18 @@ export const profileApi = {
       silent: true,
     });
     return authMapper.toModel(response.data);
+  },
+  updateName: async (fullName: string): Promise<UserModel> => {
+    const response = await api.patch<UserDto>(
+      API_ENDPOINTS.IDENTITY.USERS.ME,
+      { fullName },
+      { silent: true }
+    );
+    return authMapper.toModel(response.data);
+  },
+  requestEmailChange: async (newEmail: string, currentPassword: string): Promise<void> => {
+    const payload: RequestEmailChangeRequestDto = { newEmail, currentPassword };
+    await api.post(API_ENDPOINTS.IDENTITY.USERS.ME_EMAIL_CHANGE, payload, { silent: true });
   },
   getPreferences: async (): Promise<{ receiveWeeklyDigest: boolean }> => {
     const response = await api.get<{ receiveWeeklyDigest?: boolean }>(

@@ -39,6 +39,7 @@ export class AuthMapper extends BaseMapper<UserDto, UserModel> {
       heightCm: safeNumber(pickField(dto, ['heightCm'], 0)),
       activityLevel: safeString(pickField(dto, ['activityLevel'], '')),
       dietaryPreference: safeString(pickField(dto, ['dietaryPreference'], '')),
+      goal: safeString(pickField(dto, ['goal'], 'Maintain')) || 'Maintain',
       allergies: safeArray<string>(pickField(dto, ['allergies'], [])),
       healthLimitations: safeArray<string>(pickField(dto, ['healthLimitations'], [])),
       updatedAt: safeDate(pickField(dto, ['updatedAt'], null)),

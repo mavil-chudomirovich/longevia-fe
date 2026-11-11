@@ -13,12 +13,13 @@ import { profileSchema, type ProfileFormValues } from '../schemas/profile.schema
 import { useUpdateProfileMutation } from '../queries/profile.queries';
 import { getApiErrorFields, toastFriendlyError } from '@/lib/api-error';
 
-const emptyProfile: ProfileFormValues = {
+const emptyProfile: Partial<ProfileFormValues> = {
   birthDate: '',
-  biologicalSex: 'Female',
+  biologicalSex: undefined,
   heightCm: '',
-  activityLevel: 'Sedentary',
+  activityLevel: undefined,
   dietaryPreference: 'None',
+  goal: 'Maintain',
   allergies: [],
   healthLimitations: [],
 };
@@ -45,6 +46,7 @@ export function ProfileForm({
       heightCm: String(initialProfile.heightCm),
       activityLevel: initialProfile.activityLevel as ProfileFormValues['activityLevel'],
       dietaryPreference: initialProfile.dietaryPreference as ProfileFormValues['dietaryPreference'],
+      goal: (initialProfile.goal as ProfileFormValues['goal']) ?? 'Maintain',
       allergies: initialProfile.allergies,
       healthLimitations: initialProfile.healthLimitations as ProfileFormValues['healthLimitations'],
     });
@@ -104,9 +106,21 @@ export function ProfileForm({
             className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
             {...form.register('biologicalSex')}
           >
+            <option value="" disabled>
+              Chọn giới tính
+            </option>
             <option value="Female">Nữ</option>
             <option value="Male">Nam</option>
+            <option value="Other">Khác / Không muốn tiết lộ</option>
           </select>
+          <p className="text-xs text-muted-foreground">
+            Dùng cho công thức BMR/TDEE. “Khác” sẽ dùng hệ số trung tính nên chỉ là ước lượng.
+          </p>
+          {form.formState.errors.biologicalSex && (
+            <p role="alert" className="text-sm text-destructive">
+              {form.formState.errors.biologicalSex.message}
+            </p>
+          )}
         </div>
         <div className="space-y-2">
           <Label htmlFor="heightCm">Chiều cao (cm)</Label>
@@ -132,13 +146,42 @@ export function ProfileForm({
             className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
             {...form.register('activityLevel')}
           >
+            <option value="" disabled>
+              Chọn mức vận động
+            </option>
             <option value="Sedentary">Ít vận động</option>
             <option value="LightlyActive">Vận động nhẹ</option>
             <option value="ModeratelyActive">Vận động vừa</option>
             <option value="VeryActive">Vận động nhiều</option>
           </select>
+          {form.formState.errors.activityLevel && (
+            <p role="alert" className="text-sm text-destructive">
+              {form.formState.errors.activityLevel.message}
+            </p>
+          )}
         </div>
         <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="goal">Mục tiêu sức khỏe</Label>
+          <select
+            id="goal"
+            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            {...form.register('goal')}
+          >
+            <option value="LoseWeight">Giảm cân</option>
+            <option value="Maintain">Duy trì cân nặng</option>
+            <option value="BuildMuscle">Tăng cơ</option>
+            <option value="Longevity">Sống trường thọ</option>
+          </select>
+          <p className="text-xs text-muted-foreground">
+            Mục tiêu này được dùng làm mặc định khi Longevia gợi ý mục tiêu dinh dưỡng.
+          </p>
+          {form.formState.errors.goal && (
+            <p role="alert" className="text-sm text-destructive">
+              {form.formState.errors.goal.message}
+            </p>
+          )}
+        </div>
+        <div className="space-y-2">
           <Label htmlFor="dietaryPreference">Chế độ ăn</Label>
           <select
             id="dietaryPreference"

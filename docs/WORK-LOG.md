@@ -4,6 +4,84 @@
 
 ---
 
+## [2026-11-11] P5.5–P5.7 — Giới tính "Khác", tự tính mục tiêu, đổi email đầy đủ
+
+- **Giới tính "Khác"**: Identity thêm `BiologicalSex.Other`, hồ sơ/gRPC trả `Other`; Diet dùng
+  `IsOther` (BMR trung tính `-78`, giữa nam `+5` và nữ `-161`, migration
+  `AddEnergyCalculationIsOther` thêm `Calculation_IsOther` và repository lưu cột này); proto
+  Recommendation thêm `OTHER = 3` (additive) và công thức trung tính; RDA vi chất lấy mức cao
+  hơn nam/nữ. FE có lựa chọn "Khác / Không muốn tiết lộ" kèm ghi chú chỉ là ước lượng.
+- **Tự tính mục tiêu**: `POST /diet/targets/me/auto` (`AutoTargetRequest` + validator) dùng
+  TDEE × 0.85/1.0/1.10 theo goal, protein 1.4–1.8 g/kg, fat 25%, clamp 1.200–4.000, làm tròn
+  10 và lưu ngay. FE thêm `autoTarget` + nút "Tính từ hồ sơ & mục tiêu" ở `/diet/targets`.
+- **Đổi email**: Identity lưu `PendingEmail` + token hash/expiry (migration `AddEmailChange`),
+  `POST /users/me/email-change` (xác minh mật khẩu, cooldown 5 phút, token 24h, `202`) và
+  `POST /auth/confirm-email-change` (anon, single-use, thu hồi toàn bộ refresh token, phát
+  `EmailChangedEvent`). Worker gửi xác nhận tới email mới + cảnh báo/tin hoàn tất tới email cũ.
+  FE: dialog đổi email trong thẻ "Tài khoản" (`/profile`), trang `/confirm-email-change`,
+  đăng xuất và hiện banner `/login?email-changed=success`.
+- **Kiểm chứng**: BE build 0 warning/0 error; Identity unit 80/80, integration email-change
+  3/3; Diet unit 30/30 + AutoTarget 6/6; Recommendation target 5/5; Progress 120/120; Worker
+  17/17. FE: `tsc` 0 lỗi, lint 0 error (137 warning cũ), 234 test pass, `npm run build` OK.
+- **Quyết định**: giữ `409 identity.email_taken` khi đăng ký/đổi email trùng; email change
+  re-check trùng ở bước confirm để tránh race. `make lint` BE còn lỗi format ở các file cũ
+  (`BusinessTime.cs`, `FoodEndpoints.cs`...) không thuộc phạm vi P5.
+
+---
+
+## [2026-11-11] P5.2–P5.4 — Sửa giấc ngủ, đổi tên, thay thế bữa ăn
+
+- **Ngủ (BE/FE)**: `PUT /progress/sleep/{id}` (transaction + advisory lock, overlap trừ chính
+  bản ghi, 404/409 rõ ràng); dialog “Sửa” trong lịch sử giấc ngủ, prefill giờ + chất lượng.
+- **Tên (BE/FE)**: `PATCH /identity/users/me` (1–100 ký tự); card Tài khoản ở `/profile` cho
+  sửa họ tên, cập nhật auth store + cache.
+- **Bữa ăn (BE/FE)**: `PUT /diet/meals?date&mealType` thay thế bữa trong 1 transaction
+  (advisory lock), phát removal cho log cũ + logged cho log mới; `IUnitOfWork.ExecuteInTransactionAsync`.
+  FE: nút Sửa ở nhật ký, dialog mode `replace` prefill món/lượng của bữa.
+- **Kiểm chứng**: BE build OK; Sleep 11/11, MealReplace unit 3/3 + integration 5/5; Identity
+  ChangeFullName unit 4/4 + integration 3/3. FE 234 test pass, tsc 0 lỗi, build OK.
+
+---
+
+## [2026-11-11] P5.1 — Dọn "(demo)", a11y nút nước, layout checklist mật khẩu
+
+- **BE**: đổi tên seed `Ức gà`, `Cơm trắng`, `Nước lọc` (bỏ hậu tố "(demo)"); migration
+  `RenameDemoFoods` cập nhật dữ liệu theo Id cố định. Test `/foods` xác nhận không còn "(demo)".
+- **FE**: `aria-label` cho nút thêm nước nhanh ở `/progress/water` và `/today`; icon trang trí
+  `aria-hidden`.
+- **FE**: checklist mật khẩu luôn hiển thị trong vùng `min-h` cố định, lỗi hiển thị riêng nên
+  không đẩy form khi gõ.
+- **Docs**: ghi chú quyết định giữ `409 identity.email_taken`; sửa câu "ngày nghiệp vụ UTC" còn sót.
+- **Kiểm chứng**: FE 234 test pass, tsc 0 lỗi; BE build OK, Diet FoodSearch integration 8/8 pass.
+
+---
+
+## [2026-11-11] Sửa UX report: AI timeout, dị ứng, nhật ký, nước, onboarding, email
+
+- **AI**: `suggestTargets`/`getRecommendations`/`getNutrientGaps` timeout 60s (BE budget 20s,
+  provider tới 30s). Axios phân biệt `ECONNABORTED`/`ETIMEDOUT` với mất mạng; thêm
+  `TIMEOUT_ERROR_MESSAGE`; trang gợi ý báo “có thể mất tới 30 giây”.
+- **Form**: `noValidate` cho ghi chỉ số cơ thể, nước, giấc ngủ, nhịn ăn; bỏ cân nặng mặc định
+  70 kg; bỏ giấc ngủ mặc định 8h + chất lượng “Tốt”; thêm nút gợi ý 23:00–07:00.
+- **Nhãn/ngày**: `meal-labels`, `food-category-labels`, `allergen-labels`; ngày dd/mm/yyyy ở
+  nhật ký & kế hoạch tuần; bỏ “UTC/MVP/Systolic/Diastolic/Slept At/Woke At/Fasting tuần này”.
+- **Dị ứng**: `allergen-conflicts` (so nhóm + token, tránh “cá” khớp “cà chua”); dialog ghi bữa
+  cảnh báo và bắt xác nhận; danh mục món có badge “Trùng dị ứng”.
+- **Nhật ký ăn**: hiện chi tiết món, empty state `diet.target_not_found`, xoá bữa (gọi
+  `DELETE /meals?date&mealType`) với ConfirmDialog.
+- **Nước**: hoàn tác lần ghi gần nhất (`DELETE /water/{id}`, `latestLogId`); copy mục tiêu theo
+  cân nặng/ngày nghiệp vụ.
+- **Onboarding**: “Bỏ qua”, bắt buộc chọn giới tính/mức vận động, message ngày sinh, ô cân nặng
+  (lưu hồ sơ xong mới ghi metric), chọn mục tiêu sức khỏe; `/profile` có card tài khoản read-only.
+- **Auth/email**: `/register` redirect; hiện/ẩn mật khẩu; màn kiểm tra email nêu địa chỉ + gửi
+  lại; `identity.email_not_verified` có nút gửi lại; reset-password nhận token từ URL, auto về
+  login; email reset có link + mã + giờ VN (BE/Worker).
+- **Tìm kiếm**: BE bật `unaccent` cho `/foods`, hỗ trợ “ca chua”/“dau phong”.
+- **Kiểm chứng**: `npx tsc --noEmit` 0 lỗi; `npm test` 234 test pass; `npm run build` thành công
+  (có route `/register`).
+
+---
+
 ## [2026-11-10] Targets BMR/TDEE, WeekPicker, lịch sử nước/ngủ, AI-only meal-plan
 
 - **Navbar**: đổi thứ tự Trang chủ → Dinh dưỡng → Tiến trình → Hỏi sách.

@@ -10,8 +10,13 @@ function isAtLeast13(birthDate: string): boolean {
 }
 
 export const profileSchema = z.object({
-  birthDate: z.string().refine(isAtLeast13, 'Bạn phải từ đủ 13 tuổi trở lên.'),
-  biologicalSex: z.enum(['Male', 'Female'], { message: 'Vui lòng chọn giới tính sinh học.' }),
+  birthDate: z
+    .string()
+    .min(1, 'Vui lòng chọn ngày sinh.')
+    .refine(isAtLeast13, 'Bạn phải từ đủ 13 tuổi trở lên.'),
+  biologicalSex: z.enum(['Male', 'Female', 'Other'], {
+    message: 'Vui lòng chọn giới tính sinh học.',
+  }),
   heightCm: z
     .string()
     .refine(
@@ -28,6 +33,9 @@ export const profileSchema = z.object({
   }),
   dietaryPreference: z.enum(['None', 'Keto', 'Vegan', 'Mediterranean', 'LowCarb'], {
     message: 'Vui lòng chọn chế độ ăn.',
+  }),
+  goal: z.enum(['LoseWeight', 'Maintain', 'BuildMuscle', 'Longevity'], {
+    message: 'Vui lòng chọn mục tiêu sức khỏe.',
   }),
   allergies: z.array(z.string().trim().min(1)).max(32, 'Tối đa 32 mục dị ứng.'),
   healthLimitations: z

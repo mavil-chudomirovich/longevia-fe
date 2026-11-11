@@ -317,6 +317,8 @@ export class ProgressMapper extends BaseMapper<BodyMetricResponseDto, BodyMetric
       percentComplete,
       visualPercent,
       remainingMl,
+      latestLogId:
+        safeString(pickField<string | null>(dto, ['latestLogId', 'latest_log_id'], null)) || null,
     };
   }
 

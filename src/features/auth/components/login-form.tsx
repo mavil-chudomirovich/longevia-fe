@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { useLoginMutation } from '../queries/auth.queries';
 import { loginSchema, type LoginFormValues } from '../schemas/auth.schema';
 import { getApiErrorCode, getApiErrorFields, getApiErrorMessage } from '@/lib/api-error';
+import { ResendVerificationButton } from './resend-verification';
 
 /**
  * Form đăng nhập email/mật khẩu. Lỗi nghiệp vụ đọc theo `error.code`:
@@ -21,6 +22,7 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
   const loginMutation = useLoginMutation();
   const [showPassword, setShowPassword] = React.useState(false);
   const [formError, setFormError] = React.useState<string | null>(null);
+  const [unverifiedEmail, setUnverifiedEmail] = React.useState<string | null>(null);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -29,6 +31,7 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
 
   const onSubmit = async (values: LoginFormValues) => {
     setFormError(null);
+    setUnverifiedEmail(null);
     try {
       await loginMutation.mutateAsync(values);
       onSuccess?.();
@@ -55,6 +58,13 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
         }
         if (mapped) return;
       }
+      if (code === 'identity.email_not_verified') {
+        setFormError(
+          'Tài khoản chưa xác minh email. Bạn mở email kích hoạt, hoặc bấm "Gửi lại email xác minh" bên dưới.'
+        );
+        setUnverifiedEmail(values.email);
+        return;
+      }
       setFormError(
         getApiErrorMessage(
           error,
@@ -73,6 +83,13 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
         >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{formError}</span>
+        </div>
+      )}
+
+      {unverifiedEmail && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-muted/40 p-3">
+          <span className="text-sm text-muted-foreground">Chưa nhận được email?</span>
+          <ResendVerificationButton email={unverifiedEmail} />
         </div>
       )}
 

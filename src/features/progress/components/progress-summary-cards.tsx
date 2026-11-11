@@ -229,7 +229,7 @@ export function ProgressSummaryCards({
           <CardContent>
             <div className="space-y-1">
               <div className="flex items-baseline justify-between">
-                <span className="text-xs text-muted-foreground">Fasting tuần này:</span>
+                <span className="text-xs text-muted-foreground">Nhịn ăn tuần này:</span>
                 <span className="text-sm font-semibold tabular-nums text-foreground">
                   {summary?.fastingThisWeekCompleted ?? 0} phiên
                 </span>
@@ -247,12 +247,12 @@ export function ProgressSummaryCards({
         </Card>
       </div>
 
-      {/* Ghi chú minh bạch về chuỗi ngày theo ADR005 */}
+      {/* Ghi chú minh bạch về chuỗi ngày theo ADR006 */}
       <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted/40 border border-border/40 text-[11px] text-muted-foreground">
         <Info className="size-3.5 shrink-0 text-muted-foreground" />
         <span className="text-pretty">
-          Chuỗi ngày liên tiếp tổng hợp từ nhật ký dinh dưỡng và số đo cơ thể hợp lệ theo chu kỳ
-          UTC.
+          Chuỗi ngày liên tiếp được tổng hợp từ nhật ký dinh dưỡng và số đo cơ thể hợp lệ, tính theo
+          ngày nghiệp vụ (giờ Việt Nam).
         </span>
       </div>
     </div>

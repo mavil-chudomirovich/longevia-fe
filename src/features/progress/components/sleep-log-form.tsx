@@ -68,11 +68,14 @@ function SleepLogFormInner() {
     return savedSleepState.record;
   }, [savedSleepState, userId, sessionId]);
 
-  // Mặc định: Giấc ngủ từ 23:00 tối qua đến 07:00 sáng nay
-  const getDefaultTimes = () => {
+  // Không điền sẵn giấc ngủ 8 giờ + chất lượng để tránh lưu dữ liệu rác.
+  // Người dùng có thể bấm nút gợi ý "23:00 → 07:00" nếu muốn điền nhanh.
+  const getSuggestedTimes = () => {
     const now = new Date();
-    const wake = new Date(now);
-    const slept = new Date(now);
+    const todaySeven = new Date(now);
+    todaySeven.setHours(7, 0, 0, 0);
+    const wake = todaySeven.getTime() <= now.getTime() ? todaySeven : now;
+    const slept = new Date(wake);
     slept.setHours(slept.getHours() - 8);
 
     return {
@@ -84,8 +87,9 @@ function SleepLogFormInner() {
   const form = useForm<LogSleepFormValues>({
     resolver: zodResolver(logSleepSchema),
     defaultValues: {
-      ...getDefaultTimes(),
-      sleepQuality: 'Good',
+      sleptAt: '',
+      wokeAt: '',
+      sleepQuality: undefined,
     },
   });
 
@@ -123,10 +127,12 @@ function SleepLogFormInner() {
         ownerUserId: sessionSnapshot.userId,
         ownerSessionId: sessionSnapshot.sessionId,
       });
-      // Giữ nguyên form nhưng reset sang giá trị mặc định mới
+      // Giữ nguyên giờ vừa nhập để lần ghi tiếp theo dễ hơn, nhưng bắt buộc
+      // chọn lại chất lượng giấc ngủ cho bản ghi mới.
       form.reset({
-        ...getDefaultTimes(),
-        sleepQuality: 'Good',
+        sleptAt: values.sleptAt,
+        wokeAt: values.wokeAt,
+        sleepQuality: undefined,
       });
     } catch {
       // Đã xử lý toast tại mutation
@@ -151,17 +157,12 @@ function SleepLogFormInner() {
         </CardHeader>
 
         <CardContent>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" noValidate>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Giờ đi ngủ */}
               <div className="space-y-2">
-                <Label htmlFor="sleep-slept-at">Thời điểm đi ngủ (Slept At)</Label>
-                <Input
-                  id="sleep-slept-at"
-                  type="datetime-local"
-                  defaultValue={getDefaultTimes().sleptAt}
-                  {...form.register('sleptAt')}
-                />
+                <Label htmlFor="sleep-slept-at">Thời điểm đi ngủ</Label>
+                <Input id="sleep-slept-at" type="datetime-local" {...form.register('sleptAt')} />
                 {form.formState.errors.sleptAt && (
                   <p className="text-xs text-destructive">
                     {form.formState.errors.sleptAt.message}
@@ -171,17 +172,30 @@ function SleepLogFormInner() {
 
               {/* Giờ thức dậy */}
               <div className="space-y-2">
-                <Label htmlFor="sleep-woke-at">Thời điểm thức dậy (Woke At)</Label>
-                <Input
-                  id="sleep-woke-at"
-                  type="datetime-local"
-                  defaultValue={getDefaultTimes().wokeAt}
-                  {...form.register('wokeAt')}
-                />
+                <Label htmlFor="sleep-woke-at">Thời điểm thức dậy</Label>
+                <Input id="sleep-woke-at" type="datetime-local" {...form.register('wokeAt')} />
                 {form.formState.errors.wokeAt && (
                   <p className="text-xs text-destructive">{form.formState.errors.wokeAt.message}</p>
                 )}
               </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const suggested = getSuggestedTimes();
+                  form.setValue('sleptAt', suggested.sleptAt, { shouldValidate: true });
+                  form.setValue('wokeAt', suggested.wokeAt, { shouldValidate: true });
+                }}
+              >
+                Dùng gợi ý 23:00 – 07:00
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Hoặc tự chọn giờ thực tế của bạn.
+              </span>
             </div>
 
             {/* Preview thời lượng */}

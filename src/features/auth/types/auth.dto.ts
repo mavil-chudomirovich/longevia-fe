@@ -12,6 +12,7 @@ export interface ProfileDto {
   heightCm?: number;
   activityLevel?: string;
   dietaryPreference?: string;
+  goal?: string;
   allergies?: string[] | null;
   healthLimitations?: string[] | null;
   updatedAt?: string;
@@ -44,4 +45,13 @@ export interface ForgotPasswordRequestDto {
 export interface ResetPasswordRequestDto {
   token: string;
   newPassword: string;
+}
+
+export interface RequestEmailChangeRequestDto {
+  newEmail: string;
+  currentPassword: string;
+}
+
+export interface ConfirmEmailChangeRequestDto {
+  token: string;
 }

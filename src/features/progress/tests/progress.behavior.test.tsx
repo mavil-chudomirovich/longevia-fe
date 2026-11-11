@@ -153,6 +153,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       percentComplete: 40,
       visualPercent: 40,
       remainingMl: 1500,
+      latestLogId: null,
     });
     vi.spyOn(progressApi, 'getCurrentFasting').mockResolvedValue(null);
     vi.spyOn(progressApi, 'getDashboardSummary').mockResolvedValue({
@@ -201,6 +202,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
         percentComplete: 10,
         visualPercent: 10,
         remainingMl: 2250,
+        latestLogId: null,
       });
 
       render(<WaterTracker />, { wrapper: createWrapper() });
@@ -252,6 +254,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
           percentComplete: 10,
           visualPercent: 10,
           remainingMl: 2250,
+          latestLogId: null,
         });
       });
 
@@ -293,6 +296,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
           percentComplete: 10,
           visualPercent: 10,
           remainingMl: 2250,
+          latestLogId: null,
         });
       });
 
@@ -368,6 +372,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
           percentComplete: 10,
           visualPercent: 10,
           remainingMl: 2250,
+          latestLogId: null,
         });
       });
 
@@ -580,6 +585,9 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
 
       render(<BodyMetricForm />, { wrapper: createWrapper() });
 
+      // Cân nặng không còn giá trị mặc định: phải nhập trước khi gửi.
+      fireEvent.change(screen.getByLabelText(/cân nặng/i), { target: { value: '70' } });
+
       const submitBtn = screen.getByRole('button', { name: /lưu chỉ số cơ thể/i });
       await act(async () => {
         fireEvent.submit(submitBtn.closest('form')!);
@@ -593,6 +601,28 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
           })
         );
       });
+    });
+  });
+
+  describe('Scenario I2 — Fasting 204/empty body is a valid "no active session" state', () => {
+    it('renders the start form instead of the error card for an empty 204 body', async () => {
+      useAuthStore.setState({ user: mockUserA, isAuthenticated: true, token: 'token-a' });
+      syncProgressSessionWithAuth();
+
+      // Dùng pipeline thật: Axios -> progressApi -> mapper.
+      vi.spyOn(progressApi, 'getCurrentFasting').mockRestore();
+      vi.spyOn(api, 'get').mockImplementation(async (url: string) => {
+        if (url === '/progress/fasting/current') {
+          // Axios trả data rỗng cho HTTP 204 No Content.
+          return { data: '', status: 204, statusText: 'No Content' } as unknown as AxiosResponse;
+        }
+        return { data: null } as unknown as AxiosResponse;
+      });
+
+      render(<FastingPanel />, { wrapper: createWrapper() });
+
+      expect(await screen.findByText(/bắt đầu phiên nhịn ăn mới/i)).toBeInTheDocument();
+      expect(screen.queryByText(/không thể tải trạng thái nhịn ăn/i)).not.toBeInTheDocument();
     });
   });
 
@@ -756,6 +786,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
           percentComplete: 10,
           visualPercent: 10,
           remainingMl: 2250,
+          latestLogId: null,
         });
         deferredSleep.resolve({
           id: 'sleep-concurrent',
@@ -809,6 +840,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
           percentComplete: 10,
           visualPercent: 10,
           remainingMl: 2250,
+          latestLogId: null,
         });
       });
 
@@ -857,6 +889,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
         percentComplete: 10,
         visualPercent: 10,
         remainingMl: 2250,
+        latestLogId: null,
       });
 
       const onSuccess = vi.fn();
@@ -948,6 +981,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
           percentComplete: 10,
           visualPercent: 10,
           remainingMl: 2250,
+          latestLogId: null,
         });
       });
 
@@ -990,6 +1024,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
           percentComplete: 10,
           visualPercent: 10,
           remainingMl: 2250,
+          latestLogId: null,
         });
       });
 
@@ -1010,6 +1045,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
         percentComplete: 20,
         visualPercent: 20,
         remainingMl: 2000,
+        latestLogId: null,
       };
       vi.spyOn(progressApi, 'logWater').mockResolvedValueOnce(expectedPayload);
 
@@ -1062,6 +1098,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
           percentComplete: 10,
           visualPercent: 10,
           remainingMl: 2250,
+          latestLogId: null,
         });
       });
 
@@ -1118,6 +1155,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
           percentComplete: 10,
           visualPercent: 10,
           remainingMl: 2250,
+          latestLogId: null,
         });
       });
 
@@ -1167,6 +1205,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
           percentComplete: 10,
           visualPercent: 10,
           remainingMl: 2250,
+          latestLogId: null,
         });
       });
 
@@ -1207,6 +1246,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
           percentComplete: 10,
           visualPercent: 10,
           remainingMl: 2250,
+          latestLogId: null,
         });
       });
 
@@ -1249,6 +1289,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
         percentComplete: 10,
         visualPercent: 10,
         remainingMl: 2250,
+        latestLogId: null,
       });
 
       const explodingCallback = vi.fn(() => {
@@ -1304,6 +1345,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
           percentComplete: 10,
           visualPercent: 10,
           remainingMl: 2250,
+          latestLogId: null,
         });
       });
 
@@ -1453,6 +1495,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
         percentComplete: 10,
         visualPercent: 10,
         remainingMl: 2250,
+        latestLogId: null,
       });
 
       const enteredBeforeDispatch = createDeferred<void>();
@@ -1843,7 +1886,7 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       // User B receives clean default values, not User A's unsubmitted draft
       const newWeightInput = screen.getByLabelText(/cân nặng/i);
       const newWaistInput = screen.getByLabelText(/vòng eo/i);
-      expect(newWeightInput).toHaveValue(70);
+      expect(newWeightInput).toHaveValue(null);
       expect(newWaistInput).toHaveValue(null);
     });
 
@@ -1867,9 +1910,9 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
 
       rerender(<SleepLogForm />);
 
-      // User B has default Good (Tốt) selected, not Poor
+      // User B không có chất lượng nào được chọn sẵn (tránh lưu dữ liệu rác)
       const goodRadio = screen.getByRole('radio', { name: /^tốt\b/i });
-      expect(goodRadio).toBeChecked();
+      expect(goodRadio).not.toBeChecked();
     });
 
     it('isolates WaterTracker custom amount input across account switches', async () => {
@@ -1999,6 +2042,9 @@ describe('Progress Module - Real React Behavioral Regression Tests (Corrective C
       vi.spyOn(progressApi, 'logBodyMetric').mockReturnValueOnce(deferred.promise);
 
       const { rerender } = render(<BodyMetricForm />, { wrapper: createWrapper() });
+
+      // Cân nặng không còn giá trị mặc định: phải nhập trước khi gửi.
+      fireEvent.change(screen.getByLabelText(/cân nặng/i), { target: { value: '70' } });
 
       const submitBtn = screen.getByRole('button', { name: /lưu chỉ số cơ thể/i });
       await act(async () => {

@@ -100,6 +100,7 @@ export interface WaterSummary {
   percentComplete: number; // % thực tế (vd: 120%)
   visualPercent: number; // % kẹp [0..100] cho thanh tiến trình
   remainingMl: number; // Số ml còn thiếu để đạt mục tiêu (tối thiểu 0)
+  latestLogId: string | null; // Lần ghi gần nhất trong ngày, dùng cho "Hoàn tác"
 }
 
 export interface WaterHistoryDay {

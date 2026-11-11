@@ -18,6 +18,7 @@ import { WeekPicker } from '@/components/shared/week-picker';
 import { getApiErrorCode, getApiErrorMessage } from '@/lib/api-error';
 import {
   formatBusinessWeekRange,
+  formatDateOnlyDisplay,
   getBusinessTodayDateString,
   getBusinessWeekStart,
 } from '@/lib/business-date';
@@ -25,6 +26,7 @@ import {
   useGenerateMealPlanMutation,
   useMealPlanQuery,
 } from '@/features/diet/queries/diet.queries';
+import { mealTypeLabel } from '@/common/constants/meal-labels';
 import { partitionWarnings } from '@/features/diet/utils/meal-plan-warnings';
 
 export default function MealPlanPage() {
@@ -166,7 +168,9 @@ export default function MealPlanPage() {
                   return (
                     <Card key={day.date}>
                       <CardHeader>
-                        <CardTitle className="text-base">Ngày {day.date}</CardTitle>
+                        <CardTitle className="text-base">
+                          Ngày {formatDateOnlyDisplay(day.date)}
+                        </CardTitle>
                         <CardDescription>
                           {day.totalCalories} / {day.targetCalories} kcal · P{' '}
                           {Math.round(day.totalProteinGrams)}g
@@ -186,7 +190,7 @@ export default function MealPlanPage() {
                         ) : (
                           day.meals.map((meal) => (
                             <div key={meal.mealType} className="rounded border p-3 text-sm">
-                              <p className="font-medium">{meal.mealType}</p>
+                              <p className="font-medium">{mealTypeLabel(meal.mealType)}</p>
                               <MarkdownText
                                 content={meal.rationale}
                                 compact

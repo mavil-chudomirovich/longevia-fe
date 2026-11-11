@@ -15,7 +15,9 @@ import { InfoTooltip } from '@/components/shared/info-tooltip';
 import { MarkdownText } from '@/components/shared/markdown-text';
 import { targetSchema, type TargetFormValues } from '@/features/diet/schemas/diet.schema';
 import type { SuggestedTargetsModel } from '@/features/diet/types/diet.model';
+import { useAuthStore } from '@/store/useAuthStore';
 import {
+  useAutoTargetMutation,
   useSaveTargetMutation,
   useSuggestTargetsMutation,
   useTargetQuery,
@@ -50,7 +52,10 @@ export default function TargetsPage() {
   const query = useTargetQuery();
   const save = useSaveTargetMutation();
   const suggest = useSuggestTargetsMutation();
-  const [goal, setGoal] = React.useState('Maintain');
+  const auto = useAutoTargetMutation();
+  const [goal, setGoal] = React.useState(
+    () => useAuthStore.getState().user?.profile?.goal ?? 'Maintain'
+  );
   const [description, setDescription] = React.useState('');
   const [suggestion, setSuggestion] = React.useState<SuggestedTargetsModel | null>(null);
   const form = useForm<TargetFormValues>({
@@ -91,6 +96,28 @@ export default function TargetsPage() {
           'Chưa gợi ý được mục tiêu. Bạn kiểm tra hồ sơ/cân nặng rồi thử lại nhé.'
         )
       );
+    }
+  };
+
+  const onAuto = async () => {
+    setFormError('');
+    setFormAction(undefined);
+    try {
+      const { data: target } = await auto.mutateAsync(goal);
+      form.reset({
+        targetCalories: String(target.targetCalories),
+        targetProteinGrams: String(target.targetProteinGrams),
+        targetCarbsGrams: String(target.targetCarbsGrams),
+        targetFatGrams: String(target.targetFatGrams),
+      });
+    } catch (error) {
+      setFormError(
+        getApiErrorMessage(
+          error,
+          'Chưa tính được mục tiêu. Bạn kiểm tra hồ sơ và cân nặng gần nhất rồi thử lại nhé.'
+        )
+      );
+      setFormAction(getApiErrorAction(error));
     }
   };
 
@@ -299,11 +326,23 @@ export default function TargetsPage() {
                       )}
                     </div>
                   )}
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Button type="submit" disabled={save.isPending}>
                       {save.isPending ? 'Đang lưu…' : 'Lưu mục tiêu'}
                     </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={auto.isPending}
+                      onClick={() => void onAuto()}
+                    >
+                      {auto.isPending ? 'Đang tính…' : 'Tính từ hồ sơ & mục tiêu'}
+                    </Button>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    “Tính từ hồ sơ” dùng TDEE và mục tiêu sức khỏe (giảm cân −15%, tăng cơ +10%) rồi
+                    lưu ngay; bạn vẫn có thể sửa tay và lưu lại.
+                  </p>
                 </form>
               </>
             )}

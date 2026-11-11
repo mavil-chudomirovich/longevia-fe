@@ -33,6 +33,7 @@ describe('ProfileMapper', () => {
         heightCm: '165.5',
         activityLevel: 'LightlyActive',
         dietaryPreference: 'Vegan',
+        goal: 'Longevity',
         allergies: [' Soy '],
         healthLimitations: ['joint_pain'],
       })
@@ -44,6 +45,7 @@ describe('ProfileMapper', () => {
       heightCm: 165.5,
       activityLevel: 'LightlyActive',
       dietaryPreference: 'Vegan',
+      goal: 'Longevity',
       allergies: ['Soy'],
       healthLimitations: ['joint_pain'],
     });

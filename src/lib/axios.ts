@@ -8,7 +8,7 @@ import { sharedRefresh, forceLogout } from './auth-refresh';
 import { PROTECTED_PREFIXES } from '@/common/constants/routes';
 import { API_ENDPOINTS } from '@/common/constants/api-endpoints';
 import { getApiErrorMessage } from './api-error';
-import { NETWORK_ERROR_MESSAGE } from './error-messages';
+import { NETWORK_ERROR_MESSAGE, TIMEOUT_ERROR_MESSAGE } from './error-messages';
 
 declare module 'axios' {
   export interface AxiosRequestConfig {
@@ -173,7 +173,13 @@ api.interceptors.response.use(
       }
     } else if (error.request) {
       if (!silent) {
-        toast.error(NETWORK_ERROR_MESSAGE);
+        // Phân biệt timeout với mất kết nối: timeout nghĩa là máy chủ vẫn sống
+        // nhưng xử lý chậm, không phải lỗi mạng của người dùng.
+        const isTimeout =
+          error.code === 'ECONNABORTED' ||
+          error.code === 'ETIMEDOUT' ||
+          error.message?.toLowerCase().includes('timeout');
+        toast.error(isTimeout ? TIMEOUT_ERROR_MESSAGE : NETWORK_ERROR_MESSAGE);
       }
     }
 

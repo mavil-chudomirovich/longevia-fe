@@ -8,6 +8,7 @@ import { CheckCircle2, Leaf, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LoginForm } from '@/features/auth/components/login-form';
 import { RegisterForm } from '@/features/auth/components/register-form';
+import { ResendVerificationButton } from '@/features/auth/components/resend-verification';
 import { useAuthStore } from '@/store/useAuthStore';
 
 function safeTarget(value: string | null): string {
@@ -19,6 +20,7 @@ function LoginContent() {
   const search = useSearchParams();
   const [tab, setTab] = React.useState(search.get('tab') === 'register' ? 'register' : 'login');
   const [registered, setRegistered] = React.useState(false);
+  const [registeredEmail, setRegisteredEmail] = React.useState('');
 
   const onLogin = () => {
     const user = useAuthStore.getState().user;
@@ -44,22 +46,45 @@ function LoginContent() {
         ))}
       </div>
 
+      {search.get('reset') === 'success' && (
+        <div
+          role="status"
+          className="mb-4 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm text-primary"
+        >
+          Mật khẩu đã được đặt lại. Bạn đăng nhập bằng mật khẩu mới nhé.
+        </div>
+      )}
+
+      {search.get('email-changed') === 'success' && (
+        <div
+          role="status"
+          className="mb-4 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm text-primary"
+        >
+          Email đăng nhập đã được đổi. Bạn đăng nhập bằng địa chỉ mới nhé.
+        </div>
+      )}
+
       {registered ? (
         <div className="space-y-4 py-6 text-center">
           <CheckCircle2 className="mx-auto h-10 w-10 text-primary" />
           <h1 className="text-2xl font-semibold">Kiểm tra email để xác minh</h1>
           <p className="text-sm text-muted-foreground">
-            Tài khoản đã được tạo. Mở email xác minh rồi quay lại đăng nhập.
+            Tài khoản đã được tạo. Longevia đã gửi email xác minh tới{' '}
+            <strong className="font-medium text-foreground">{registeredEmail}</strong>. Mở email rồi
+            quay lại đăng nhập.
           </p>
-          <Button
-            className="w-full"
-            onClick={() => {
-              setTab('login');
-              setRegistered(false);
-            }}
-          >
-            Quay lại đăng nhập
-          </Button>
+          <div className="flex flex-col items-center gap-3">
+            <ResendVerificationButton email={registeredEmail} variant="outline" />
+            <Button
+              className="w-full"
+              onClick={() => {
+                setTab('login');
+                setRegistered(false);
+              }}
+            >
+              Quay lại đăng nhập
+            </Button>
+          </div>
         </div>
       ) : tab === 'login' ? (
         <>
@@ -92,7 +117,12 @@ function LoginContent() {
             Dùng email của bạn để bắt đầu theo dõi sức khỏe.
           </p>
           <div className="mt-6">
-            <RegisterForm onSuccess={() => setRegistered(true)} />
+            <RegisterForm
+              onSuccess={(email) => {
+                setRegisteredEmail(email);
+                setRegistered(true);
+              }}
+            />
           </div>
           <p className="mt-4 text-center text-sm text-muted-foreground">
             Đã có tài khoản?{' '}

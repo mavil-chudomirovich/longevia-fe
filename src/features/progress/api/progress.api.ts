@@ -136,6 +136,18 @@ export const progressApi = {
   },
 
   /**
+   * Hoàn tác một lần ghi nước
+   * DELETE /api/progress/water/{id}
+   */
+  undoWater: async (id: string, signal?: AbortSignal): Promise<WaterSummary> => {
+    const res = await api.delete<WaterSummaryResponseDto>(
+      `${API_ENDPOINTS.PROGRESS.WATER_LOG}/${id}`,
+      { signal, silent: true }
+    );
+    return progressMapper.toWaterSummary(res.data);
+  },
+
+  /**
    * Lấy lịch sử uống nước theo ngày
    * GET /api/progress/water/history
    */
@@ -181,6 +193,29 @@ export const progressApi = {
       showErrorToast: false,
       signal,
     });
+    return progressMapper.toSleepRecord(res.data);
+  },
+
+  /**
+   * Sửa bản ghi giấc ngủ
+   * PUT /api/progress/sleep/{id}
+   */
+  updateSleep: async (
+    id: string,
+    values: LogSleepFormValues,
+    signal?: AbortSignal
+  ): Promise<SleepRecord> => {
+    const payload: LogSleepRequestDto = {
+      sleptAt: toUtcInstantIsoString(values.sleptAt),
+      wokeAt: toUtcInstantIsoString(values.wokeAt),
+      sleepQuality: values.sleepQuality,
+    };
+
+    const res = await api.put<SleepResponseDto>(
+      `${API_ENDPOINTS.PROGRESS.SLEEP_LOG}/${id}`,
+      payload,
+      { silent: true, showErrorToast: false, signal }
+    );
     return progressMapper.toSleepRecord(res.data);
   },
 

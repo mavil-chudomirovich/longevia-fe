@@ -6,6 +6,7 @@ import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { authApi } from '@/features/auth/api/auth.api';
+import { ResendVerificationForm } from '@/features/auth/components/resend-verification';
 
 function VerifyContent() {
   const token = useSearchParams().get('token') ?? '';
@@ -37,9 +38,14 @@ function VerifyContent() {
         {state === 'success'
           ? 'Tài khoản của bạn đã được kích hoạt. Bạn có thể đăng nhập.'
           : state === 'error'
-            ? 'Liên kết có thể đã hết hạn hoặc đã được sử dụng. Nếu tài khoản đã kích hoạt, bạn chỉ cần đăng nhập. Nếu chưa, bạn hãy liên hệ bộ phận hỗ trợ của Longevia nhé.'
+            ? 'Liên kết có thể đã hết hạn hoặc đã được sử dụng. Bạn nhập email bên dưới để nhận liên kết mới, hoặc đăng nhập nếu tài khoản đã kích hoạt.'
             : 'Vui lòng đợi trong giây lát.'}
       </p>
+      {state === 'error' && (
+        <div className="mt-5">
+          <ResendVerificationForm />
+        </div>
+      )}
       {(state === 'success' || state === 'error') && (
         <Button asChild className="mt-6">
           <Link href="/login">Đăng nhập</Link>

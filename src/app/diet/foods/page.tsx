@@ -15,6 +15,10 @@ import {
   useFoodsQuery,
   useUpdateFoodMutation,
 } from '@/features/diet/queries/diet.queries';
+import { foodCategoryLabel } from '@/common/constants/food-category-labels';
+import { toDisplayAllergens } from '@/common/constants/allergen-labels';
+import { hasAllergenConflict } from '@/features/diet/utils/allergen-conflicts';
+import { useAuthStore } from '@/store/useAuthStore';
 import type { FoodModel } from '@/features/diet/types/diet.model';
 
 const defaults: CreateFoodValues = {
@@ -204,6 +208,7 @@ export default function FoodsPage() {
   const [category, setCategory] = React.useState('');
   const [pageNumber, setPage] = React.useState(1);
   const [editing, setEditing] = React.useState<FoodModel | undefined>();
+  const userAllergies = useAuthStore((state) => state.user?.profile?.allergies ?? []);
   const removeFood = useDeleteFoodMutation();
   const query = useFoodsQuery({
     search: useDebounce(search, 300),
@@ -265,7 +270,14 @@ export default function FoodsPage() {
                 {query.data.items.map((food) => (
                   <li key={food.id} className="py-3">
                     <div className="flex justify-between gap-3">
-                      <strong>{food.name}</strong>
+                      <strong className="flex items-center gap-2">
+                        {food.name}
+                        {hasAllergenConflict(food.allergens, userAllergies) && (
+                          <span className="rounded-full border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">
+                            Trùng dị ứng
+                          </span>
+                        )}
+                      </strong>
                       <div className="flex items-center gap-2">
                         <span className="text-sm">{food.calories} kcal</span>
                         {food.isCustom && (
@@ -289,7 +301,7 @@ export default function FoodsPage() {
                       </div>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {food.category} · {food.servingSize} {food.servingUnit} · P{' '}
+                      {foodCategoryLabel(food.category)} · {food.servingSize} {food.servingUnit} · P{' '}
                       {food.proteinGrams}g · C {food.carbsGrams}g · F {food.fatGrams}g
                     </p>
                     <p className="text-xs text-muted-foreground">
@@ -297,8 +309,8 @@ export default function FoodsPage() {
                       {food.allergens === null
                         ? 'Chưa khai báo'
                         : food.allergens.length
-                          ? food.allergens.join(', ')
-                          : 'Đã khai báo không có nhãn'}
+                          ? toDisplayAllergens(food.allergens).join(', ')
+                          : 'Không chứa dị nguyên phổ biến'}
                     </p>
                   </li>
                 ))}

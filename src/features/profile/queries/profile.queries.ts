@@ -46,6 +46,36 @@ export function useUpdateProfileMutation() {
   });
 }
 
+export function useUpdateNameMutation() {
+  const client = useQueryClient();
+  const setUser = useAuthStore((state) => state.setUser);
+  const userId = useAuthStore((state) => state.user?.id ?? '');
+  return useMutation({
+    mutationFn: (fullName: string) => profileApi.updateName(fullName),
+    onSuccess: (user) => {
+      setUser(user);
+      client.setQueryData(AUTH_QUERY_KEYS.me(), user);
+      client.setQueryData(profileKeys.me(userId), user);
+      toast.success('Đã cập nhật họ tên.');
+    },
+    onError: () => {
+      toast.error('Chưa cập nhật được họ tên. Bạn thử lại giúp mình nhé.');
+    },
+  });
+}
+
+export function useRequestEmailChangeMutation() {
+  return useMutation({
+    mutationFn: (payload: { newEmail: string; currentPassword: string }) =>
+      profileApi.requestEmailChange(payload.newEmail, payload.currentPassword),
+    onSuccess: () => {
+      toast.success(
+        'Đã gửi link xác nhận tới email mới. Email hiện tại chỉ thay đổi sau khi bạn bấm link.'
+      );
+    },
+  });
+}
+
 export function useChangePasswordMutation() {
   const client = useQueryClient();
   const router = useRouter();

@@ -1,13 +1,15 @@
 'use client';
 
 import * as React from 'react';
-import { BedDouble, Trash2 } from 'lucide-react';
+import { BedDouble, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Pagination } from '@/components/shared/pagination';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { getApiErrorMessage } from '@/lib/api-error';
 import { useDeleteSleepMutation, useSleepHistoryQuery } from '../queries/progress.queries';
+import { SleepEditDialog } from './sleep-edit-dialog';
+import type { SleepRecord } from '../types/progress.model';
 import {
   formatDateOnlyDisplay,
   formatDisplayDateTime,
@@ -19,6 +21,7 @@ const PAGE_SIZE = 10;
 export function SleepHistory() {
   const [page, setPage] = React.useState(1);
   const [pendingDelete, setPendingDelete] = React.useState<string | null>(null);
+  const [editing, setEditing] = React.useState<SleepRecord | null>(null);
   const query = useSleepHistoryQuery(page, PAGE_SIZE);
   const remove = useDeleteSleepMutation();
   const data = query.data;
@@ -72,6 +75,14 @@ export function SleepHistory() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label="Sửa bản ghi giấc ngủ"
+                    onClick={() => setEditing(item)}
+                  >
+                    <Pencil className="size-4" aria-hidden="true" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     aria-label="Xoá bản ghi giấc ngủ"
                     onClick={() => setPendingDelete(item.id)}
                   >
@@ -93,6 +104,13 @@ export function SleepHistory() {
           </p>
         )}
       </CardContent>
+
+      <SleepEditDialog
+        record={editing}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null);
+        }}
+      />
 
       <ConfirmDialog
         open={pendingDelete !== null}

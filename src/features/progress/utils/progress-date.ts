@@ -9,8 +9,14 @@
  * - Khoảng thời gian (fasting/sleep) tính theo chênh lệch instant (mili-giây), không trừ wall-clock.
  */
 
-import { getBusinessTodayDateString, getMsUntilNextBusinessMidnight } from '@/lib/business-date';
+import {
+  formatDateOnlyDisplay,
+  getBusinessTodayDateString,
+  getMsUntilNextBusinessMidnight,
+} from '@/lib/business-date';
 import { ProgressDataIntegrityError } from '../errors/progress-data-integrity.error';
+
+export { formatDateOnlyDisplay };
 
 function isLeapYear(year: number): boolean {
   return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
@@ -142,16 +148,6 @@ export function parseUtcDateOnly(dateString: string): Date {
 
   const timestamp = Date.UTC(year, month, day, 0, 0, 0, 0);
   return new Date(timestamp);
-}
-
-/**
- * Hiển thị ngày dạng YYYY-MM-DD sang định dạng quen thuộc Việt Nam: DD/MM/YYYY.
- */
-export function formatDateOnlyDisplay(dateString: string | null | undefined): string {
-  if (!dateString) return 'Chưa có';
-  const parts = dateString.split('-');
-  if (parts.length !== 3) return dateString;
-  return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
 /**

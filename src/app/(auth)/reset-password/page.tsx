@@ -3,7 +3,8 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,12 +14,21 @@ import { getApiErrorMessage } from '@/lib/api-error';
 
 function ResetContent() {
   const search = useSearchParams();
+  const router = useRouter();
   const [token, setToken] = React.useState(search.get('token') ?? '');
   const [password, setPassword] = React.useState('');
   const [confirm, setConfirm] = React.useState('');
+  const [showPassword, setShowPassword] = React.useState(false);
   const [message, setMessage] = React.useState('');
   const [error, setError] = React.useState('');
   const [pending, setPending] = React.useState(false);
+  const [succeeded, setSucceeded] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!succeeded) return;
+    const timer = setTimeout(() => router.replace('/login?reset=success'), 2000);
+    return () => clearTimeout(timer);
+  }, [succeeded, router]);
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError('');
@@ -41,7 +51,10 @@ function ResetContent() {
     setPending(true);
     try {
       await authApi.resetPassword({ token, newPassword: password });
-      setMessage('Mật khẩu đã được đặt lại. Bạn có thể đăng nhập.');
+      setMessage(
+        'Mật khẩu đã được đặt lại. Longevia sẽ chuyển bạn sang trang đăng nhập trong giây lát.'
+      );
+      setSucceeded(true);
     } catch (reason) {
       setError(
         getApiErrorMessage(
@@ -71,15 +84,26 @@ function ResetContent() {
         </div>
         <div className="space-y-2">
           <Label htmlFor="new-password">Mật khẩu mới</Label>
-          <Input
-            id="new-password"
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={8}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
+          <div className="relative">
+            <Input
+              id="new-password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              required
+              minLength={8}
+              className="pr-12"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+            <button
+              type="button"
+              aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              onClick={() => setShowPassword((value) => !value)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
         <div className="space-y-2">
           <Label htmlFor="confirm-password">Nhập lại mật khẩu mới</Label>

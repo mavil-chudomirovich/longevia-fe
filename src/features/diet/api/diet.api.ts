@@ -78,6 +78,14 @@ export const dietApi = {
     );
     return dietMapper.toTarget(response.data);
   },
+  autoTarget: async (goal: string, signal: AbortSignal): Promise<TargetModel> => {
+    const response = await api.post<TargetDto>(
+      API_ENDPOINTS.DIET.AUTO_TARGETS,
+      { goal },
+      { signal, silent: true }
+    );
+    return dietMapper.toTarget(response.data);
+  },
   suggestTargets: async (
     input: { description: string; goal: string },
     signal: AbortSignal
@@ -85,7 +93,9 @@ export const dietApi = {
     const response = await api.post<SuggestedTargetsDto>(
       API_ENDPOINTS.DIET.SUGGEST_TARGETS,
       input,
-      { signal, silent: true }
+      // BE dành tới 20s cho Recommendation, provider có thể tới 30s; client
+      // phải chờ lâu hơn để không huỷ ngang (trước đây timeout 15s gây lỗi oan).
+      { signal, silent: true, timeout: 60_000 }
     );
     return dietMapper.toSuggestedTargets(response.data);
   },
@@ -99,6 +109,24 @@ export const dietApi = {
   logMeal: async (payload: LogMealDto, signal: AbortSignal): Promise<void> => {
     await api.post(API_ENDPOINTS.DIET.MEALS, payload, { signal, silent: true });
   },
+  replaceMeal: async (payload: LogMealDto, signal: AbortSignal): Promise<void> => {
+    await api.put(
+      API_ENDPOINTS.DIET.MEALS,
+      { items: payload.items },
+      {
+        params: { date: payload.date, mealType: payload.mealType },
+        signal,
+        silent: true,
+      }
+    );
+  },
+  deleteMeal: async (date: string, mealType: string, signal: AbortSignal): Promise<void> => {
+    await api.delete(API_ENDPOINTS.DIET.MEALS, {
+      params: { date, mealType },
+      signal,
+      silent: true,
+    });
+  },
   getRecommendations: async (
     params: { mealType: string; goal: string },
     signal?: AbortSignal
@@ -108,6 +136,8 @@ export const dietApi = {
       params,
       signal,
       silent: true,
+      // Gợi ý bữa ăn cũng đi qua Recommendation (budget 20s, provider tới 30s).
+      timeout: 60_000,
     });
     return dietMapper.toRecommendations(response.data);
   },
@@ -140,6 +170,7 @@ export const dietApi = {
       params: { days },
       signal,
       silent: true,
+      timeout: 60_000,
     });
     return nutritionMapper.toModel(response.data);
   },

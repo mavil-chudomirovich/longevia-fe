@@ -5,9 +5,13 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { LogMealDialog } from '@/features/diet/components/log-meal-dialog';
-import { getBusinessTodayDateString } from '@/lib/business-date';
-import { useDailySummaryQuery } from '@/features/diet/queries/diet.queries';
+import { Trash2, Pencil } from 'lucide-react';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
+import { LogMealDialog, type MealPrefillItem } from '@/features/diet/components/log-meal-dialog';
+import { getBusinessTodayDateString, formatDateOnlyDisplay } from '@/lib/business-date';
+import { getApiErrorCode } from '@/lib/api-error';
+import { mealTypeLabel } from '@/common/constants/meal-labels';
+import { useDailySummaryQuery, useDeleteMealMutation } from '@/features/diet/queries/diet.queries';
 
 function Macro({
   label,
@@ -37,7 +41,14 @@ export default function DietPage() {
   const [date, setDate] = React.useState(() => getBusinessTodayDateString());
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const query = useDailySummaryQuery(date);
+  const deleteMeal = useDeleteMealMutation();
+  const [pendingDelete, setPendingDelete] = React.useState<string | null>(null);
+  const [editing, setEditing] = React.useState<{
+    mealType: string;
+    items: MealPrefillItem[];
+  } | null>(null);
   const summary = query.data;
+  const missingTarget = getApiErrorCode(query.error) === 'diet.target_not_found';
   const caloriePercent =
     summary && summary.targetCalories > 0
       ? Math.min(100, Math.max(0, (summary.consumedCalories / summary.targetCalories) * 100))
@@ -66,12 +77,23 @@ export default function DietPage() {
       </div>
       {query.isLoading ? (
         <p className="py-10 text-muted-foreground">Đang tải nhật ký…</p>
+      ) : query.isError && missingTarget ? (
+        <Card className="mt-6">
+          <CardContent className="space-y-3 py-6">
+            <p className="font-medium">Bạn chưa thiết lập mục tiêu dinh dưỡng.</p>
+            <p className="text-sm text-muted-foreground">
+              Nhật ký ăn uống cần mục tiêu calo để tính phần còn lại. Hãy thiết lập mục tiêu trước
+              rồi quay lại ghi bữa ăn nhé.
+            </p>
+            <Button asChild>
+              <Link href="/diet/targets">Thiết lập mục tiêu</Link>
+            </Button>
+          </CardContent>
+        </Card>
       ) : query.isError ? (
         <Card className="mt-6">
           <CardContent className="space-y-3 py-6">
-            <p role="alert">
-              {query.error && 'Không thể tải nhật ký. Hãy kiểm tra mục tiêu dinh dưỡng và thử lại.'}
-            </p>
+            <p role="alert">Không thể tải nhật ký. Bạn thử lại giúp mình nhé.</p>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => void query.refetch()}>
                 Thử lại
@@ -87,7 +109,7 @@ export default function DietPage() {
           <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_0.8fr]">
             <Card>
               <CardHeader>
-                <CardTitle>Tổng quan ngày {summary.date}</CardTitle>
+                <CardTitle>Tổng quan ngày {formatDateOnlyDisplay(summary.date)}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-5">
                 <div>
@@ -119,11 +141,53 @@ export default function DietPage() {
                 {summary.meals.length ? (
                   <ul className="divide-y">
                     {summary.meals.map((meal) => (
-                      <li key={meal.mealType} className="flex justify-between py-3 text-sm">
-                        <span>
-                          {meal.mealType} · {meal.itemsCount} món
-                        </span>
-                        <strong>{meal.totalCalories} kcal</strong>
+                      <li key={meal.mealType} className="space-y-1.5 py-3 text-sm">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="font-medium">{mealTypeLabel(meal.mealType)}</span>
+                          <div className="flex items-center gap-2">
+                            <strong className="tabular-nums">{meal.totalCalories} kcal</strong>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground"
+                              aria-label={`Sửa ${mealTypeLabel(meal.mealType)} ngày ${formatDateOnlyDisplay(summary.date)}`}
+                              onClick={() =>
+                                setEditing({
+                                  mealType: meal.mealType,
+                                  items: meal.items.map((item) => ({
+                                    foodId: item.foodId,
+                                    name: item.name,
+                                    // Dùng chính lượng đã ghi làm khẩu phần để ước tính calo khớp snapshot.
+                                    servingSize: item.quantity,
+                                    servingUnit: item.servingUnit,
+                                    calories: item.calories,
+                                  })),
+                                })
+                              }
+                            >
+                              <Pencil className="size-4" aria-hidden="true" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground"
+                              aria-label={`Xoá ${mealTypeLabel(meal.mealType)} ngày ${formatDateOnlyDisplay(summary.date)}`}
+                              onClick={() => setPendingDelete(meal.mealType)}
+                            >
+                              <Trash2 className="size-4" aria-hidden="true" />
+                            </Button>
+                          </div>
+                        </div>
+                        <ul className="space-y-0.5 text-xs text-muted-foreground">
+                          {meal.items.map((item) => (
+                            <li key={`${meal.mealType}-${item.foodId}`}>
+                              {item.name} · {item.quantity} {item.servingUnit} ·{' '}
+                              {Math.round(item.calories)} kcal
+                            </li>
+                          ))}
+                        </ul>
                       </li>
                     ))}
                   </ul>
@@ -141,6 +205,34 @@ export default function DietPage() {
         )
       )}
       <LogMealDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+
+      <LogMealDialog
+        open={editing !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null);
+        }}
+        mode="replace"
+        initialDate={date}
+        initialMealType={editing?.mealType}
+        initialItems={editing?.items}
+      />
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+        title={`Xoá ${pendingDelete ? mealTypeLabel(pendingDelete).toLowerCase() : 'bữa ăn'}?`}
+        description={`Bữa ăn và toàn bộ món đã ghi trong ngày ${formatDateOnlyDisplay(date)} sẽ bị xoá khỏi nhật ký. Bạn có thể ghi lại sau.`}
+        confirmLabel="Xoá bữa"
+        danger
+        loading={deleteMeal.isPending}
+        onConfirm={async () => {
+          if (!pendingDelete) return;
+          await deleteMeal.mutateAsync({ date, mealType: pendingDelete }).catch(() => undefined);
+          setPendingDelete(null);
+        }}
+      />
     </div>
   );
 }

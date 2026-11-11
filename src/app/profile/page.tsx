@@ -1,18 +1,23 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { AuthGuard } from '@/components/shared/auth-guard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { ProfileForm } from '@/features/profile/components/profile-form';
 import { ChangePasswordForm } from '@/features/profile/components/change-password-form';
+import { EmailChangeDialog } from '@/features/profile/components/email-change-dialog';
 import {
   usePreferencesQuery,
   useProfileQuery,
+  useUpdateNameMutation,
   useUpdatePreferencesMutation,
 } from '@/features/profile/queries/profile.queries';
 import { useAuthStore } from '@/store/useAuthStore';
+import type { UserModel } from '@/features/auth/types/auth.model';
 
 function ProfileContent() {
   const [tab, setTab] = React.useState<'profile' | 'security'>('profile');
@@ -24,6 +29,9 @@ function ProfileContent() {
     <div className="container mx-auto max-w-4xl px-4 py-10 sm:px-6">
       <h1 className="text-3xl font-bold">Hồ sơ cá nhân</h1>
       <p className="mt-2 text-muted-foreground">Quản lý thông tin sức khỏe và bảo mật tài khoản.</p>
+
+      <AccountCard key={`${user?.id ?? 'anonymous'}:${user?.fullName ?? ''}`} user={user} />
+
       <div className="my-6 flex gap-2">
         <Button
           variant={tab === 'profile' ? 'default' : 'outline'}
@@ -92,6 +100,79 @@ function ProfileContent() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function AccountCard({ user }: { user: UserModel | null }) {
+  const updateName = useUpdateNameMutation();
+  const [fullNameDraft, setFullNameDraft] = React.useState(user?.fullName ?? '');
+  const [emailDialogOpen, setEmailDialogOpen] = React.useState(false);
+  const trimmedName = fullNameDraft.trim();
+  const canSaveName =
+    trimmedName.length > 0 &&
+    trimmedName !== (user?.fullName ?? '').trim() &&
+    !updateName.isPending;
+
+  return (
+    <Card className="mt-6">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Tài khoản</CardTitle>
+        <CardDescription>Đổi họ tên hiển thị và email đăng nhập của bạn.</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
+        <form
+          className="space-y-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!canSaveName) return;
+            void updateName.mutateAsync(trimmedName).catch(() => undefined);
+          }}
+        >
+          <label htmlFor="account-full-name" className="text-muted-foreground">
+            Họ và tên
+          </label>
+          <div className="flex gap-2">
+            <Input
+              id="account-full-name"
+              value={fullNameDraft}
+              maxLength={100}
+              onChange={(event) => setFullNameDraft(event.target.value)}
+              autoComplete="name"
+            />
+            <Button type="submit" variant="outline" disabled={!canSaveName}>
+              {updateName.isPending ? 'Đang lưu…' : 'Lưu'}
+            </Button>
+          </div>
+          {trimmedName.length === 0 && (
+            <p className="text-xs text-destructive">Họ tên không được để trống.</p>
+          )}
+        </form>
+        <div className="space-y-2">
+          <p className="text-muted-foreground">Email</p>
+          <p className="font-medium break-all">{user?.email || 'Chưa cập nhật'}</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setEmailDialogOpen(true)}
+            disabled={!user?.email}
+          >
+            Đổi email
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Link xác nhận gửi tới email mới; địa chỉ cũ chỉ bị thay sau khi bạn bấm link.{' '}
+            <Link href="/confirm-email-change" className="text-primary hover:underline">
+              Đã có mã xác nhận?
+            </Link>
+          </p>
+        </div>
+      </CardContent>
+      <EmailChangeDialog
+        open={emailDialogOpen}
+        onOpenChange={setEmailDialogOpen}
+        currentEmail={user?.email ?? ''}
+      />
+    </Card>
   );
 }
 

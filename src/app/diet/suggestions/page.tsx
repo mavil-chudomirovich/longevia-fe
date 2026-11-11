@@ -8,13 +8,16 @@ import { LogMealDialog } from '@/features/diet/components/log-meal-dialog';
 import { useRecommendationsQuery } from '@/features/diet/queries/diet.queries';
 import type { MealSuggestionModel } from '@/features/diet/types/diet.model';
 import { getApiErrorAction, getApiErrorMessage } from '@/lib/api-error';
+import { useAuthStore } from '@/store/useAuthStore';
 import { CitationChipList } from '@/components/shared/citation-chip';
 import { InfoTooltip } from '@/components/shared/info-tooltip';
 import { MarkdownText } from '@/components/shared/markdown-text';
 
 export default function SuggestionsPage() {
   const [mealType, setMealType] = React.useState('Breakfast');
-  const [goal, setGoal] = React.useState('Longevity');
+  const [goal, setGoal] = React.useState(
+    () => useAuthStore.getState().user?.profile?.goal ?? 'Longevity'
+  );
   const [requested, setRequested] = React.useState(false);
   const [selected, setSelected] = React.useState<MealSuggestionModel>();
   const [dialogOpen, setDialogOpen] = React.useState(false);
@@ -76,7 +79,12 @@ export default function SuggestionsPage() {
       {!requested ? (
         <p className="mt-6 text-sm text-muted-foreground">Chọn bữa ăn và mục tiêu rồi tạo gợi ý.</p>
       ) : query.isLoading ? (
-        <p className="py-8 text-muted-foreground">Đang phân tích hồ sơ và nhật ký…</p>
+        <div className="py-8">
+          <p className="text-muted-foreground">Đang phân tích hồ sơ và nhật ký…</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Trợ lý có thể mất tới 30 giây. Bạn giữ trang này mở giúp mình nhé.
+          </p>
+        </div>
       ) : query.isError ? (
         <Card className="mt-6">
           <CardContent className="space-y-3 py-6">

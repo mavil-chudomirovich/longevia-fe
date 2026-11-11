@@ -593,6 +593,33 @@ export function useLogWaterMutation() {
   });
 }
 
+export function useUndoWaterMutation() {
+  const queryClient = useQueryClient();
+
+  return useSessionBoundMutation<WaterSummary, string>({
+    mutationFn: (logId, signal) => progressApi.undoWater(logId, signal),
+    onSuccess: (_data, _logId, context) => {
+      if (!isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)) {
+        return;
+      }
+      toast.success('Đã hoàn tác lần ghi nước gần nhất.');
+      queryClient.invalidateQueries({
+        queryKey: progressKeys.water(context.initiatingUserId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: progressKeys.dashboard(context.initiatingUserId),
+      });
+    },
+    onError: (error, _logId, context) => {
+      handleProgressMutationError(
+        error,
+        context,
+        'Không thể hoàn tác lần ghi nước. Vui lòng thử lại.'
+      );
+    },
+  });
+}
+
 export function useLogSleepMutation() {
   const queryClient = useQueryClient();
 
@@ -615,6 +642,33 @@ export function useLogSleepMutation() {
         error,
         context,
         'Không thể ghi nhận giấc ngủ. Vui lòng kiểm tra lại thời gian.'
+      );
+    },
+  });
+}
+
+export function useUpdateSleepMutation() {
+  const queryClient = useQueryClient();
+
+  return useSessionBoundMutation<SleepRecord, { id: string; values: LogSleepFormValues }>({
+    mutationFn: ({ id, values }, signal) => progressApi.updateSleep(id, values, signal),
+    onSuccess: (_record, _variables, context) => {
+      if (!isProgressSessionActive(context.initiatingUserId, context.initiatingSessionId)) {
+        return;
+      }
+      toast.success('Đã cập nhật bản ghi giấc ngủ.');
+      queryClient.invalidateQueries({
+        queryKey: progressKeys.sleep(context.initiatingUserId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: progressKeys.dashboard(context.initiatingUserId),
+      });
+    },
+    onError: (error, _variables, context) => {
+      handleProgressMutationError(
+        error,
+        context,
+        'Không thể cập nhật giấc ngủ. Bạn kiểm tra lại thời gian rồi thử lại nhé.'
       );
     },
   });

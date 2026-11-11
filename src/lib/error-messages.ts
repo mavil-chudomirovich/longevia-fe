@@ -30,6 +30,11 @@ export const FRIENDLY_ERRORS: Record<string, FriendlyError> = {
     message:
       'Email hoặc mật khẩu chưa đúng. Nếu bạn vừa đăng ký, hãy mở email và bấm link xác thực trước khi đăng nhập.',
   },
+  'identity.email_not_verified': {
+    message:
+      'Tài khoản chưa xác minh email. Bạn mở link trong email kích hoạt, hoặc gửi lại email xác minh.',
+    action: { label: 'Đăng nhập', href: '/login' },
+  },
   'identity.email_taken': {
     message:
       'Email này đã được đăng ký. Bạn hãy đăng nhập, hoặc dùng "Quên mật khẩu" nếu không nhớ.',
@@ -220,5 +225,12 @@ export function friendlyMessageForStatus(status: number | undefined): string | u
 
 export const NETWORK_ERROR_MESSAGE =
   'Không kết nối được tới Longevia. Bạn kiểm tra kết nối mạng rồi thử lại nhé.';
+
+/**
+ * Máy chủ vẫn phản hồi nhưng xử lý lâu hơn thời gian client chờ.
+ * Tách khỏi `NETWORK_ERROR_MESSAGE` để không đổ lỗi sai cho mạng người dùng.
+ */
+export const TIMEOUT_ERROR_MESSAGE =
+  'Longevia đang xử lý lâu hơn bình thường nên yêu cầu đã tạm dừng. Bạn thử lại sau ít phút nhé.';
 
 export const DEFAULT_ERROR_MESSAGE = 'Có lỗi xảy ra. Bạn vui lòng thử lại nhé.';

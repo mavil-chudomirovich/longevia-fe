@@ -445,6 +445,7 @@ describe('ProgressMapper & Strict Timestamp Data Integrity (Corrective A)', () =
         consumedMl: 1000,
         targetMl: 2500,
         percentComplete: 40.0,
+        latestLogId: 'log-1',
       };
 
       const result = progressMapper.toWaterSummary(dto);
@@ -455,6 +456,17 @@ describe('ProgressMapper & Strict Timestamp Data Integrity (Corrective A)', () =
       expect(result.percentComplete).toBe(40.0);
       expect(result.visualPercent).toBe(40.0);
       expect(result.remainingMl).toBe(1500);
+      expect(result.latestLogId).toBe('log-1');
+    });
+
+    it('normalizes a missing latestLogId to null', () => {
+      const result = progressMapper.toWaterSummary({
+        date: '2026-10-25',
+        consumedMl: 0,
+        targetMl: 2500,
+        percentComplete: 0,
+      });
+      expect(result.latestLogId).toBeNull();
     });
   });
 });

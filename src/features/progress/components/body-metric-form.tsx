@@ -71,7 +71,8 @@ function BodyMetricFormInner({ onSuccessLogged }: BodyMetricFormProps) {
     resolver: zodResolver(logBodyMetricSchema),
     defaultValues: {
       loggedAt: toLocalInputDateTimeString(new Date()),
-      weightKg: 70.0,
+      // Không điền sẵn cân nặng để tránh người dùng lưu nhầm 70 kg mặc định.
+      weightKg: undefined,
       bodyFatPercent: null,
       waistCircumferenceCm: null,
       systolicBloodPressure: null,
@@ -144,7 +145,7 @@ function BodyMetricFormInner({ onSuccessLogged }: BodyMetricFormProps) {
         </CardHeader>
 
         <CardContent>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" noValidate>
             {/* Hàng 1: Thời điểm & Cân nặng (Bắt buộc) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -158,7 +159,6 @@ function BodyMetricFormInner({ onSuccessLogged }: BodyMetricFormProps) {
                     step="0.1"
                     min="25.0"
                     max="300.0"
-                    defaultValue={70.0}
                     placeholder="VD: 68.5"
                     {...form.register('weightKg', {
                       setValueAs: (v) => (v === '' ? NaN : Number(v)),
@@ -263,7 +263,7 @@ function BodyMetricFormInner({ onSuccessLogged }: BodyMetricFormProps) {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="metric-systolic" className="text-xs text-muted-foreground">
-                    Huyết áp tâm thu (Systolic)
+                    Huyết áp tâm thu
                   </Label>
                   <div className="relative">
                     <Input
@@ -288,7 +288,7 @@ function BodyMetricFormInner({ onSuccessLogged }: BodyMetricFormProps) {
 
                 <div className="space-y-2">
                   <Label htmlFor="metric-diastolic" className="text-xs text-muted-foreground">
-                    Huyết áp tâm trương (Diastolic)
+                    Huyết áp tâm trương
                   </Label>
                   <div className="relative">
                     <Input

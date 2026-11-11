@@ -8,6 +8,8 @@ import {
   ArrowRight,
   CheckCircle2,
   Circle,
+  Eye,
+  EyeOff,
   Lock,
   Mail,
   User as UserIcon,
@@ -67,9 +69,11 @@ function PasswordStrength({ value }: { value: string }) {
  * Form đăng ký tài khoản. Người dùng xác minh email trước khi đăng nhập.
  * Lỗi nghiệp vụ đọc theo `error.code` (không branch theo text).
  */
-export function RegisterForm({ onSuccess }: { onSuccess?: () => void }) {
+export function RegisterForm({ onSuccess }: { onSuccess?: (email: string) => void }) {
   const registerMutation = useRegisterMutation();
   const [formError, setFormError] = React.useState<string | null>(null);
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [showConfirm, setShowConfirm] = React.useState(false);
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -87,7 +91,7 @@ export function RegisterForm({ onSuccess }: { onSuccess?: () => void }) {
     setFormError(null);
     try {
       await registerMutation.mutateAsync(values);
-      onSuccess?.();
+      onSuccess?.(values.email);
     } catch (error) {
       const code = getApiErrorCode(error);
       if (code === 'identity.email_taken') {
@@ -187,18 +191,28 @@ export function RegisterForm({ onSuccess }: { onSuccess?: () => void }) {
           <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             id="register-password"
-            type="password"
+            type={showPassword ? 'text' : 'password'}
             autoComplete="new-password"
             placeholder="Tối thiểu 8 ký tự..."
-            className="h-12 rounded-xl pl-10 text-sm border-border/80 focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
+            className="h-12 rounded-xl pl-10 pr-12 text-sm border-border/80 focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
             {...form.register('password')}
           />
+          <button
+            type="button"
+            aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+            onClick={() => setShowPassword((value) => !value)}
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
         </div>
-        {form.formState.errors.password ? (
-          <p className="text-xs text-destructive">{form.formState.errors.password.message}</p>
-        ) : (
+        <div className="min-h-[112px] space-y-1.5">
+          {/* Luôn hiển thị checklist để gõ mật khẩu không đẩy các ô bên dưới xuống. */}
           <PasswordStrength value={passwordValue ?? ''} />
-        )}
+          {form.formState.errors.password && (
+            <p className="text-xs text-destructive">{form.formState.errors.password.message}</p>
+          )}
+        </div>
       </div>
 
       <div className="space-y-1.5">
@@ -208,14 +222,24 @@ export function RegisterForm({ onSuccess }: { onSuccess?: () => void }) {
         >
           Nhập lại mật khẩu
         </Label>
-        <Input
-          id="register-confirmPassword"
-          type="password"
-          autoComplete="new-password"
-          placeholder="Nhập lại mật khẩu..."
-          className="h-12 rounded-xl px-4 text-sm border-border/80 focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
-          {...form.register('confirmPassword')}
-        />
+        <div className="relative">
+          <Input
+            id="register-confirmPassword"
+            type={showConfirm ? 'text' : 'password'}
+            autoComplete="new-password"
+            placeholder="Nhập lại mật khẩu..."
+            className="h-12 rounded-xl px-4 pr-12 text-sm border-border/80 focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
+            {...form.register('confirmPassword')}
+          />
+          <button
+            type="button"
+            aria-label={showConfirm ? 'Ẩn mật khẩu nhập lại' : 'Hiện mật khẩu nhập lại'}
+            onClick={() => setShowConfirm((value) => !value)}
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
         {form.formState.errors.confirmPassword && (
           <p className="text-xs text-destructive">
             {form.formState.errors.confirmPassword.message}
