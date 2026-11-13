@@ -19,12 +19,11 @@ export interface LoginPayload {
 }
 
 export const authApi = {
-  register: async (values: RegisterFormValues): Promise<UserModel> => {
+  register: async (values: RegisterFormValues): Promise<void> => {
     const payload: RegisterRequestDto = authMapper.toRegisterDto(values);
-    const response = await api.post<UserDto>(API_ENDPOINTS.BFF.REGISTER, payload, {
+    await api.post(API_ENDPOINTS.BFF.REGISTER, payload, {
       silent: true,
     });
-    return authMapper.toModel(response.data);
   },
 
   login: async (payload: LoginPayload): Promise<AuthSession> => {

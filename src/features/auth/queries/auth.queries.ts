@@ -31,9 +31,8 @@ export const useRegisterMutation = () => {
   return {
     ...mutation,
     mutateAsync: async (values: RegisterFormValues) => {
-      const user = await mutation.mutateAsync(values);
+      await mutation.mutateAsync(values);
       toast.success('Tài khoản đã tạo. Hãy kiểm tra email để xác minh địa chỉ của bạn.');
-      return user;
     },
   };
 };
@@ -65,6 +64,7 @@ export const useLoginMutation = () => {
       }
     },
     onSuccess: ({ session, user }) => {
+      queryClient.clear();
       setSession(session.accessToken, user);
       queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user);
       toast.success('Đăng nhập thành công!');

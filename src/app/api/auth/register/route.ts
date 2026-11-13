@@ -9,6 +9,12 @@ export async function POST(request: NextRequest) {
       headers: { 'Content-Type': 'application/json' },
       body: await request.text(),
     });
+
+    // BE trả 202 no-body: pending registration nằm trong Redis, DB user chỉ tạo khi verify.
+    if (backend.status === 202) {
+      return new NextResponse(null, { status: 202 });
+    }
+
     const payload: unknown = await backend.json().catch(() => null);
     return NextResponse.json(payload, { status: backend.status });
   } catch {
