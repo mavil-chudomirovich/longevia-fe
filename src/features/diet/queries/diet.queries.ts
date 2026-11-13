@@ -45,12 +45,12 @@ export function useFoodsQuery(
   });
 }
 
-export function useDailySummaryQuery(date: string) {
-  const { userId, enabled } = useDietSession();
+export function useDailySummaryQuery(date: string, enabled = true) {
+  const { userId, enabled: authenticated } = useDietSession();
   return useQuery({
     queryKey: dietKeys.summary(userId ?? '', date),
     queryFn: ({ signal }) => dietApi.getDailySummary(date, signal),
-    enabled,
+    enabled: enabled && authenticated,
   });
 }
 

@@ -20,7 +20,11 @@ import { getApiErrorCode } from '@/lib/api-error';
 import { mealTypeLabel } from '@/common/constants/meal-labels';
 import { getBusinessTodayDateString, getBusinessWeekStart } from '@/lib/business-date';
 import { cn } from '@/lib/utils';
-import { useDailySummaryQuery, useMealPlanQuery } from '@/features/diet/queries/diet.queries';
+import {
+  useDailySummaryQuery,
+  useMealPlanQuery,
+  useTargetQuery,
+} from '@/features/diet/queries/diet.queries';
 import {
   useLogWaterMutation,
   useWaterTodayQuery,
@@ -56,13 +60,16 @@ export default function TodayPage() {
   const [mealOpen, setMealOpen] = React.useState(false);
   const [selectedMeal, setSelectedMeal] = React.useState('Breakfast');
   const [prefill, setPrefill] = React.useState<MealPrefillItem[]>([]);
-  const summary = useDailySummaryQuery(today);
+  const target = useTargetQuery();
+  const noTarget = getApiErrorCode(target.error) === 'diet.target_not_found';
+  const targetReady = target.isSuccess;
+  const summary = useDailySummaryQuery(today, targetReady);
   const water = useWaterTodayQuery();
   const fasting = useCurrentFastingQuery();
   const sleep = useSleepTodayQuery();
   const dashboard = useDashboardSummaryQuery();
-  const mealPlan = useMealPlanQuery(weekStart, true);
-  const workoutPlan = useWorkoutPlanQuery(weekStart, true);
+  const mealPlan = useMealPlanQuery(weekStart, targetReady);
+  const workoutPlan = useWorkoutPlanQuery(weekStart, targetReady);
   const longevity = useLongevityQuery(7);
   const logWater = useLogWaterMutation();
   const undoWater = useUndoWaterMutation();
@@ -204,11 +211,25 @@ export default function TodayPage() {
               ))}
             </div>
 
-            {summary.isLoading ? (
+            {noTarget ? (
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                <p className="text-sm text-muted-foreground">
+                  Bạn chưa thiết lập mục tiêu dinh dưỡng. Thiết lập một lần để xem nhật ký và gợi ý
+                  hôm nay.
+                </p>
+                <Button asChild size="sm" className="mt-2">
+                  <Link href="/diet/targets">Thiết lập mục tiêu</Link>
+                </Button>
+              </div>
+            ) : target.isLoading || summary.isLoading ? (
               <p className="text-sm text-muted-foreground">Đang tải nhật ký ăn uống…</p>
+            ) : target.isError ? (
+              <p className="text-sm text-muted-foreground">
+                Chưa tải được mục tiêu dinh dưỡng. Vui lòng thử lại sau.
+              </p>
             ) : summary.isError ? (
               <p className="text-sm text-muted-foreground">
-                Chưa tải được nhật ký. Bạn cần thiết lập mục tiêu dinh dưỡng trước.
+                Chưa tải được nhật ký ăn uống. Vui lòng thử lại sau.
               </p>
             ) : summary.data ? (
               <div className="space-y-4">
