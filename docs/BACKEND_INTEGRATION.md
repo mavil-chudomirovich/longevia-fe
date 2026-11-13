@@ -12,7 +12,7 @@ API service routes dưới `/api/identity`:
 
 | Method | Path | Hành vi FE |
 | --- | --- | --- |
-| POST | `/auth/register` | Gửi `email`, `password`, `fullName`; nhận `201 UserResponse`, không đăng nhập tự động |
+| POST | `/auth/register` | Gửi `email`, `password`, `fullName`; nhận **`202` không body** (pending Redis 1 giờ), không đăng nhập tự động |
 | GET | `/auth/verify?token=...` | Xác thực email; thành công `204` |
 | POST | `/auth/resend-verification` | Gửi lại email xác minh; **luôn `202`** kể cả email không tồn tại (chống dò tài khoản) |
 | POST | `/auth/login` | BFF gọi Identity; nhận cặp token, chỉ trả access token cho client. Chưa xác minh → `403 identity.email_not_verified` |
