@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ProfileForm } from '@/features/profile/components/profile-form';
+import { useAutoTargetMutation } from '@/features/diet/queries/diet.queries';
 import { useLogBodyMetricMutation } from '@/features/progress/queries/progress.queries';
 import { toLocalInputDateTimeString } from '@/features/progress/utils/progress-date';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -20,6 +21,7 @@ export default function OnboardingPage() {
   const router = useRouter();
   const profile = useAuthStore((state) => state.user?.profile);
   const logWeight = useLogBodyMetricMutation();
+  const autoTarget = useAutoTargetMutation();
   const [weightKg, setWeightKg] = React.useState('');
   const [weightError, setWeightError] = React.useState('');
 
@@ -27,30 +29,39 @@ export default function OnboardingPage() {
   const hasWeight = weightKg.trim() !== '';
 
   const handleSaved = async () => {
-    if (hasWeight) {
-      if (
-        !Number.isFinite(parsedWeight) ||
-        parsedWeight < MIN_WEIGHT_KG ||
-        parsedWeight > MAX_WEIGHT_KG
-      ) {
-        setWeightError(`Cân nặng cần nằm trong khoảng ${MIN_WEIGHT_KG} – ${MAX_WEIGHT_KG} kg.`);
-        return;
-      }
-      try {
-        await logWeight.mutateAsync({
-          loggedAt: toLocalInputDateTimeString(new Date()),
-          weightKg: parsedWeight,
-          bodyFatPercent: null,
-          waistCircumferenceCm: null,
-          systolicBloodPressure: null,
-          diastolicBloodPressure: null,
-          restingHeartRate: null,
-        });
-      } catch {
-        // Lỗi đã được báo bằng toast; hồ sơ vẫn đã lưu nên cho người dùng đi tiếp.
-      }
+    if (!hasWeight) {
+      // Không có cân nặng thì chưa thể auto-target; đưa user tới trang mục tiêu.
+      router.push('/diet/targets');
+      return;
     }
-    router.push('/progress');
+
+    if (
+      !Number.isFinite(parsedWeight) ||
+      parsedWeight < MIN_WEIGHT_KG ||
+      parsedWeight > MAX_WEIGHT_KG
+    ) {
+      setWeightError(`Cân nặng cần nằm trong khoảng ${MIN_WEIGHT_KG} – ${MAX_WEIGHT_KG} kg.`);
+      return;
+    }
+
+    try {
+      await logWeight.mutateAsync({
+        loggedAt: toLocalInputDateTimeString(new Date()),
+        weightKg: parsedWeight,
+        bodyFatPercent: null,
+        waistCircumferenceCm: null,
+        systolicBloodPressure: null,
+        diastolicBloodPressure: null,
+        restingHeartRate: null,
+      });
+
+      const goal = useAuthStore.getState().user?.profile?.goal ?? 'Maintain';
+      await autoTarget.mutateAsync(goal);
+      router.push('/progress');
+    } catch {
+      // Lỗi đã được toast; vẫn cho user sang trang mục tiêu để tự thiết lập.
+      router.push('/diet/targets');
+    }
   };
 
   return (
